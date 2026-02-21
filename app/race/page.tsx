@@ -144,10 +144,10 @@ export default function RacePage() {
       )}
 
       {/* Trivia Modal */}
-      {trivia && (
+      {trivia && trivia.triviaQuestion && trivia.triviaAnswer && (
         <TriviaModal
-          question={trivia.triviaQuestion!}
-          answer={trivia.triviaAnswer!}
+          question={trivia.triviaQuestion}
+          answer={trivia.triviaAnswer}
           pointsValue={trivia.pointsEarned}
           onClose={(correct) => handleTriviaAnswer(correct)}
         />

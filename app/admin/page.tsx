@@ -9,7 +9,7 @@ import Card from "@/components/Card";
 import type { QRCodeConfig } from "@/types";
 
 // Simple mock auth — replace with real auth (NextAuth, Supabase Auth, etc.)
-const ADMIN_PASSWORD = "velocity2024";
+// Password is validated server-side in /api/admin/auth using ADMIN_PASSWORD env var.
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -25,13 +25,24 @@ export default function AdminPage() {
     triviaAnswer: "",
   });
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setAuthenticated(true);
-      setAuthError("");
-    } else {
-      setAuthError("Incorrect password.");
+    setAuthError("");
+    try {
+      // Auth is validated server-side via /api/admin/auth so the password
+      // is never embedded in client-side code.
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setAuthenticated(true);
+      } else {
+        setAuthError("Incorrect password.");
+      }
+    } catch {
+      setAuthError("Auth check failed — please try again.");
     }
   }
 

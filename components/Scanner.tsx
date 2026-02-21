@@ -33,6 +33,7 @@ export default function Scanner({ onScan }: ScannerProps) {
           (decodedText) => {
             onScan(decodedText);
             // Stop after first successful scan
+            // Stopping can throw when the stream has already ended — safe to ignore
             scanner.stop().catch(() => {});
           },
           () => {
@@ -51,6 +52,7 @@ export default function Scanner({ onScan }: ScannerProps) {
 
     return () => {
       if (scannerRef.current) {
+        // Stop can throw if the camera was never fully started — safe to ignore
         scannerRef.current.stop().catch(() => {});
         scannerRef.current = null;
       }
