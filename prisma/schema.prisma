@@ -1,0 +1,75 @@
+// ─── Prisma Schema for Velocity Grand Prix ───────────────────────────────────
+//
+// To use with SQLite (local dev):
+//   1. Run: npx prisma generate
+//   2. Run: npx prisma db push
+//
+// To switch to PostgreSQL (Supabase):
+//   Replace `provider = "sqlite"` with `provider = "postgresql"`
+//   Set DATABASE_URL in .env to your Supabase connection string.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model Team {
+  id          String         @id @default(cuid())
+  name        String
+  /// URL of the AI-generated car image
+  carImageUrl String         @default("")
+  /// AI-generated team slogan
+  slogan      String         @default("")
+  /// Running fuel/points total
+  fuelLevel   Int            @default(0)
+  createdAt   DateTime       @default(now())
+
+  users       User[]
+  scanActivities ScanActivity[]
+}
+
+model User {
+  id        String         @id @default(cuid())
+  name      String
+  role      String         @default("player") // "player" | "admin"
+  createdAt DateTime       @default(now())
+
+  team      Team           @relation(fields: [teamId], references: [id])
+  teamId    String
+
+  scanActivities ScanActivity[]
+}
+
+model QRCode {
+  id              String         @id @default(cuid())
+  /// Unique code string encoded into the QR code itself
+  codeString      String         @unique @default(cuid())
+  /// STANDARD | VIP_EXEC | GOLDEN
+  type            String         @default("STANDARD")
+  pointsValue     Int
+  triviaQuestion  String?
+  triviaAnswer    String?
+
+  scanActivities  ScanActivity[]
+}
+
+model ScanActivity {
+  id           String   @id @default(cuid())
+  pointsEarned Int
+  timestamp    DateTime @default(now())
+
+  team         Team     @relation(fields: [teamId], references: [id])
+  teamId       String
+
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+
+  qrCode       QRCode   @relation(fields: [qrCodeId], references: [id])
+  qrCodeId     String
+}
