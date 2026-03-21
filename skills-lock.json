@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "app-platform-router": {
+      "source": "digitalocean-labs/do-app-platform-skills",
+      "sourceType": "github",
+      "computedHash": "9495a98ece553c3e8939ad96abadbbb13d6e2384857c072e049b2cc19350ad68"
+    },
     "github-issues": {
       "source": "github/awesome-copilot",
       "sourceType": "github",
