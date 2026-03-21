@@ -37,5 +37,3 @@
 
 * Observability: Posthog (with OpenTel)  
 * Testing: Load Testing (TBD)
-
-- 
