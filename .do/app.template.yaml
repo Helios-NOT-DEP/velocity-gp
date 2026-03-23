@@ -1,0 +1,210 @@
+# DigitalOcean App Platform spec for Cloud Team CDA application
+# This spec defines two components:
+#  1) `api` - a container service built using the repository Dockerfile (production multi-stage Dockerfile)
+#  2) `client` - a static site that builds the React client located in client and serves the output
+#
+# NOTE:
+# - This is a template. Update `repo` if your GitHub org or repository name differs.
+# - If you prefer to manage the service differently (e.g. a single Docker image for both API+client), update accordingly.
+# - Keep secrets (DATABASE_URL, JWT_SECRET, etc.) in the DigitalOcean App Platform UI (app settings) or connect via project-level secrets.
+
+name: ${ENV}-velocity-app
+region: nyc
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+databases:
+- cluster_name: ${ENV}-velocity-db-cluster
+  db_name: velocity
+  db_user: velocity
+  engine: PG
+  name: velocity
+  production: true
+  version: "18"
+domains:
+  - domain: ${FULL_DOMAIN} 
+    type: PRIMARY
+    zone: ${DOMAIN}
+features:
+  - buildpack-stack=ubuntu-22
+ingress:
+  rules:
+  - component:
+      name: api
+    match:
+      path:
+        prefix: /api/v1
+  - component:
+      name: client
+    match:
+      path:
+        prefix: /
+services:
+  - build_command: NODE_ENV=development npm install && NODE_ENV=development npm run build:api && NODE_ENV=production npm ci
+    environment_slug: node-js
+    github:
+      branch: ${GITHUB_BRANCH}
+      repo: ${GITHUB_REPOSITORY}
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    name: api
+    run_command: node dist/server/api/server.js
+    source_dir: /
+    envs:
+      - key: NODE_ENV
+        value: "${NODE_ENV}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: PORT
+        value: "${PORT}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: API_PREFIX
+        value: ""
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: CLIENT_BASE_URL
+        value: "${CLIENT_BASE_URL}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DB_HOST
+        value: "${DB_HOST}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DB_PORT
+        value: "${DB_PORT}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DB_NAME
+        value: "${DB_NAME}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DB_USER
+        value: "${DB_USER}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DB_PASSWORD
+        value: "${DB_PASSWORD}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: DB_SSL
+        value: "${DB_SSL}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DB_POOL_MAX
+        value: "${DB_POOL_MAX}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL           
+      - key: JWT_SECRET
+        value: "${JWT_SECRET}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: JWT_EXPIRES_IN
+        value: "${JWT_EXPIRES_IN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: JWT_COOKIE_NAME
+        value: "${JWT_COOKIE_NAME}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: EMAIL_PROVIDER
+        value: "${EMAIL_PROVIDER}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: EMAIL_FROM
+        value: "${EMAIL_FROM}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: EMAIL_FROM_NAME
+        value: "${EMAIL_FROM_NAME}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: SENDGRID_API_KEY
+        value: "${SENDGRID_API_KEY}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: CORS_ORIGIN
+        value: "${CORS_ORIGIN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: LOG_LEVEL
+        value: "${LOG_LEVEL}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: LOG_FORMAT
+        value: "${LOG_FORMAT}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DATABASE_URL
+        value: "${DATABASE_URL}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: VITE_PUBLIC_POSTHOG_KEY
+        value: "${VITE_PUBLIC_POSTHOG_KEY}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: VITE_PUBLIC_POSTHOG_HOST
+        value: "${VITE_PUBLIC_POSTHOG_HOST}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: SPACE_ACCESS_KEY_ID
+        value: "${SPACE_ACCESS_KEY_ID}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: SPACE_SECRET_ACCESS_KEY
+        value: "${SPACE_SECRET_ACCESS_KEY}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: SPACE_ENDPOINT
+        value: "${SPACE_ENDPOINT}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: SPACE_ENDPOINT_DOMAIN
+        value: "${SPACE_ENDPOINT_DOMAIN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: SPACE_BUCKET
+        value: "${SPACE_BUCKET}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: CLIENT_PACKAGE_PATH
+        value: "${CLIENT_PACKAGE_PATH}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: API_PACKAGE_PATH
+        value: "${API_PACKAGE_PATH}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+    # liveness_health_check:
+    #   http_path: /api/v1/health
+    #   period_seconds: 10
+    #   success_threshold: 1
+    #   failure_threshold: 3
+    #   timeout_seconds: 5
+static_sites:
+  - build_command: NODE_ENV=development npm install && NODE_ENV=development npm run build:client
+    environment_slug: node-js
+    github:
+        branch: ${GITHUB_BRANCH}
+        repo: ${GITHUB_REPOSITORY}
+    name: client
+    output_dir: ./dist/client
+    catchall_document: index.html
+    source_dir: /
+    envs:
+      - key: CLIENT_BASE_URL
+        value: "${CLIENT_BASE_URL}"
+      - key: VITE_API_BASE_URL
+        value: "${API_BASE_URL}"
+      - key: VITE_PUBLIC_POSTHOG_KEY
+        value: "${VITE_PUBLIC_POSTHOG_KEY}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: VITE_PUBLIC_POSTHOG_HOST
+        value: "${VITE_PUBLIC_POSTHOG_HOST}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: DEBUG
+        value: "${DEBUG}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL

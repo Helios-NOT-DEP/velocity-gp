@@ -1,0 +1,139 @@
+name: Deploy to Infra to DigitalOcean
+on:
+  # push:
+  #   branches: [main]
+  workflow_call:
+  workflow_dispatch: # allows you to run the workflow manually from the Actions tab
+    inputs:
+      environment:
+        description: "Environment to run against"
+        type: environment
+        required: true
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to DigitalOcean
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    env:
+      DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      DO_APP_ID: ${{ vars.DO_APP_ID || ' ' }}
+      APP_SPEC_PATH: ${{ '.do/app.yaml' }}
+      NODE_ENV: ${{ 'production' }}
+      ENV: ${{ inputs.environment }}
+      PORT: ${{ secrets.PORT || '3000' }}
+      API_PREFIX: ${{ vars.API_PREFIX || '/api/v1' }}
+      DOMAIN: ${{ vars.DOMAIN || 'velocity.app' }}
+      FULL_DOMAIN: ${{ vars.FULL_DOMAIN || 'dev.velocity.app' }}
+      CLIENT_BASE_URL: ${{ vars.CLIENT_BASE_URL || 'https://dev.velocity.app' }}
+      DB_HOST: ${{ vars.DB_HOST || 'localhost' }}
+      DB_PORT: ${{ vars.DB_PORT || '5432' }}
+      DB_NAME: ${{ vars.DB_NAME || 'cda' }}
+      DB_USER: ${{ vars.DB_USER || 'postgres' }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+      DB_SSL: ${{ vars.DB_SSL || 'false' }}
+      DB_POOL_MAX: ${{ vars.DB_POOL_MAX || '20' }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET || 'your-secret-key-change-this-in-production-min-32-characters' }}
+      JWT_EXPIRES_IN: ${{ vars.JWT_EXPIRES_IN || '24h' }}
+      JWT_COOKIE_NAME: ${{ vars.JWT_COOKIE_NAME || 'auth_token' }}
+      SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY || '' }}
+      CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://dev.velocity.app' }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
+      LOG_FORMAT: ${{ vars.LOG_FORMAT || 'json' }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:15432/cda?schema=public&connection_limit=20&pool_timeout=20&connect_timeout=10' }}
+      GITHUB_BRANCH: "${{ github.ref_name }}"
+      GITHUB_REPOSITORY: "${{ github.repository }}"
+      VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY || '' }}
+      VITE_PUBLIC_POSTHOG_HOST: ${{ vars.VITE_PUBLIC_POSTHOG_HOST || '' }}
+      SPACE_ACCESS_KEY_ID: ${{ vars.SPACE_ACCESS_KEY_ID || '' }}
+      SPACE_SECRET_ACCESS_KEY: ${{ secrets.SPACE_SECRET_ACCESS_KEY || '' }}
+      SPACE_ENDPOINT: ${{ vars.SPACE_ENDPOINT || '' }}
+      SPACE_ENDPOINT_DOMAIN: ${{ vars.SPACE_ENDPOINT_DOMAIN || '' }}
+      CLIENT_PACKAGE_PATH: ${{ vars.CLIENT_PACKAGE_PATH || '' }}
+      API_PACKAGE_PATH: ${{ vars.API_PACKAGE_PATH || '' }}
+      DEBUG: ${{ vars.CLIENT_DEBUG || 'false' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # - name: Render App Platform spec from template
+      #   run: |
+      #     node <<'EOF'
+      #     const fs = require('fs');
+      #     const templatePath = '.do/app.template.yaml';
+      #     const outputPath = '.do/app.yaml';
+      #     const template = fs.readFileSync(templatePath, 'utf8');
+      #     const rendered = template.replace(/\${(\w+)}/g, (_, name) => {
+      #       if (!Object.prototype.hasOwnProperty.call(process.env, name)) {
+      #         console.warn(`Environment variable ${name} is missing; defaulting to empty string.`);
+      #         return '';
+      #       }
+      #       return process.env[name];
+      #     });
+      #     fs.writeFileSync(outputPath, rendered);
+      #     console.log(`Rendered ${outputPath}`);
+      #     EOF
+      - name: Replace placeholders in app.yaml
+        uses: danielr1996/envsubst-action@1.0.0
+        with:
+          input: ./.do/app.template.yaml
+          output: ./.do/app.yaml
+
+      - name: Authenticate doctl (DigitalOcean CLI)
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Validate App Spec
+        run: doctl app spec validate ./.do/app.yaml
+
+      - if: vars.DO_APP_ID == ' '
+        name: Create App
+        run: doctl app create --spec ./.do/app.yaml  --format ID,DefaultIngress,Created
+
+      - if: vars.DO_APP_ID != ' '
+        name: Update App
+        run: doctl app update ${{ vars.DO_APP_ID }} --spec ./.do/app.yaml  --format ID,DefaultIngress,Created
+
+      # - name: Trigger DigitalOcean App Platform deployment
+      #   run: |
+      #     set -euo pipefail
+      #     if [ "${DO_APP_ID}" = " " ]; then
+      #       echo "Error: DO_APP_ID secret is not set" >&2
+      #       exit 1
+      #     fi
+      #     if [ -n "${APP_SPEC_PATH}" ]; then
+      #       echo "Updating app spec from: ${APP_SPEC_PATH}"
+      #       doctl apps update "${DO_APP_ID}" --spec "${APP_SPEC_PATH}"
+      #     fi
+      #     echo "Creating a deployment for app id: ${DO_APP_ID}"
+      #     doctl apps create-deployment "${DO_APP_ID}" --wait
+
+      - name: Notify success
+        if: success()
+        run: echo "Production deployment completed successfully."
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-build-artifacts
+          path: |
+            dist
+            build
+
+# Notes for maintainers:
+# - Required repository Secrets (Settings → Secrets & variables → Actions):
+#   - DO_API_TOKEN : DigitalOcean Personal Access Token with `read`/`write` for Apps
+#   - DO_APP_ID    : DigitalOcean App Platform application ID (e.g., abcd-1234)
+# - Optional:
+#   - APP_SPEC_PATH : Path to an app spec file in the repo (e.g., .do/app.yaml) to update the App spec before deployment
+# - Protect the `main` branch and configure environment approvals in the GitHub repo settings
+#   so the deployment only runs after PRs are reviewed & merged and approved by required reviewers.
