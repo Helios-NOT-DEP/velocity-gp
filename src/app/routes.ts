@@ -6,6 +6,7 @@ import PitStop from './pages/PitStop';
 import HeliosProfile from './pages/HeliosProfile';
 import Leaderboard from './pages/Leaderboard';
 import VictoryLane from './pages/VictoryLane';
+import RootLayout from './layouts/RootLayout';
 
 export const router = createBrowserRouter([
   {
@@ -17,23 +18,14 @@ export const router = createBrowserRouter([
     Component: Garage,
   },
   {
-    path: '/race-hub',
-    Component: RaceHub,
-  },
-  {
-    path: '/pit-stop',
-    Component: PitStop,
-  },
-  {
-    path: '/helios',
-    Component: HeliosProfile,
-  },
-  {
-    path: '/leaderboard',
-    Component: Leaderboard,
-  },
-  {
-    path: '/victory-lane',
-    Component: VictoryLane,
+    path: '/',
+    Component: RootLayout,
+    children: [
+      { path: 'race-hub', Component: RaceHub },
+      { path: 'pit-stop', Component: PitStop },
+      { path: 'helios', Component: HeliosProfile },
+      { path: 'leaderboard', Component: Leaderboard },
+      { path: 'victory-lane', Component: VictoryLane },
+    ],
   },
 ]);
