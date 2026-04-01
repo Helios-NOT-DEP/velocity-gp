@@ -4,22 +4,22 @@
   /* Velocity GP Design System - Modern/Edgy */
   --font-heading: 'Space Grotesk', sans-serif;
   --font-body: 'DM Sans', sans-serif;
-  
+
   /* Color Palette - Modern Edge */
   --black-pure: #000000;
-  --black-soft: #0A0A0A;
+  --black-soft: #0a0a0a;
   --gray-900: #111111;
-  --gray-800: #1A1A1A;
-  --gray-700: #2A2A2A;
-  --gray-500: #6B7280;
-  --gray-300: #9CA3AF;
-  --white: #FFFFFF;
-  --blue-electric: #3B82F6;
-  --blue-bright: #60A5FA;
-  --orange-vibrant: #F97316;
-  --red-alert: #EF4444;
-  --green-success: #10B981;
-  
+  --gray-800: #1a1a1a;
+  --gray-700: #2a2a2a;
+  --gray-500: #6b7280;
+  --gray-300: #9ca3af;
+  --white: #ffffff;
+  --blue-electric: #3b82f6;
+  --blue-bright: #60a5fa;
+  --orange-vibrant: #f97316;
+  --red-alert: #ef4444;
+  --green-success: #10b981;
+
   --font-size: 16px;
   --background: var(--black-soft);
   --foreground: var(--white);
