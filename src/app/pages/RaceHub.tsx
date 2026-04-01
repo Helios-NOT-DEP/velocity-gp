@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useGame } from '../context/GameContext';
-import { Scan, Trophy, User, Plus } from 'lucide-react';
+import { Scan, Plus } from 'lucide-react';
 
 export default function RaceHub() {
   const { gameState, addScan, triggerPitStop } = useGame();

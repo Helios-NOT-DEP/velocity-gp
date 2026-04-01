@@ -27,6 +27,8 @@ export default [
         KeyboardEvent: 'readonly',
         RequestInit: 'readonly',
         React: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
       },
     },
     plugins: {

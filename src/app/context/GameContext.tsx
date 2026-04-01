@@ -108,6 +108,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev,
       currentUser: {
         name,
+        email,
         teamId: '',
         isHelios: false,
       },
