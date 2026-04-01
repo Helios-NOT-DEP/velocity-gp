@@ -9,8 +9,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": "./",
-    "paths": { "@/*": ["src/*"] },
-    "ignoreDeprecations": "6.0",
+    "paths": { "@/*": ["src/*"] },    
     "types": ["vite/client"]
   },
   "include": ["src", "tests"]

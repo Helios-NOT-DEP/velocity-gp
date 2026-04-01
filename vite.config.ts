@@ -19,4 +19,23 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+
+  // Disable source maps completely
+  build: {
+    sourcemap: false,
+  },
+
+  // Disable source maps in dev
+  css: {
+    devSourcemap: false,
+  },
+
+  esbuild: {
+    sourcemap: false,
+  },
+
+  // Ignore source maps for node_modules
+  server: {
+    sourcemapIgnoreList: () => true, // Ignore all
+  },
 })
