@@ -25,7 +25,6 @@ jobs:
     env:
       DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       DO_APP_ID: ${{ vars.DO_APP_ID || ' ' }}
-      APP_SPEC_PATH: ${{ '.do/app.yaml' }}
       NODE_ENV: ${{ 'production' }}
       ENV: ${{ inputs.environment }}
       PORT: ${{ secrets.PORT || '3000' }}
@@ -101,20 +100,6 @@ jobs:
       - if: vars.DO_APP_ID != ' '
         name: Update App
         run: doctl app update ${{ vars.DO_APP_ID }} --spec ./.do/app.yaml  --format ID,DefaultIngress,Created
-
-      # - name: Trigger DigitalOcean App Platform deployment
-      #   run: |
-      #     set -euo pipefail
-      #     if [ "${DO_APP_ID}" = " " ]; then
-      #       echo "Error: DO_APP_ID secret is not set" >&2
-      #       exit 1
-      #     fi
-      #     if [ -n "${APP_SPEC_PATH}" ]; then
-      #       echo "Updating app spec from: ${APP_SPEC_PATH}"
-      #       doctl apps update "${DO_APP_ID}" --spec "${APP_SPEC_PATH}"
-      #     fi
-      #     echo "Creating a deployment for app id: ${DO_APP_ID}"
-      #     doctl apps create-deployment "${DO_APP_ID}" --wait
 
       - name: Notify success
         if: success()
