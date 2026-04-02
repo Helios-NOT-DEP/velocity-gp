@@ -20,23 +20,28 @@ export interface ApiResponse<T> {
   ok: boolean;
 }
 
+interface ApiEnvelope<T> {
+  data?: T;
+  error?: {
+    message?: string;
+  };
+  success?: boolean;
+}
+
 /**
  * Base API client for making requests to backend
  */
 export class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api') {
+  constructor(baseUrl: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api') {
     this.baseUrl = baseUrl;
   }
 
   /**
    * Make an HTTP request
    */
-  async request<T>(
-    endpoint: string,
-    options: ApiRequestOptions = {}
-  ): Promise<ApiResponse<T>> {
+  async request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
     const url = this.createUrl(endpoint);
 
     // Add query parameters
@@ -55,7 +60,7 @@ export class ApiClient {
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
-    const data = await response.json();
+    const data = await this.parseResponseBody<T>(response);
 
     return {
       data,
@@ -101,6 +106,30 @@ export class ApiClient {
     const normalizedEndpoint = endpoint.replace(/^\/+/, '');
 
     return new URL(normalizedEndpoint, normalizedBaseUrl);
+  }
+
+  private async parseResponseBody<T>(response: globalThis.Response): Promise<T> {
+    const contentType = response.headers?.get?.('content-type') || 'application/json';
+
+    if (!contentType.includes('application/json')) {
+      return undefined as T;
+    }
+
+    const payload = (await response.json()) as T | ApiEnvelope<T>;
+
+    if (this.isApiEnvelope<T>(payload)) {
+      if (payload.success === false) {
+        throw new Error(payload.error?.message || 'API request failed.');
+      }
+
+      return payload.data as T;
+    }
+
+    return payload as T;
+  }
+
+  private isApiEnvelope<T>(payload: T | ApiEnvelope<T>): payload is ApiEnvelope<T> {
+    return typeof payload === 'object' && payload !== null && 'success' in payload;
   }
 }
 
