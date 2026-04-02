@@ -23,7 +23,7 @@ export interface ApiResponse<T> {
 /**
  * Base API client for making requests to backend
  */
-class ApiClient {
+export class ApiClient {
   private baseUrl: string;
 
   constructor(baseUrl: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api') {
@@ -37,7 +37,7 @@ class ApiClient {
     endpoint: string,
     options: ApiRequestOptions = {}
   ): Promise<ApiResponse<T>> {
-    const url = new URL(endpoint, this.baseUrl);
+    const url = this.createUrl(endpoint);
 
     // Add query parameters
     if (options.params) {
@@ -90,6 +90,17 @@ class ApiClient {
    */
   delete<T>(endpoint: string) {
     return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  private createUrl(endpoint: string): URL {
+    if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(endpoint)) {
+      return new URL(endpoint);
+    }
+
+    const normalizedBaseUrl = this.baseUrl.endsWith('/') ? this.baseUrl : `${this.baseUrl}/`;
+    const normalizedEndpoint = endpoint.replace(/^\/+/, '');
+
+    return new URL(normalizedEndpoint, normalizedBaseUrl);
   }
 }
 
