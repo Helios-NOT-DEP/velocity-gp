@@ -8,7 +8,10 @@
     "dev": "vite",
     "lint": "eslint src --ext .ts,.tsx",
     "test": "vitest",
-    "format": "prettier --write src"
+    "format": "prettier --write src",
+    "db:generate": "prisma generate --schema=src/db/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=src/db/schema.prisma",
+    "db:studio": "prisma studio --schema=src/db/schema.prisma"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.3",
@@ -61,6 +64,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@prisma/client": "^5.22.0",
     "@tailwindcss/vite": "4.1.12",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -72,6 +76,7 @@
     "@vitejs/plugin-react": "4.7.0",
     "eslint": "^10.1.0",
     "prettier": "^3.8.1",
+    "prisma": "^5.22.0",
     "tailwindcss": "4.1.12",
     "typescript": "^6.0.2",
     "vite": "6.3.5",

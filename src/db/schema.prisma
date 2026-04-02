@@ -101,7 +101,7 @@ model Hazard {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  event Race[]  @relation("RaceHazard")
+  event Event  @relation(fields: [eventId], references: [id])
   races RaceHazard[]
 
   @@index([eventId])

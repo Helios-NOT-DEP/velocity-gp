@@ -39,4 +39,31 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
+  // Backend/database files (Node.js environment)
+  {
+    files: ['src/db/**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        global: 'readonly',
+        globalThis: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      ...tseslint.configs.recommended.rules,
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
+  },
 ];
