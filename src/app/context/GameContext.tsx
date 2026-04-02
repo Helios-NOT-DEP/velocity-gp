@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { identifyAnalyticsUser, trackAnalyticsEvent } from '@/services/observability';
 
 export interface Team {
   id: string;
@@ -20,6 +21,7 @@ export interface Scan {
 export interface GameState {
   currentUser: {
     name: string;
+    email: string;
     teamId: string;
     isHelios: boolean;
   } | null;
@@ -104,6 +106,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = (name: string, email: string) => {
+    identifyAnalyticsUser(email, {
+      name,
+      team_id: '',
+      is_helios: false,
+    });
+    trackAnalyticsEvent('auth_login_submitted', {
+      login_channel: email.includes('@') ? 'email' : 'phone',
+    });
+
     setGameState((prev) => ({
       ...prev,
       currentUser: {
@@ -116,6 +127,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const becomeHelios = () => {
+    trackAnalyticsEvent('helios_role_enabled', {
+      player_name: gameState.currentUser?.name ?? 'unknown',
+    });
+
     setGameState((prev) => ({
       ...prev,
       currentUser: prev.currentUser ? { ...prev.currentUser, isHelios: true } : null,
@@ -133,6 +148,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       keywords,
     };
 
+    trackAnalyticsEvent('team_created', {
+      team_id: newTeam.id,
+      team_name: teamName,
+      keyword_count: keywords.length,
+    });
+
     setGameState((prev) => ({
       ...prev,
       teams: [...prev.teams, newTeam],
@@ -147,6 +168,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       points,
       timestamp: new Date(),
     };
+
+    trackAnalyticsEvent('qr_scan_recorded', {
+      points_awarded: points,
+      team_id: gameState.currentTeam?.id ?? 'unknown',
+    });
 
     setGameState((prev) => {
       const updatedTeam = prev.currentTeam
@@ -163,6 +189,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const triggerPitStop = (teamId: string, duration: number) => {
+    trackAnalyticsEvent('pit_stop_started', {
+      team_id: teamId,
+      duration_seconds: duration,
+    });
+
     setGameState((prev) => ({
       ...prev,
       teams: prev.teams.map((team) =>
@@ -176,6 +207,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const clearPitStop = (teamId: string) => {
+    trackAnalyticsEvent('pit_stop_cleared', {
+      team_id: teamId,
+    });
+
     setGameState((prev) => ({
       ...prev,
       teams: prev.teams.map((team) =>

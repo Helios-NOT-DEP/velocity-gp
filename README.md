@@ -35,6 +35,7 @@ Quick links to key docs (full index in [docs/README.md](./docs/README.md)):
 - **Setup & Contributing**: [DEVELOPMENT.md](./DEVELOPMENT.md)
 - **Product Spec**: [BDD Specifications](./docs/product/Velocity%20GP%20BDD%20Specifications.md)
 - **Architecture**: [Tech Stack Needed](./docs/architecture/Tech%20Stack%20Needed.md)
+- **Observability**: [Observability Plan](./docs/architecture/observability.md)
 - **Design System**: [Figma Design Prompt](./docs/design/Figma%20Design%20Prompt.md)
 - **Personas**: [Player, Admin, AI Announcer, etc.](./docs/product/persona/)
 - **Testing**: [tests/README.md](./tests/README.md)
