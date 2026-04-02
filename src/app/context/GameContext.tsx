@@ -89,13 +89,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           return team;
         }),
-        currentTeam: prev.currentTeam && prev.currentTeam.inPitStop && prev.currentTeam.pitStopTimeLeft
-          ? {
-              ...prev.currentTeam,
-              pitStopTimeLeft: Math.max(0, prev.currentTeam.pitStopTimeLeft - 1),
-              inPitStop: prev.currentTeam.pitStopTimeLeft > 1,
-            }
-          : prev.currentTeam,
+        currentTeam:
+          prev.currentTeam && prev.currentTeam.inPitStop && prev.currentTeam.pitStopTimeLeft
+            ? {
+                ...prev.currentTeam,
+                pitStopTimeLeft: Math.max(0, prev.currentTeam.pitStopTimeLeft - 1),
+                inPitStop: prev.currentTeam.pitStopTimeLeft > 1,
+              }
+            : prev.currentTeam,
       }));
     }, 1000);
 
@@ -107,6 +108,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev,
       currentUser: {
         name,
+        email,
         teamId: '',
         isHelios: false,
       },
@@ -135,9 +137,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev,
       teams: [...prev.teams, newTeam],
       currentTeam: newTeam,
-      currentUser: prev.currentUser
-        ? { ...prev.currentUser, teamId: newTeam.id }
-        : null,
+      currentUser: prev.currentUser ? { ...prev.currentUser, teamId: newTeam.id } : null,
     }));
   };
 
@@ -157,9 +157,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...prev,
         scans: [newScan, ...prev.scans].slice(0, 20),
         currentTeam: updatedTeam,
-        teams: prev.teams.map((team) =>
-          team.id === prev.currentTeam?.id ? updatedTeam! : team
-        ),
+        teams: prev.teams.map((team) => (team.id === prev.currentTeam?.id ? updatedTeam! : team)),
       };
     });
   };

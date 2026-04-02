@@ -1,0 +1,33 @@
+{
+  "name": "velocity-gp",
+  "version": "1.0.0",
+  "description": "Velocity GP Game Backend - Multi-player endurance race experience",
+  "tools": [
+    {
+      "name": "get_race_state",
+      "description": "Get current race state for a player"
+    },
+    {
+      "name": "update_hazard_status",
+      "description": "Update hazard status when scanned by player"
+    },
+    {
+      "name": "get_leaderboard",
+      "description": "Get current event leaderboard"
+    },
+    {
+      "name": "initiate_helios_rescue",
+      "description": "Start Helios emergency rescue flow"
+    }
+  ],
+  "resources": [
+    {
+      "name": "game_state",
+      "description": "Current game state for all active players"
+    },
+    {
+      "name": "event_config",
+      "description": "Event configuration and rules"
+    }
+  ]
+}

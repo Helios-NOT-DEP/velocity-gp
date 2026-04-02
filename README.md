@@ -28,16 +28,16 @@ The planned stack is documented in [docs/Tech Stack Needed.md](./docs/Tech%20Sta
 - Authentication: Auth.js email authentication
 - Observability: PostHog with OpenTelemetry
 
-## Product and Spec Docs
+## Documentation
 
-- [Master BDD Index](./docs/Velocity%20GP%20BDD%20Specifications.md)
-- [Persona 1: Player](./docs/persona/player-event-attendee.md)
-- [Persona 2: Helios Player](./docs/persona/helios-player-app-creator.md)
-- [Persona 3: Admin](./docs/persona/admin-event-organizer.md)
-- [Persona 4: System](./docs/persona/system-backend-sync.md)
-- [Persona 5: Display Board](./docs/persona/display-board-venue-visuals.md)
-- [Persona 6: Gen AI Announcer](./docs/persona/gen-ai-announcer.md)
-- [Tech Stack Needed](./docs/Tech%20Stack%20Needed.md)
+Quick links to key docs (full index in [docs/README.md](./docs/README.md)):
+
+- **Setup & Contributing**: [DEVELOPMENT.md](./DEVELOPMENT.md)
+- **Product Spec**: [BDD Specifications](./docs/product/Velocity%20GP%20BDD%20Specifications.md)
+- **Architecture**: [Tech Stack Needed](./docs/architecture/Tech%20Stack%20Needed.md)
+- **Design System**: [Figma Design Prompt](./docs/design/Figma%20Design%20Prompt.md)
+- **Personas**: [Player, Admin, AI Announcer, etc.](./docs/product/persona/)
+- **Testing**: [tests/README.md](./tests/README.md)
 
 ## Backlog and Workflow
 
@@ -49,30 +49,43 @@ When implementing features, keep documentation and code aligned with the relevan
 
 ## Development
 
-Install dependencies, then run:
+**For full setup instructions, conventions, and workflow see [DEVELOPMENT.md](./DEVELOPMENT.md).**
+
+Quick start:
 
 ```bash
-npm run dev
-```
-
-To create a production build:
-
-```bash
-npm run build
+npm install
+npm run dev        # Start dev server at http://localhost:5173
+npm run build      # Create production bundle
+npm run lint       # Check code style
+npm test          # Run test suite
 ```
 
 ## Project Structure
 
-- `src/app/pages`: route-level screens
-- `src/app/components/ui`: reusable UI primitives
-- `src/app/components/figma`: design-derived components
-- `src/app/context`: shared state and providers
-- `src/styles`: Tailwind entry and theme styles
-- `docs`: product, architecture, and planning documentation
+```
+src/
+  ├── app/              # Pages, layouts, and React components
+  ├── components/       # Reusable UI primitives and design components
+  ├── services/         # Business logic (auth, API, game)
+  ├── models/           # Domain types (Player, Team, Race, etc.)
+  ├── hooks/            # Custom React hooks
+  ├── utils/            # Helper functions
+  ├── db/               # Database (Prisma) configuration
+  └── styles/           # Tailwind and theme styles
+
+docs/                   # Complete documentation (see docs/README.md)
+tests/                  # Automated tests
+scripts/                # Development scripts
+.mcp/                   # Model Context Protocol config
+```
 
 ## Implementation Guidance
 
-- Prefer existing UI primitives before adding new component patterns.
-- Keep route concerns in pages and shared logic in reusable modules when reuse is real.
-- Preserve typed interfaces and clear boundaries for future auth, data, and service integrations.
-- Avoid coupling UI components directly to future backend providers; align with the planned stack instead.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed conventions. Key principles:
+
+- ✅ Reuse UI primitives from `src/app/components/ui/` before adding new patterns
+- ✅ Keep route concerns in pages, share logic via services or custom hooks
+- ✅ Use typed interfaces for clear boundaries (auth, API, state)
+- ✅ Align with the planned stack for future backend integration
+- ❌ Avoid: UI components coupled to backend providers, hardcoded config values
