@@ -40,4 +40,26 @@ describe('ApiClient', () => {
       expect.objectContaining({ method: 'GET' })
     );
   });
+
+  it('returns failed API envelopes without rejecting the request promise', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      headers: {
+        get: vi.fn().mockReturnValue('application/json'),
+      },
+      json: vi.fn().mockResolvedValue({
+        success: false,
+        error: { message: 'Request validation failed.' },
+      }),
+      ok: false,
+      status: 400,
+    } as unknown as Response);
+
+    const client = new ApiClient('http://localhost:4000/api');
+
+    await expect(client.post('/players', { email: 'not-an-email' })).resolves.toEqual({
+      data: undefined,
+      ok: false,
+      status: 400,
+    });
+  });
 });

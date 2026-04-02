@@ -118,10 +118,6 @@ export class ApiClient {
     const payload = (await response.json()) as T | ApiEnvelope<T>;
 
     if (this.isApiEnvelope<T>(payload)) {
-      if (payload.success === false) {
-        throw new Error(payload.error?.message || 'API request failed.');
-      }
-
       return payload.data as T;
     }
 
