@@ -3,6 +3,7 @@ import type { EventSummary } from '../contracts/domain.js';
 import { placeholderEvent } from './placeholderData.js';
 
 export function listEvents(): EventSummary[] {
+  // TODO: Query all events from database
   return [
     placeholderEvent,
     {
@@ -16,6 +17,7 @@ export function listEvents(): EventSummary[] {
 }
 
 export function getEvent(eventId: string): EventSummary {
+  // TODO: Query event from database
   return {
     ...placeholderEvent,
     id: eventId,
@@ -23,5 +25,6 @@ export function getEvent(eventId: string): EventSummary {
 }
 
 export function getCurrentEvent(): EventSummary {
+  // TODO: Query current event from database
   return placeholderEvent;
 }

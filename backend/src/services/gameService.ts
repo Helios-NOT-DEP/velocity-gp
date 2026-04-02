@@ -8,6 +8,7 @@ import type {
 import { createIsoDate, placeholderPlayer, placeholderTeam } from './placeholderData.js';
 
 export function getRaceState(eventId: string, playerId: string): GetRaceStateResponse {
+  // TODO: Query real race state from database
   return {
     playerId,
     eventId,
@@ -24,6 +25,7 @@ export function updateHazardStatus(
   playerId: string,
   request: HazardStatusUpdateRequest
 ): HazardStatusUpdateResponse {
+  // TODO: Persist hazard status update to database
   return {
     eventId,
     playerId,
@@ -34,6 +36,7 @@ export function updateHazardStatus(
 }
 
 export function getLeaderboard(eventId: string): LeaderboardEntry[] {
+  // TODO: Query real leaderboard data from database
   return [
     {
       rank: 1,

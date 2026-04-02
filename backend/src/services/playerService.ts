@@ -7,6 +7,7 @@ import type {
 import { createIsoDate, placeholderPlayer } from './placeholderData.js';
 
 export function createPlayer(request: CreatePlayerRequest): PlayerProfile {
+  // TODO: Save player to database and generate real ID
   return {
     id: 'player-generated-placeholder',
     email: request.email,
@@ -17,6 +18,7 @@ export function createPlayer(request: CreatePlayerRequest): PlayerProfile {
 }
 
 export function getPlayerProfile(playerId: string): PlayerProfile {
+  // TODO: Query player profile from database
   return {
     ...placeholderPlayer,
     id: playerId,
@@ -24,6 +26,7 @@ export function getPlayerProfile(playerId: string): PlayerProfile {
 }
 
 export function updatePlayerProfile(playerId: string, request: UpdatePlayerRequest): PlayerProfile {
+  // TODO: Persist player profile updates to database
   return {
     ...placeholderPlayer,
     id: playerId,

@@ -6,6 +6,7 @@ export function createIsoDate(offsetMinutes: number = 0): string {
   return new Date(baseTimestamp.getTime() + offsetMinutes * 60_000).toISOString();
 }
 
+// TODO: Replace with real event data from database
 export const placeholderEvent: EventSummary = {
   id: 'event-123',
   name: 'Velocity GP Spring Qualifier',
@@ -14,6 +15,7 @@ export const placeholderEvent: EventSummary = {
   status: 'ACTIVE',
 };
 
+// TODO: Replace with real player data from database
 export const placeholderPlayer: PlayerProfile = {
   id: 'player-123',
   email: 'driver@velocitygp.dev',
@@ -22,6 +24,7 @@ export const placeholderPlayer: PlayerProfile = {
   createdAt: createIsoDate(-240),
 };
 
+// TODO: Replace with real team data from database
 export const placeholderTeam: Team = {
   id: 'team-123',
   name: 'Helios Hyperdrive',
@@ -30,6 +33,7 @@ export const placeholderTeam: Team = {
   score: 1280,
 };
 
+// TODO: Replace with real hazard data from database
 export const placeholderHazards: Hazard[] = [
   {
     id: 'hazard-001',

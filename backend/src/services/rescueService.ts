@@ -7,6 +7,7 @@ import type {
 import { createIsoDate, placeholderEvent, placeholderPlayer } from './placeholderData.js';
 
 export function initiateRescue(request: InitiateRescueRequest): HeliosRescueFlow {
+  // TODO: Create rescue request in database
   return {
     playerId: request.playerId,
     eventId: request.eventId,
@@ -16,6 +17,7 @@ export function initiateRescue(request: InitiateRescueRequest): HeliosRescueFlow
 }
 
 export function getRescueStatus(playerId: string): HeliosRescueFlow {
+  // TODO: Query rescue status from database
   return {
     playerId,
     eventId: placeholderEvent.id,
@@ -25,6 +27,7 @@ export function getRescueStatus(playerId: string): HeliosRescueFlow {
 }
 
 export function completeRescue(playerId: string): RescueCompletionResponse {
+  // TODO: Mark rescue as completed in database
   return {
     playerId,
     completedAt: createIsoDate(15),
