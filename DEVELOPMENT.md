@@ -19,6 +19,12 @@ npm install
 
 This installs all required packages including React, TypeScript, Tailwind, Radix UI, and development tools.
 
+To install the new backend package as well, run:
+
+```bash
+npm --prefix backend install
+```
+
 ### 2. Start Development Server
 
 ```bash
@@ -26,6 +32,14 @@ npm run dev
 ```
 
 The app opens to `http://localhost:5173` by default. Changes to files are hot-reloaded automatically.
+
+To run both the frontend and backend together:
+
+```bash
+npm run dev:all
+```
+
+The backend BFF listens on `http://localhost:4000` and serves its API under `/api`.
 
 ### 3. Build for Production
 
@@ -67,13 +81,17 @@ docs/
 
 ## Key Commands
 
-| Command | Purpose |
-|---------|---------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run lint` | Run ESLint |
-| `npm run format` | Format code with Prettier |
-| `npm test` | Run Vitest (unit & integration tests) |
+| Command             | Purpose                               |
+| ------------------- | ------------------------------------- |
+| `npm run dev`       | Start development server              |
+| `npm run dev:all`   | Start frontend and backend together   |
+| `npm run api:dev`   | Start only the backend BFF            |
+| `npm run build`     | Build for production                  |
+| `npm run api:build` | Build the backend BFF                 |
+| `npm run lint`      | Run ESLint                            |
+| `npm run format`    | Format code with Prettier             |
+| `npm test`          | Run Vitest (unit & integration tests) |
+| `npm run api:test`  | Run backend integration tests         |
 
 ## Coding Conventions
 
@@ -119,9 +137,7 @@ HTTP client for backend communication.
 ```typescript
 import { apiClient, gameEndpoints } from '@/services/api';
 
-const response = await apiClient.get(
-  gameEndpoints.getRaceState(eventId, playerId)
-);
+const response = await apiClient.get(gameEndpoints.getRaceState(eventId, playerId));
 ```
 
 ### Game (`src/services/game/`)
@@ -147,11 +163,13 @@ npm test -- game.test.ts  # Run specific test
 ```
 
 Tests should cover:
+
 - ✅ Unit: utils, services, hooks
 - ✅ Integration: page flows, API calls
 - ❌ Avoid: implementation details, internal state
 
 Prefer `@testing-library/react` patterns:
+
 ```typescript
 import { render, screen } from '@testing-library/react';
 
@@ -169,21 +187,25 @@ Copy `.env.example` to `.env.local` and update as needed:
 cp .env.example .env.local
 ```
 
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:3000/api` |
-| `VITE_EVENT_ID` | Current event | `event-123` |
+| Variable            | Purpose         | Example                     |
+| ------------------- | --------------- | --------------------------- |
+| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:4000/api` |
+| `VITE_EVENT_ID`     | Current event   | `event-123`                 |
+
+The backend package has its own `backend/.env.example` file for server-side configuration.
 
 **Never commit `.env.local`** — it's in `.gitignore`.
 
 ## Git Workflow
 
 1. **Create a feature branch** from `main`:
+
    ```bash
    git checkout -b feat/player-profile
    ```
 
 2. **Make focused commits** with conventional messages:
+
    ```bash
    git commit -m "feat: add player profile page"
    git commit -m "fix: correct hazard penalty calculation"
@@ -212,12 +234,12 @@ cp .env.example .env.local
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| Hot reload not working | Restart `npm run dev` |
-| Styles not applying | Check Tailwind class names, run `npm run build` to verify |
-| Import errors | Verify `@/` alias is in `tsconfig.json` |
-| Tests failing | Check mock data in `tests/fixtures/` |
+| Issue                  | Solution                                                  |
+| ---------------------- | --------------------------------------------------------- |
+| Hot reload not working | Restart `npm run dev`                                     |
+| Styles not applying    | Check Tailwind class names, run `npm run build` to verify |
+| Import errors          | Verify `@/` alias is in `tsconfig.json`                   |
+| Tests failing          | Check mock data in `tests/fixtures/`                      |
 
 ## Documentation
 
