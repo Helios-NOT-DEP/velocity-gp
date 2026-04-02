@@ -7,6 +7,10 @@
  * @module services/api
  */
 
+import { SpanStatusCode } from '@opentelemetry/api';
+
+import { withTelemetrySpan } from '../observability';
+
 export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
@@ -46,22 +50,43 @@ export class ApiClient {
       });
     }
 
-    const response = await fetch(url.toString(), {
-      method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
+    return withTelemetrySpan(
+      'api.request',
+      {
+        attributes: {
+          'app.api.endpoint': endpoint,
+          'http.method': options.method || 'GET',
+          'url.full': url.toString(),
+        },
       },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+      async (span) => {
+        const response = await fetch(url.toString(), {
+          method: options.method || 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+          body: options.body ? JSON.stringify(options.body) : undefined,
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    return {
-      data,
-      status: response.status,
-      ok: response.ok,
-    };
+        span?.setAttribute('http.response.status_code', response.status);
+
+        if (!response.ok) {
+          span?.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: `Request failed with status ${response.status}`,
+          });
+        }
+
+        return {
+          data,
+          status: response.status,
+          ok: response.ok,
+        };
+      }
+    );
   }
 
   /**
