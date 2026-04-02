@@ -26,10 +26,13 @@ export default function PitStop() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6" style={{ fontFamily: 'var(--font-body)' }}>
+    <div
+      className="min-h-screen bg-black flex flex-col items-center justify-center p-6"
+      style={{ fontFamily: 'var(--font-body)' }}
+    >
       {/* Red accent overlay */}
       <div className="fixed inset-0 bg-gradient-to-br from-red-600/20 via-black to-red-900/20 -z-10" />
-      
+
       <div className="w-full max-w-md">
         {/* Icon */}
         <div className="flex justify-center mb-8">
@@ -39,15 +42,13 @@ export default function PitStop() {
         </div>
 
         {/* Title */}
-        <h1 
+        <h1
           className="text-4xl font-bold text-center mb-3 text-white"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
           PIT STOP PENALTY
         </h1>
-        <p className="text-center text-gray-400 mb-8">
-          Hot Potato hazard detected
-        </p>
+        <p className="text-center text-gray-400 mb-8">Hot Potato hazard detected</p>
 
         {/* Timer Card */}
         <div className="bg-gray-900 border-2 border-red-500/50 rounded-2xl p-8 mb-6">
@@ -55,8 +56,8 @@ export default function PitStop() {
             <Clock className="w-6 h-6 text-red-400" />
             <p className="text-red-400 font-medium">Time Remaining</p>
           </div>
-          
-          <div 
+
+          <div
             className="text-7xl font-bold text-center tabular-nums text-white mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
@@ -64,9 +65,7 @@ export default function PitStop() {
           </div>
 
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-            <p className="text-center text-red-400 text-sm font-medium">
-              Scanner Disabled
-            </p>
+            <p className="text-center text-red-400 text-sm font-medium">Scanner Disabled</p>
           </div>
         </div>
 
@@ -94,7 +93,7 @@ export default function PitStop() {
           Scan Helios QR (Demo)
         </button>
 
-        <button 
+        <button
           onClick={() => navigate('/race-hub')}
           className="w-full py-4 rounded-xl font-semibold bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors"
         >

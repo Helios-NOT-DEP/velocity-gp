@@ -64,7 +64,10 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#111111] text-white" style={{ fontFamily: 'var(--font-body)' }}>
+    <div
+      className="min-h-screen bg-[#111111] text-white"
+      style={{ fontFamily: 'var(--font-body)' }}
+    >
       {/* F1-Style Top Bar */}
       <div className="bg-[#1a1a1a] border-b border-[#333]">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-3 lg:px-8">
@@ -72,16 +75,28 @@ export default function Leaderboard() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="bg-red-600 px-2 py-0.5 rounded-sm">
-                <span className="text-xs tracking-widest" style={{ fontFamily: 'var(--font-heading)' }}>V-GP</span>
+                <span
+                  className="text-xs tracking-widest"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  V-GP
+                </span>
               </div>
               <div className="text-gray-400 text-xs">
-                <span className="text-white" style={{ fontFamily: 'var(--font-heading)' }}>RACE</span>
+                <span className="text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                  RACE
+                </span>
               </div>
             </div>
             <div className="hidden sm:block h-6 w-px bg-[#333]" />
             <div className="hidden sm:flex items-center gap-2">
               <div className="bg-gradient-to-r from-[#3B82F6] to-[#F97316] px-4 py-1 rounded-sm">
-                <span className="text-xs tracking-wider" style={{ fontFamily: 'var(--font-heading)' }}>VELOCITY GRAND PRIX</span>
+                <span
+                  className="text-xs tracking-wider"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  VELOCITY GRAND PRIX
+                </span>
               </div>
             </div>
           </div>
@@ -94,7 +109,10 @@ export default function Leaderboard() {
 
           {/* Right: Clock */}
           <div className="flex items-center gap-4">
-            <span className="text-3xl lg:text-4xl tabular-nums tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+            <span
+              className="text-3xl lg:text-4xl tabular-nums tracking-tight"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
               {formatTime(currentTime)}
             </span>
           </div>
@@ -149,11 +167,7 @@ export default function Leaderboard() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.03 }}
                 className={`grid grid-cols-[40px_4px_1fr_80px_100px] lg:grid-cols-[50px_4px_1fr_100px_120px_120px] items-center px-3 py-2.5 lg:py-3 transition-colors ${
-                  isPitStop
-                    ? 'bg-red-950/30'
-                    : index % 2 === 0
-                    ? 'bg-[#151515]'
-                    : 'bg-[#1a1a1a]'
+                  isPitStop ? 'bg-red-950/30' : index % 2 === 0 ? 'bg-[#151515]' : 'bg-[#1a1a1a]'
                 } hover:bg-[#222] group`}
               >
                 {/* Position */}
@@ -163,10 +177,10 @@ export default function Leaderboard() {
                       index === 0
                         ? 'text-yellow-400'
                         : index === 1
-                        ? 'text-gray-300'
-                        : index === 2
-                        ? 'text-orange-400'
-                        : 'text-gray-500'
+                          ? 'text-gray-300'
+                          : index === 2
+                            ? 'text-orange-400'
+                            : 'text-gray-500'
                     }`}
                     style={{ fontFamily: 'var(--font-heading)' }}
                   >
@@ -175,16 +189,11 @@ export default function Leaderboard() {
                 </div>
 
                 {/* Team Color Bar */}
-                <div
-                  className="w-1 h-8 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
+                <div className="w-1 h-8 rounded-full" style={{ backgroundColor: color }} />
 
                 {/* Team Name */}
                 <div className="flex items-center gap-3 pl-3 min-w-0">
-                  {isPitStop && (
-                    <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                  )}
+                  {isPitStop && <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span
@@ -235,7 +244,8 @@ export default function Leaderboard() {
                 <div className="hidden lg:flex justify-end">
                   {isPitStop ? (
                     <span className="px-2 py-0.5 bg-red-600/80 text-white text-[10px] tracking-wider rounded-sm">
-                      PIT {Math.floor((team.pitStopTimeLeft || 0) / 60)}:{String((team.pitStopTimeLeft || 0) % 60).padStart(2, '0')}
+                      PIT {Math.floor((team.pitStopTimeLeft || 0) / 60)}:
+                      {String((team.pitStopTimeLeft || 0) % 60).padStart(2, '0')}
                     </span>
                   ) : isTopThree ? (
                     <span className="px-2 py-0.5 bg-green-600/30 text-green-400 text-[10px] tracking-wider rounded-sm">
@@ -267,7 +277,8 @@ export default function Leaderboard() {
             }}
             className="whitespace-nowrap py-3 px-4 text-sm text-gray-400"
           >
-            {commentary} &nbsp;&nbsp;•&nbsp;&nbsp; {commentary} &nbsp;&nbsp;•&nbsp;&nbsp; {commentary} &nbsp;&nbsp;•&nbsp;&nbsp; {commentary}
+            {commentary} &nbsp;&nbsp;•&nbsp;&nbsp; {commentary} &nbsp;&nbsp;•&nbsp;&nbsp;{' '}
+            {commentary} &nbsp;&nbsp;•&nbsp;&nbsp; {commentary}
           </motion.div>
         </div>
       </div>

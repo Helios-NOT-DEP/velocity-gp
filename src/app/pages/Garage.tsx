@@ -17,13 +17,15 @@ export default function Garage() {
 
   const handleGenerate = () => {
     if (!keyword1 || !keyword2 || !keyword3) return;
-    
+
     setIsGenerating(true);
-    
+
     setTimeout(() => {
       const teamName = `${keyword1} ${keyword3}s`;
       setGeneratedTeamName(teamName);
-      setGeneratedCarImage('https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&h=500&fit=crop');
+      setGeneratedCarImage(
+        'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&h=500&fit=crop'
+      );
       setIsGenerating(false);
       setIsComplete(true);
     }, 2500);
@@ -43,31 +45,25 @@ export default function Garage() {
             <Sparkles className="w-4 h-4 text-blue-400" />
             <span className="text-sm font-medium text-blue-400">AI Design Studio</span>
           </div>
-          <h1 
+          <h1
             className="text-4xl font-bold text-white mb-2"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
             Create Your Team
           </h1>
-          <p className="text-gray-400">
-            Generate a unique team identity using AI
-          </p>
+          <p className="text-gray-400">Generate a unique team identity using AI</p>
         </div>
 
         {/* Car Preview */}
         <div className="mb-8">
-          <div 
-            className="w-full aspect-[16/10] rounded-2xl overflow-hidden bg-gray-900 border border-gray-800 relative"
-          >
+          <div className="w-full aspect-[16/10] rounded-2xl overflow-hidden bg-gray-900 border border-gray-800 relative">
             {!isGenerating && !isComplete && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-orange-500/20 border border-gray-700 flex items-center justify-center">
                     <Sparkles className="w-10 h-10 text-gray-600" />
                   </div>
-                  <p className="text-gray-500 text-sm">
-                    Your AI-generated car will appear here
-                  </p>
+                  <p className="text-gray-500 text-sm">Your AI-generated car will appear here</p>
                 </div>
               </div>
             )}
@@ -86,14 +82,14 @@ export default function Garage() {
 
             {isComplete && (
               <>
-                <img 
-                  src={generatedCarImage} 
+                <img
+                  src={generatedCarImage}
                   alt="Generated F1 Car"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
                 <div className="absolute bottom-6 left-6 right-6">
-                  <h2 
+                  <h2
                     className="text-3xl font-bold text-white"
                     style={{ fontFamily: 'var(--font-heading)' }}
                   >
@@ -101,7 +97,7 @@ export default function Garage() {
                   </h2>
                   <div className="flex gap-2 mt-3">
                     {[keyword1, keyword2, keyword3].map((kw, i) => (
-                      <span 
+                      <span
                         key={i}
                         className="px-3 py-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-xs text-white"
                       >
@@ -118,9 +114,7 @@ export default function Garage() {
         {/* Input Fields */}
         <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Keyword 1
-            </label>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Keyword 1</label>
             <input
               type="text"
               placeholder="e.g., Fast"
@@ -130,11 +124,9 @@ export default function Garage() {
               className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50"
             />
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Keyword 2
-            </label>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Keyword 2</label>
             <input
               type="text"
               placeholder="e.g., Corporate"
@@ -144,11 +136,9 @@ export default function Garage() {
               className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50"
             />
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Keyword 3
-            </label>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Keyword 3</label>
             <input
               type="text"
               placeholder="e.g., Tiger"

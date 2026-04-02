@@ -37,3 +37,31 @@
 
 * Observability: Posthog (with OpenTel)  
 * Testing: Load Testing (TBD)
+
+---
+
+# Project Structure
+
+src/
+  ├── app/ → pages/, layouts/
+  ├── components/ → ui/, figma/
+  ├── models/ → domain types
+  ├── services/ → auth/, api/, game/
+  ├── hooks/
+  ├── utils/
+  ├── db/ → (future: Prisma)
+  └── types/
+
+tests/
+  ├── unit/
+  ├── integration/
+  └── fixtures/
+
+docs/
+  ├── architecture/
+  ├── product/
+  ├── design/
+  └── contributing/
+
+scripts/
+.mcp/
