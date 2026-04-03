@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router';
-import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Garage from './pages/Garage';
 import RaceHub from './pages/RaceHub';
 import PitStop from './pages/PitStop';
@@ -11,7 +11,7 @@ import RootLayout from './layouts/RootLayout';
 export const router = createBrowserRouter([
   {
     path: '/',
-    Component: Login,
+    Component: Signup,
   },
   {
     path: '/garage',
