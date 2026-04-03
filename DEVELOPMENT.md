@@ -82,6 +82,7 @@ docs/
 | `npm run dev:web`   | Start only the web app              |
 | `npm run dev:api`   | Start only the backend BFF          |
 | `npm run build`     | Build all workspaces                |
+| `npm run db:seed`   | Seed API database test data         |
 | `npm run lint`      | Run ESLint across workspaces        |
 | `npm run format`    | Format the web workspace            |
 | `npm test`          | Run workspace test suites           |

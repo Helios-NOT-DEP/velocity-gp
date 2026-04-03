@@ -17,7 +17,8 @@
     "format": "npm run format --workspace=@velocity-gp/web",
     "db:generate": "npm run db:generate --workspace=@velocity-gp/api",
     "db:migrate": "npm run db:migrate --workspace=@velocity-gp/api",
-    "db:studio": "npm run db:studio --workspace=@velocity-gp/api"
+    "db:studio": "npm run db:studio --workspace=@velocity-gp/api",
+    "db:seed": "npm run db:seed --workspace=@velocity-gp/api"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

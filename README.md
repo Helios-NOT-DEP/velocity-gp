@@ -59,6 +59,7 @@ npm install
 npm run dev:web    # Start web app at http://localhost:5173
 npm run dev:api    # Start the backend BFF at http://localhost:4000
 npm run dev        # Start both services together
+npm run db:seed    # Seed API database with deterministic test data
 npm run build      # Create production bundle
 npm run lint       # Check code style
 npm test          # Run test suite
