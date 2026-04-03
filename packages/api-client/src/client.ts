@@ -53,6 +53,7 @@ export class ApiClient {
 
     const response = await fetch(url.toString(), {
       method: options.method || 'GET',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,

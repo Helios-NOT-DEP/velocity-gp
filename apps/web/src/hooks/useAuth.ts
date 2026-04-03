@@ -1,13 +1,35 @@
-﻿import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-/**
- * Minimal example hook. Replace with real auth logic later.
- */
+import { getSession, type AuthSession } from '../services/auth';
+
 export function useAuth() {
-  const [user, setUser] = useState(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    // placeholder: load from auth provider / localStorage
-    setUser(null);
+    let isMounted = true;
+
+    void getSession()
+      .then((nextSession) => {
+        if (isMounted) {
+          setSession(nextSession);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
-  return { user, setUser };
+
+  return {
+    user: session?.user ?? null,
+    session,
+    isAuthenticated: Boolean(session?.isAuthenticated && session.user),
+    isLoading,
+  };
 }

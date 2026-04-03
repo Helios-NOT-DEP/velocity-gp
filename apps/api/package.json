@@ -18,6 +18,8 @@
     "db:studio": "prisma studio --schema=src/db/schema.prisma"
   },
   "dependencies": {
+    "@auth/express": "^0.11.0",
+    "@auth/prisma-adapter": "^2.10.0",
     "@prisma/client": "^5.22.0",
     "@velocity-gp/api-contract": "0.1.0",
     "cors": "^2.8.5",
@@ -28,6 +30,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@auth/core": "^0.41.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^25.5.0",

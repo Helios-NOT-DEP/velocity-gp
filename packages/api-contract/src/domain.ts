@@ -114,3 +114,24 @@ export interface RescueCompletionResponse {
   readonly completedAt: string;
   readonly status: Extract<RescueStatus, 'COMPLETED'>;
 }
+
+export interface AuthenticatedPlayerContext {
+  readonly playerId: string | null;
+  readonly eventId: string | null;
+  readonly teamId: string | null;
+  readonly hasTeam: boolean;
+}
+
+export interface AuthenticatedUserProfile {
+  readonly id: string;
+  readonly email: string;
+  readonly name: string | null;
+  readonly image: string | null;
+  readonly player: AuthenticatedPlayerContext;
+}
+
+export interface AuthSessionResponse {
+  readonly isAuthenticated: boolean;
+  readonly expires: string | null;
+  readonly user: AuthenticatedUserProfile | null;
+}

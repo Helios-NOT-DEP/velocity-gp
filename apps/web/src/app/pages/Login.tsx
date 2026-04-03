@@ -1,21 +1,35 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
-import { useGame } from '../context/GameContext';
 import { Zap } from 'lucide-react';
+import { sendVerificationEmail } from '@/services/auth';
 
 export default function Login() {
-  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const navigate = useNavigate();
-  const { login } = useGame();
+  const [statusMessage, setStatusMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (emailOrPhone && name) {
-      login(name, emailOrPhone);
-      navigate('/garage');
+    setStatusMessage('');
+    setErrorMessage('');
+
+    if (!email || !name) {
+      setErrorMessage('Enter your work email and full name to continue.');
+      return;
     }
-  };
+
+    setIsSubmitting(true);
+
+    try {
+      await sendVerificationEmail(email);
+      setStatusMessage('Check your messages for your secure access link!');
+    } catch {
+      setErrorMessage('We could not send your secure link yet. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div
@@ -52,12 +66,12 @@ export default function Login() {
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Email or Phone</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Work Email</label>
               <input
-                type="text"
-                placeholder="your@email.com"
-                value={emailOrPhone}
-                onChange={(e) => setEmailOrPhone(e.target.value)}
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 bg-black border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 style={{ fontFamily: 'var(--font-body)' }}
               />
@@ -77,14 +91,18 @@ export default function Login() {
 
             <button
               type="submit"
+              disabled={isSubmitting}
               className="w-full py-4 rounded-xl font-semibold text-white transition-all duration-200 hover:opacity-90 mt-6"
               style={{
                 background: 'linear-gradient(135deg, #3B82F6 0%, #F97316 100%)',
                 fontFamily: 'var(--font-body)',
               }}
             >
-              Continue to Event
+              {isSubmitting ? 'Sending Secure Link...' : 'Send Secure Link'}
             </button>
+
+            {statusMessage ? <p className="text-sm text-emerald-400">{statusMessage}</p> : null}
+            {errorMessage ? <p className="text-sm text-red-400">{errorMessage}</p> : null}
           </form>
         </div>
 

@@ -20,7 +20,7 @@ describe('ApiClient', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3000/api/events/monaco',
-      expect.objectContaining({ method: 'GET' })
+      expect.objectContaining({ method: 'GET', credentials: 'include' })
     );
   });
 
@@ -37,7 +37,7 @@ describe('ApiClient', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://example.com/health',
-      expect.objectContaining({ method: 'GET' })
+      expect.objectContaining({ method: 'GET', credentials: 'include' })
     );
   });
 
