@@ -1,0 +1,8 @@
+{
+  "extends": "@velocity-gp/config-typescript/node.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src", "tests"]
+}

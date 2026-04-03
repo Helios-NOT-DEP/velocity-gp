@@ -17,13 +17,7 @@ Welcome to Velocity GP! This guide walks you through setting up your development
 npm install
 ```
 
-This installs all required packages including React, TypeScript, Tailwind, Radix UI, and development tools.
-
-To install the new backend package as well, run:
-
-```bash
-npm --prefix backend install
-```
+This installs every workspace package from the root, including `apps/web`, `apps/api`, and all shared `packages/*` modules.
 
 ### 2. Start Development Server
 
@@ -31,15 +25,16 @@ npm --prefix backend install
 npm run dev
 ```
 
-The app opens to `http://localhost:5173` by default. Changes to files are hot-reloaded automatically.
+`npm run dev` starts both apps. The web app opens to `http://localhost:5173` and the API listens on `http://localhost:4000`.
 
-To run both the frontend and backend together:
+To run only one side:
 
 ```bash
-npm run dev:all
+npm run dev:web
+npm run dev:api
 ```
 
-The backend BFF listens on `http://localhost:4000` and serves its API under `/api`.
+The backend BFF serves its API under `/api`.
 
 ### 3. Build for Production
 
@@ -47,30 +42,30 @@ The backend BFF listens on `http://localhost:4000` and serves its API under `/ap
 npm run build
 ```
 
-Creates an optimized bundle in `dist/` ready for deployment.
+Builds shared packages, `apps/api/dist`, and `apps/web/dist`.
 
 ## Project Structure
 
 ```
-src/
-  ├── app/               # Route pages and layouts
-  │   ├── pages/         # Route-level screens
-  │   ├── components/    # Reusable UI components
-  │   ├── context/       # Shared state (GameContext)
-  │   └── routes.ts      # Route definitions
-  ├── services/          # Business logic & integrations
-  │   ├── auth/          # Authentication
-  │   ├── api/           # HTTP client & endpoints
-  │   └── game/          # Game mechanics
-  ├── models/            # Domain types
+apps/web/src/
+  ├── app/               # Route pages, layouts, and app-local components
+  ├── services/          # Web auth, game, API instance, and observability logic
   ├── hooks/             # Custom React hooks
   ├── utils/             # Utility functions
   └── styles/            # Global CSS & themes
 
-tests/
-  ├── unit/              # Component & utility tests
-  ├── integration/       # Page & flow tests
-  └── fixtures/          # Mock data
+apps/api/src/
+  ├── app/               # Express app composition
+  ├── routes/            # Route handlers
+  ├── services/          # Backend business logic
+  ├── db/                # Prisma schema, migrations, and client
+  └── middleware/        # Request handling and validation
+
+packages/
+  ├── api-contract/      # Shared DTOs, endpoint builders, and Zod schemas
+  ├── api-client/        # Reusable HTTP client
+  ├── ui/                # Shared UI primitives
+  └── config-typescript/ # Shared TS presets
 
 docs/
   ├── architecture/      # Technical decisions & stack
@@ -83,15 +78,13 @@ docs/
 
 | Command             | Purpose                               |
 | ------------------- | ------------------------------------- |
-| `npm run dev`       | Start development server              |
-| `npm run dev:all`   | Start frontend and backend together   |
-| `npm run api:dev`   | Start only the backend BFF            |
-| `npm run build`     | Build for production                  |
-| `npm run api:build` | Build the backend BFF                 |
-| `npm run lint`      | Run ESLint                            |
-| `npm run format`    | Format code with Prettier             |
-| `npm test`          | Run Vitest (unit & integration tests) |
-| `npm run api:test`  | Run backend integration tests         |
+| `npm run dev`       | Start frontend and backend together |
+| `npm run dev:web`   | Start only the web app              |
+| `npm run dev:api`   | Start only the backend BFF          |
+| `npm run build`     | Build all workspaces                |
+| `npm run lint`      | Run ESLint across workspaces        |
+| `npm run format`    | Format the web workspace            |
+| `npm test`          | Run workspace test suites           |
 
 ## Coding Conventions
 
@@ -104,15 +97,17 @@ docs/
 
 ### React
 
-- Reuse UI primitives from `src/app/components/ui/` before creating new ones
+- Reuse UI primitives from `packages/ui/src/components/` before creating new ones
 - Keep state in `GameContext` for app-wide data
 - Extract page-specific logic to services or custom hooks
-- Use the `@/` alias for imports: `import { Button } from '@/app/components/ui/button'`
+- Use `@/` for web-app-local imports and `@velocity-gp/*` for shared packages:
+  `import { observeRouter } from '@/services/observability/router'`
+  `import { Button } from '@velocity-gp/ui/button'`
 
 ### Styling
 
 - Use Tailwind CSS for all styling
-- Reference existing theme in `src/styles/theme.css`
+- Reference existing theme in `apps/web/src/styles/theme.css`
 - Keep consistency with existing design patterns
 - Responsive design first (mobile → desktop)
 
@@ -120,7 +115,7 @@ docs/
 
 Services are organized into three domains:
 
-### Authentication (`src/services/auth/`)
+### Authentication (`apps/web/src/services/auth/`)
 
 Handle user login, signup, and session management.
 
@@ -130,7 +125,7 @@ import { signIn, getSession } from '@/services/auth';
 const user = await signIn({ email: 'user@example.com' });
 ```
 
-### API (`src/services/api/`)
+### API (`apps/web/src/services/api/`, backed by `packages/api-client` and `packages/api-contract`)
 
 HTTP client for backend communication.
 
@@ -140,7 +135,7 @@ import { apiClient, gameEndpoints } from '@/services/api';
 const response = await apiClient.get(gameEndpoints.getRaceState(eventId, playerId));
 ```
 
-### Game (`src/services/game/`)
+### Game (`apps/web/src/services/game/`)
 
 Core game mechanics and calculations.
 
@@ -153,7 +148,7 @@ const score = calculateScore(100, hazards);
 
 ## Testing
 
-Tests live alongside features in `tests/`:
+Tests live in each workspace, such as `apps/web/tests/`, `apps/api/tests/`, and `packages/api-client/tests/`:
 
 ```bash
 npm test                  # Run all tests
@@ -192,7 +187,7 @@ cp .env.example .env.local
 | `VITE_API_BASE_URL` | Backend API URL | `http://localhost:4000/api` |
 | `VITE_EVENT_ID`     | Current event   | `event-123`                 |
 
-The backend package has its own `backend/.env.example` file for server-side configuration.
+The backend package has its own `apps/api/.env.example` file for server-side configuration.
 
 **Never commit `.env.local`** — it's in `.gitignore`.
 
@@ -238,8 +233,8 @@ The backend package has its own `backend/.env.example` file for server-side conf
 | ---------------------- | --------------------------------------------------------- |
 | Hot reload not working | Restart `npm run dev`                                     |
 | Styles not applying    | Check Tailwind class names, run `npm run build` to verify |
-| Import errors          | Verify `@/` alias is in `tsconfig.json`                   |
-| Tests failing          | Check mock data in `tests/fixtures/`                      |
+| Import errors          | Verify the workspace `tsconfig.json` and package exports |
+| Tests failing          | Check fixtures in the owning workspace                    |
 
 ## Documentation
 

@@ -1,11 +1,75 @@
-node_modules
-dist
+# macOS
 .DS_Store
+.ds_store
+Thumbs.db
+
+# Node.js / JavaScript / TypeScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm
+.yarn
+
+# Build outputs
+dist/
+build/
+out/
+*.js.map
+*.d.ts.map
+
+# TypeScript compiled outputs (keep source .ts/.tsx files only)
+# Exclude compiled .js files in src directories but keep .d.ts for type information
+src/**/*.js
+!src/**/*.config.js
+!src/**/*.setup.js
+
+# Environment variables
 .env
 .env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Local workspace/agent configs (not shared)
-.agent/
-.agents/
-.claude/
-skills-lock.json
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+playwright-report/
+test-results/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Prisma
+.prisma/
+
+/generated/prisma
+
+/generated/prisma
+
+client/.vite
+
+.playwright-mcp/
+
+tmp-scripts/
+
+
+
+

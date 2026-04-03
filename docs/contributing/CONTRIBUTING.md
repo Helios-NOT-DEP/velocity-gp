@@ -57,8 +57,8 @@ chore: update dependencies
 
 - **Tailwind CSS** for all styling (no inline styles or CSS-in-JS)
 - **Responsive first**: mobile → tablet → desktop
-- Reference `src/styles/theme.css` for design tokens
-- Reuse UI primitives from `src/app/components/ui/`
+- Reference `apps/web/src/styles/theme.css` for design tokens
+- Reuse UI primitives from `packages/ui/src/components/`
 
 ### Files & Organization
 
@@ -72,7 +72,7 @@ chore: update dependencies
 ❌ Avoid:
 - RaceLogic.ts (function files lowercase)
 - useRace.ts without clear purpose
-- Scattered types (consolidate to src/models/)
+- Scattered types (consolidate to packages/api-contract/src/)
 ```
 
 ## Testing

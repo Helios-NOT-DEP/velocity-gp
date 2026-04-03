@@ -1,0 +1,42 @@
+{
+  "name": "@velocity-gp/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "npm run db:generate",
+    "dev": "tsx watch src/server.ts",
+    "prebuild": "npm run db:generate",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "lint": "eslint src tests --ext .ts --config ../../eslint.config.js",
+    "pretest": "npm run db:generate",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "prisma generate --schema=src/db/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=src/db/schema.prisma",
+    "db:studio": "prisma studio --schema=src/db/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@velocity-gp/api-contract": "0.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "pino": "^10.1.0",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^25.5.0",
+    "@types/supertest": "^6.0.3",
+    "@velocity-gp/config-typescript": "0.1.0",
+    "prisma": "^5.22.0",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.6",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
