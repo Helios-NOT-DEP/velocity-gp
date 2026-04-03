@@ -12,28 +12,27 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Event {
-  id                String   @id @default(cuid())
-  name              String
-  description       String?
-  startDate         DateTime
-  endDate           DateTime
-  status            String   @default("UPCOMING") // UPCOMING | ACTIVE | COMPLETED
-  maxPlayers        Int?
-  currentPlayerCount Int     @default(0)
-  venueId           String?
-  isPublic          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  startDate          DateTime
+  endDate            DateTime
+  status             String   @default("UPCOMING") // UPCOMING | ACTIVE | COMPLETED
+  maxPlayers         Int?
+  currentPlayerCount Int      @default(0)
+  venueId            String?
+  isPublic           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  players  Player[]
-  teams    Team[]
-  races    Race[]
-  hazards  Hazard[]
-  rescues  Rescue[]
+  players Player[]
+  teams   Team[]
+  races   Race[]
+  hazards Hazard[]
+  rescues Rescue[]
 }
 
 model Player {
@@ -46,8 +45,8 @@ model Player {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  event   Event   @relation(fields: [eventId], references: [id])
-  team    Team?   @relation(fields: [teamId], references: [id])
+  event   Event    @relation(fields: [eventId], references: [id])
+  team    Team?    @relation(fields: [teamId], references: [id])
   races   Race[]
   rescues Rescue[]
 
@@ -70,21 +69,21 @@ model Team {
 }
 
 model Race {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   eventId         String
   playerId        String
   teamId          String
-  startedAt       DateTime @default(now())
+  startedAt       DateTime  @default(now())
   endedAt         DateTime?
-  status          String   @default("RACING") // IN_PIT | RACING | FINISHED
+  status          String    @default("RACING") // IN_PIT | RACING | FINISHED
   currentLocation String?
-  score           Int      @default(0)
-  updatedAt       DateTime @updatedAt
+  score           Int       @default(0)
+  updatedAt       DateTime  @updatedAt
 
-  event    Event         @relation(fields: [eventId], references: [id])
-  player   Player        @relation(fields: [playerId], references: [id])
-  team     Team          @relation(fields: [teamId], references: [id])
-  hazards  RaceHazard[]
+  event   Event        @relation(fields: [eventId], references: [id])
+  player  Player       @relation(fields: [playerId], references: [id])
+  team    Team         @relation(fields: [teamId], references: [id])
+  hazards RaceHazard[]
 
   @@index([eventId])
   @@index([playerId])
@@ -101,16 +100,16 @@ model Hazard {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  event Event  @relation(fields: [eventId], references: [id])
+  event Event        @relation(fields: [eventId], references: [id])
   races RaceHazard[]
 
   @@index([eventId])
 }
 
 model RaceHazard {
-  id           String   @id @default(cuid())
-  raceId       String
-  hazardId     String
+  id            String   @id @default(cuid())
+  raceId        String
+  hazardId      String
   encounteredAt DateTime @default(now())
 
   race   Race   @relation(fields: [raceId], references: [id])
@@ -118,12 +117,12 @@ model RaceHazard {
 }
 
 model Rescue {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   playerId    String
   eventId     String
-  initiatedAt DateTime @default(now())
+  initiatedAt DateTime  @default(now())
   completedAt DateTime?
-  status      String   @default("REQUESTED") // REQUESTED | IN_PROGRESS | COMPLETED
+  status      String    @default("REQUESTED") // REQUESTED | IN_PROGRESS | COMPLETED
   reason      String?
 
   player Player @relation(fields: [playerId], references: [id])

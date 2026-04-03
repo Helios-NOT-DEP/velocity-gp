@@ -23,7 +23,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^7.6.0",
     "@velocity-gp/api-contract": "0.1.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -38,7 +38,7 @@
     "@types/node": "^25.5.0",
     "@types/supertest": "^6.0.3",
     "@velocity-gp/config-typescript": "0.1.0",
-    "prisma": "^5.22.0",
+    "prisma": "^7.6.0",
     "supertest": "^7.1.4",
     "tsx": "^4.20.6",
     "typescript": "^6.0.2",
