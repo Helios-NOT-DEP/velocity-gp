@@ -32,7 +32,7 @@ ingress:
       path:
         prefix: /
 services:
-  - build_command: NODE_ENV=development npm install && NODE_ENV=development npm run build:api && NODE_ENV=production npm ci
+  - build_command: NODE_ENV=development npm ci && NODE_ENV=development npm run build:api && NODE_ENV=development npm run db:generate && NODE_ENV=production npm prune --omit=dev
     environment_slug: node-js
     github:
       branch: ${GITHUB_BRANCH}
