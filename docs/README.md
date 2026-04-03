@@ -11,6 +11,7 @@ Quick navigation for all project documentation organized by theme.
 ## 📖 Product & Requirements
 
 - **[Velocity GP BDD Specifications](./product/Velocity%20GP%20BDD%20Specifications.md)** — Game rules, mechanics, and scenarios (source of truth)
+- **[Player Flow Mermaid Diagrams](./product/player-flow-diagrams.md)** — Detailed player journey, scan/rescue decisions, and team state transitions
 - **[Personas](./product/persona/)** — User personas and use cases
   - [Player/Event Attendee](./product/persona/player-event-attendee.md)
   - [Admin/Event Organizer](./product/persona/admin-event-organizer.md)
