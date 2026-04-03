@@ -5,7 +5,14 @@ import tsparser from '@typescript-eslint/parser';
 export default [
   js.configs.recommended,
   {
-    files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
+    files: [
+      'src/**/*.{ts,tsx}',
+      'tests/**/*.{ts,tsx}',
+      'apps/*/src/**/*.{ts,tsx}',
+      'apps/*/tests/**/*.{ts,tsx}',
+      'packages/*/src/**/*.{ts,tsx}',
+      'packages/*/tests/**/*.{ts,tsx}',
+    ],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -57,7 +64,11 @@ export default [
   },
   // Backend/database files (Node.js environment)
   {
-    files: ['src/db/**/*.{ts,tsx}'],
+    files: [
+      'src/db/**/*.{ts,tsx}',
+      'apps/*/src/db/**/*.{ts,tsx}',
+      'packages/*/src/db/**/*.{ts,tsx}',
+    ],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
