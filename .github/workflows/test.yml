@@ -186,42 +186,64 @@ jobs:
         run: npm run build
 
       - name: Run all tests with coverage
-        run: npm run test
+        run: |
+          mkdir -p test-results coverage/api coverage/web
 
-      - name: Publish Unit Test Results
+          npm run test --workspace=@velocity-gp/api -- \
+            --coverage.enabled=true \
+            --coverage.provider=v8 \
+            --coverage.reportsDirectory=../../coverage/api \
+            --coverage.reporter=json-summary \
+            --coverage.reporter=json \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile.junit=../../test-results/api-junit.xml
+
+          npm run test --workspace=@velocity-gp/web -- \
+            --coverage.enabled=true \
+            --coverage.provider=v8 \
+            --coverage.reportsDirectory=../../coverage/web \
+            --coverage.reporter=json-summary \
+            --coverage.reporter=json \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile.junit=../../test-results/web-junit.xml
+
+      - name: Publish API Test Results
         uses: dorny/test-reporter@v1
         if: always()
         with:
-          name: Unit Tests
-          path: test-results/unit-junit.xml
+          name: API Tests
+          path: test-results/api-junit.xml
           reporter: java-junit
           fail-on-error: false
 
-      - name: Publish Integration Test Results
+      - name: Publish Web Test Results
         uses: dorny/test-reporter@v1
         if: always()
         with:
-          name: Integration Tests
-          path: test-results/integration-junit.xml
+          name: Web Tests
+          path: test-results/web-junit.xml
           reporter: java-junit
           fail-on-error: false
 
-      - name: Publish Component Test Results
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Component Tests
-          path: test-results/component-junit.xml
-          reporter: java-junit
-          fail-on-error: false
-
-      - name: Publish Coverage Report
+      - name: Publish API Coverage Report
         uses: davelosert/vitest-coverage-report-action@v2
         if: always()
         with:
-          json-summary-path: coverage/coverage-summary.json
-          json-final-path: coverage/coverage-final.json
-          vite-config-path: vitest.config.ts
+          name: API Coverage
+          json-summary-path: coverage/api/coverage-summary.json
+          json-final-path: coverage/api/coverage-final.json
+          vite-config-path: apps/api/vitest.config.ts
+
+      - name: Publish Web Coverage Report
+        uses: davelosert/vitest-coverage-report-action@v2
+        if: always()
+        with:
+          name: Web Coverage
+          json-summary-path: coverage/web/coverage-summary.json
+          json-final-path: coverage/web/coverage-final.json
+          vite-config-path: apps/web/vitest.config.ts
 
       - name: Upload Coverage Artifact
         uses: actions/upload-artifact@v4
