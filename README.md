@@ -4,9 +4,9 @@ Velocity GP is a React + TypeScript + Vite application for a multi-day endurance
 
 ## Repository Overview
 
-The current repository contains the attendee-facing frontend and an Express-based backend-for-frontend (BFF). The frontend includes route-level screens for the attendee experience, shared game state via React context, reusable UI primitives, and supporting design and product documentation for planned expansion. The backend currently exposes placeholder endpoints that mirror the planned API contract so future auth, persistence, and integrations can be added cleanly.
+The current repository is an npm-workspaces monorepo with an attendee-facing frontend, an Express-based backend-for-frontend (BFF), and shared packages for API contracts, the HTTP client, UI primitives, and TypeScript config. The frontend includes route-level screens for the attendee experience, shared game state via React context, and supporting design and product documentation for planned expansion. The backend currently exposes placeholder endpoints that mirror the planned API contract so future auth, persistence, and integrations can be added cleanly.
 
-Current route-level pages live in `src/app/pages/` and include:
+Current route-level pages live in `apps/web/src/app/pages/` and include:
 
 - `Login`
 - `Garage`
@@ -18,7 +18,7 @@ Current route-level pages live in `src/app/pages/` and include:
 
 ## Tech Direction
 
-The planned stack is documented in [docs/Tech Stack Needed.md](./docs/Tech%20Stack%20Needed.md). In summary:
+The planned stack is documented in [docs/architecture/Tech Stack Needed.md](./docs/architecture/Tech%20Stack%20Needed.md). In summary:
 
 - Frontend: React with TypeScript
 - Database: PostgreSQL
@@ -38,7 +38,7 @@ Quick links to key docs (full index in [docs/README.md](./docs/README.md)):
 - **Observability**: [Observability Plan](./docs/architecture/observability.md)
 - **Design System**: [Figma Design Prompt](./docs/design/Figma%20Design%20Prompt.md)
 - **Personas**: [Player, Admin, AI Announcer, etc.](./docs/product/persona/)
-- **Testing**: [tests/README.md](./tests/README.md)
+- **Testing**: [apps/web/tests/README.md](./apps/web/tests/README.md)
 
 ## Backlog and Workflow
 
@@ -56,10 +56,9 @@ Quick start:
 
 ```bash
 npm install
-npm --prefix backend install
-npm run dev        # Start dev server at http://localhost:5173
-npm run api:dev    # Start the backend BFF at http://localhost:4000
-npm run dev:all    # Start both services together
+npm run dev:web    # Start web app at http://localhost:5173
+npm run dev:api    # Start the backend BFF at http://localhost:4000
+npm run dev        # Start both services together
 npm run build      # Create production bundle
 npm run lint       # Check code style
 npm test          # Run test suite
@@ -68,20 +67,18 @@ npm test          # Run test suite
 ## Project Structure
 
 ```
-src/
-  ├── app/              # Pages, layouts, and React components
-  ├── components/       # Reusable UI primitives and design components
-  ├── services/         # Business logic (auth, API, game)
-  ├── models/           # Domain types (Player, Team, Race, etc.)
-  ├── hooks/            # Custom React hooks
-  ├── utils/            # Helper functions
-  ├── db/               # Database (Prisma) configuration
-  └── styles/           # Tailwind and theme styles
+apps/
+  ├── web/              # React + Vite frontend
+  └── api/              # Express BFF and Prisma schema/client
+
+packages/
+  ├── api-contract/     # Shared DTOs, endpoint builders, and Zod schemas
+  ├── api-client/       # Reusable HTTP client
+  ├── ui/               # Shared UI primitives
+  └── config-typescript/# Shared TS config presets
 
 docs/                   # Complete documentation (see docs/README.md)
-tests/                  # Automated tests
 scripts/                # Development scripts
-backend/                # Express BFF with placeholder endpoints
 .mcp/                   # Model Context Protocol config
 ```
 
@@ -89,7 +86,7 @@ backend/                # Express BFF with placeholder endpoints
 
 See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed conventions. Key principles:
 
-- ✅ Reuse UI primitives from `src/app/components/ui/` before adding new patterns
+- ✅ Reuse UI primitives from `packages/ui/src/components/` before adding new patterns
 - ✅ Keep route concerns in pages, share logic via services or custom hooks
 - ✅ Use typed interfaces for clear boundaries (auth, API, state)
 - ✅ Align with the planned stack for future backend integration

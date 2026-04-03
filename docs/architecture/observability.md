@@ -33,7 +33,7 @@ Issue: `#42 - [Foundation] Establish observability with PostHog and OpenTelemetr
 - Keep telemetry attributes operational and implementation-oriented.
 - Do not send backend timing or error volume into product analytics.
 - Do not couple page components to PostHog or OpenTelemetry SDKs directly.
-- Prefer adding new events via `src/services/observability/events.ts` so the catalog stays reviewable.
+- Prefer adding new events via `apps/web/src/services/observability/events.ts` so the catalog stays reviewable.
 
 ## Future Backend Adoption
 

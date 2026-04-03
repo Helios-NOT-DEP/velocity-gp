@@ -1,15 +1,10 @@
-﻿{
-  "compilerOptions": {
-    "target": "ES2023",
-    "module": "ESNext",
-    "lib": ["DOM", "ES2023"],
-    "jsx": "react-jsx",
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "paths": { "@/*": ["./src/*"] },    
-    "types": ["vite/client", "node"]
-  },
-  "include": ["src", "tests"]
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/api-contract" },
+    { "path": "./packages/api-client" },
+    { "path": "./packages/ui" },
+    { "path": "./apps/api" },
+    { "path": "./apps/web" }
+  ]
 }
