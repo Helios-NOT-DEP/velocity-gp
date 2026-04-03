@@ -1,14 +1,24 @@
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import 'dotenv/config';
 
-import { config } from 'dotenv';
+import { Pool } from 'pg';
 
-import { prisma } from '../src/db/client.js';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from './generated/client.js';
 
-const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const databaseUrl = process.env.DATABASE_URL;
 
-config({ path: resolve(currentDirectory, '../.env') });
-config({ path: resolve(currentDirectory, '../../../.env') });
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required for seeding.');
+}
+
+const prismaPool = new Pool({
+  connectionString: databaseUrl,
+});
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg(prismaPool),
+  log: ['query', 'error', 'warn'],
+});
 
 type EventStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
 type PlayerStatus = 'RACING' | 'IN_PIT' | 'FINISHED';
@@ -711,6 +721,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   } finally {
     await prisma.$disconnect();
+    await prismaPool.end();
   }
 }
 

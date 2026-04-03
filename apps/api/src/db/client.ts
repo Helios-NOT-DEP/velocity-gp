@@ -1,13 +1,12 @@
-import { createRequire } from 'node:module';
 import { Pool } from 'pg';
 
 import { PrismaPg } from '@prisma/adapter-pg';
+import 'dotenv/config';
+import { PrismaClient } from '../../prisma/generated/client.js';
 
 import { env } from '../config/env.js';
 
-const require = createRequire(import.meta.url);
-const { PrismaClient } = require('@prisma/client') as typeof import('@prisma/client');
-type PrismaClientInstance = InstanceType<typeof PrismaClient>;
+type PrismaClientInstance = PrismaClient;
 
 export interface DatabaseConfig {
   readonly provider: 'postgresql';

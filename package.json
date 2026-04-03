@@ -17,10 +17,11 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run test --workspaces --if-present",
     "format": "npm run format --workspace=@velocity-gp/web",
-    "db:generate": "prisma generate --schema=apps/api/src/db/schema.prisma",
-    "db:migrate": "prisma migrate dev --schema=apps/api/src/db/schema.prisma",
-    "db:studio": "prisma studio --schema=apps/api/src/db/schema.prisma",
-    "db:seed": "prisma db seed --schema=apps/api/src/db/schema.prisma"
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

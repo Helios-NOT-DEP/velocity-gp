@@ -8,19 +8,16 @@
     "dev": "tsx watch src/server.ts",
     "prebuild": "npm run db:generate",
     "build:app": "tsc -p tsconfig.json",
-    "build": "npm run prebuild && npm run build:app",
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "lint": "eslint src tests --ext .ts --config ../../eslint.config.js",
     "pretest": "npm run db:generate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:generate": "prisma generate --schema=src/db/schema.prisma",
-    "db:migrate": "prisma migrate dev --schema=src/db/schema.prisma",
-    "db:studio": "prisma studio --schema=src/db/schema.prisma",
-    "db:seed": "prisma db seed --schema=src/db/schema.prisma"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.6.0",
