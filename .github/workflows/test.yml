@@ -1,0 +1,262 @@
+name: Run Tests
+
+on:
+  workflow_call:
+  workflow_dispatch: # allows you to run the workflow manually from the Actions tab
+    inputs:
+      environment:
+        description: "Environment to run against"
+        type: environment
+        required: true
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "**/*.js"
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "**/*.jsx"
+      - "**/*.json"
+      - "**/*.css"
+      - "**/*.scss"
+      - "**/*.sass"
+      - "**/*.less"
+      - "**/*.html"
+      - "!**/*.md"
+      - "**/*.yml"
+      - "**/*.yaml"
+      - "**/*.mjs"
+      - "**/*.cjs"
+      - "**/*.d.ts"
+      - "**/*.config.*"
+      - "**/src/**"
+      - "**/app/**"
+      - "**/lib/**"
+      - "**/components/**"
+      - "**/utils/**"
+      - "**/hooks/**"
+      - "**/pages/**"
+      - "**/public/**"
+      - "**/prisma/**"
+      - "**/database/**"
+      - "**/migrations/**"
+      - "!**/docs/**"
+      - "!**/.do/**"
+      - "!**/.github/**"
+      - "!**/README.md"
+      - "!**/scripts/**"
+      - "!**/.(github|agent|agents|codex|cursor|gemini|opencode|husky)/**"
+
+# Limit GITHUB_TOKEN permissions for security
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: "copilot" # variable grouping for secrets and environment settings
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: velocitygp_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      TZ: America/Chicago
+      # Sensitive values (store in repository Secrets)
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
+      DB_PASSWORD: "postgres"
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      ENV: "DEV"
+      NODE_ENV: "development" # ${{ vars.NODE_ENV }}
+      DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      DO_APP_ID: ${{ vars.DO_APP_ID || ' ' }}
+      PORT: ${{ secrets.PORT || '3000' }}
+      API_PREFIX: ${{ vars.API_PREFIX || '/api/v1' }}
+      DOMAIN: ${{ vars.DOMAIN || 'velocity.app' }}
+      FULL_DOMAIN: ${{ vars.FULL_DOMAIN || 'dev.velocity.app' }}
+      CLIENT_BASE_URL: ${{ vars.CLIENT_BASE_URL || 'https://dev.velocity.app' }}
+      DB_POOL_MAX: ${{ vars.DB_POOL_MAX || '20' }}
+      JWT_EXPIRES_IN: ${{ vars.JWT_EXPIRES_IN || '24h' }}
+      JWT_COOKIE_NAME: ${{ vars.JWT_COOKIE_NAME || 'auth_token' }}
+      SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY || '' }}
+      CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://dev.velocity.app' }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
+      LOG_FORMAT: ${{ vars.LOG_FORMAT || 'json' }}
+      GITHUB_BRANCH: "${{ github.ref_name }}"
+      GITHUB_REPOSITORY: "${{ github.repository }}"
+      VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY || '' }}
+      VITE_PUBLIC_POSTHOG_HOST: ${{ vars.VITE_PUBLIC_POSTHOG_HOST || '' }}
+      SPACE_ACCESS_KEY_ID: ${{ vars.SPACE_ACCESS_KEY_ID || '' }}
+      SPACE_SECRET_ACCESS_KEY: ${{ secrets.SPACE_SECRET_ACCESS_KEY || '' }}
+      SPACE_ENDPOINT: ${{ vars.SPACE_ENDPOINT || '' }}
+      SPACE_ENDPOINT_DOMAIN: ${{ vars.SPACE_ENDPOINT_DOMAIN || '' }}
+      CLIENT_PACKAGE_PATH: ${{ vars.CLIENT_PACKAGE_PATH || '' }}
+      API_PACKAGE_PATH: ${{ vars.API_PACKAGE_PATH || '' }}
+      DEBUG: ${{ vars.CLIENT_DEBUG || 'false' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Show current time
+        run: date
+      - name: Set /etc/localtime
+        run: |
+          sudo ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
+          sudo dpkg-reconfigure -f noninteractive tzdata
+      - name: Show new time
+        run: date
+
+      - name: Check if app.template.yaml changed
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: .do/app.template.yaml
+
+      - name: Replace placeholders in app.yaml
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: danielr1996/envsubst-action@1.0.0
+        with:
+          input: ./.do/app.template.yaml
+          output: ./.do/app.yaml
+
+      - name: Display app.yaml
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: cat ./.do/app.yaml
+
+      - name: Authenticate doctl (DigitalOcean CLI)
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Validate App Spec
+        if: steps.changed-files.outputs.any_changed == 'true' && github.event_name != 'pull_request'
+        run: doctl app spec validate ./.do/app.yaml --verbose
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Verify Node.js version
+        run: node -v
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: list dependencies
+        run: npm ls
+
+      - name: Get Path & List files
+        run: pwd && ls -la
+
+      - name: ESLint Version
+        run: npx eslint --version
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed PostgreSQL with test data
+        run: npm run db:seed
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Check code formatting
+        run: npm run format:check
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run all tests with coverage
+        run: |
+          mkdir -p test-results coverage/api coverage/web
+
+          npm run test --workspace=@velocity-gp/api -- \
+            --coverage.enabled=true \
+            --coverage.provider=v8 \
+            --coverage.reportsDirectory=coverage/api \
+            --coverage.reporter=json-summary \
+            --coverage.reporter=json \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile.junit=test-results/api-junit.xml
+
+          npm run test --workspace=@velocity-gp/web -- \
+            --coverage.enabled=true \
+            --coverage.provider=v8 \
+            --coverage.reportsDirectory=coverage/web \
+            --coverage.reporter=json-summary \
+            --coverage.reporter=json \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile.junit=test-results/web-junit.xml
+
+      - name: Publish API Test Results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: API Tests
+          path: test-results/api-junit.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Publish Web Test Results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Web Tests
+          path: test-results/web-junit.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Publish API Coverage Report
+        uses: davelosert/vitest-coverage-report-action@v2
+        if: always()
+        with:
+          name: API Coverage
+          json-summary-path: coverage/api/coverage-summary.json
+          json-final-path: coverage/api/coverage-final.json
+          vite-config-path: apps/api/vitest.config.ts
+
+      - name: Publish Web Coverage Report
+        uses: davelosert/vitest-coverage-report-action@v2
+        if: always()
+        with:
+          name: Web Coverage
+          json-summary-path: coverage/web/coverage-summary.json
+          json-final-path: coverage/web/coverage-final.json
+          vite-config-path: apps/web/vitest.config.ts
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage
+          retention-days: 30
+
+      - name: Upload JUnit Test Results Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 30

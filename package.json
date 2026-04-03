@@ -1,7 +1,7 @@
 {
   "name": "@velocity-gp/root",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -9,21 +9,27 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/api && npm run build --workspace=@velocity-gp/web",
+    "build:api": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api",
+    "build:web": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/web",
     "dev": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && concurrently -k -n contract,client,ui,web,api -c magenta,cyan,yellow,green,blue \"npm run dev --workspace=@velocity-gp/api-contract\" \"npm run dev --workspace=@velocity-gp/api-client\" \"npm run dev --workspace=@velocity-gp/ui\" \"npm run dev --workspace=@velocity-gp/web\" \"npm run dev --workspace=@velocity-gp/api\"",
     "dev:web": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && concurrently -k -n contract,client,ui,web -c magenta,cyan,yellow,green \"npm run dev --workspace=@velocity-gp/api-contract\" \"npm run dev --workspace=@velocity-gp/api-client\" \"npm run dev --workspace=@velocity-gp/ui\" \"npm run dev --workspace=@velocity-gp/web\"",
     "dev:api": "npm run build --workspace=@velocity-gp/api-contract && concurrently -k -n contract,api -c magenta,blue \"npm run dev --workspace=@velocity-gp/api-contract\" \"npm run dev --workspace=@velocity-gp/api\"",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run test --workspaces --if-present",
     "format": "npm run format --workspace=@velocity-gp/web",
-    "db:generate": "npm run db:generate --workspace=@velocity-gp/api",
-    "db:migrate": "npm run db:migrate --workspace=@velocity-gp/api",
-    "db:studio": "npm run db:studio --workspace=@velocity-gp/api"
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,css,scss,sass,less,html}\"",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
+    "@vitest/coverage-v8": "^4.1.2",
     "concurrently": "^9.2.1",
     "eslint": "^10.1.0",
     "prettier": "^3.8.1",

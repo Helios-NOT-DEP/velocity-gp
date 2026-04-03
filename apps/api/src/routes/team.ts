@@ -3,7 +3,11 @@ import { Router } from 'express';
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
-import { createTeamSchema, joinTeamSchema, teamParamsSchema } from '@velocity-gp/api-contract/schemas';
+import {
+  createTeamSchema,
+  joinTeamSchema,
+  teamParamsSchema,
+} from '@velocity-gp/api-contract/schemas';
 import { createTeam, getTeam, getTeamMembers, joinTeam } from '../services/teamService.js';
 
 export const teamRouter = Router();

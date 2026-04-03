@@ -32,12 +32,6 @@ jobs:
       DOMAIN: ${{ vars.DOMAIN || 'velocity.app' }}
       FULL_DOMAIN: ${{ vars.FULL_DOMAIN || 'dev.velocity.app' }}
       CLIENT_BASE_URL: ${{ vars.CLIENT_BASE_URL || 'https://dev.velocity.app' }}
-      DB_HOST: ${{ vars.DB_HOST || 'localhost' }}
-      DB_PORT: ${{ vars.DB_PORT || '5432' }}
-      DB_NAME: ${{ vars.DB_NAME || 'cda' }}
-      DB_USER: ${{ vars.DB_USER || 'postgres' }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
-      DB_SSL: ${{ vars.DB_SSL || 'false' }}
       DB_POOL_MAX: ${{ vars.DB_POOL_MAX || '20' }}
       JWT_SECRET: ${{ secrets.JWT_SECRET || 'your-secret-key-change-this-in-production-min-32-characters' }}
       JWT_EXPIRES_IN: ${{ vars.JWT_EXPIRES_IN || '24h' }}

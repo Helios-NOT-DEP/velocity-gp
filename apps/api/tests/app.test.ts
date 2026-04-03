@@ -5,6 +5,7 @@ import { createApp } from '../src/app/createApp.js';
 
 describe('velocity gp backend', () => {
   const app = createApp();
+  const apiPrefix = process.env.API_PREFIX ?? '/api';
 
   it('returns health information', async () => {
     const response = await request(app).get('/health');
@@ -15,7 +16,9 @@ describe('velocity gp backend', () => {
   });
 
   it('serves placeholder race state data', async () => {
-    const response = await request(app).get('/api/events/event-123/players/player-123/race-state');
+    const response = await request(app).get(
+      `${apiPrefix}/events/event-123/players/player-123/race-state`
+    );
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -24,7 +27,9 @@ describe('velocity gp backend', () => {
   });
 
   it('validates request bodies', async () => {
-    const response = await request(app).post('/api/players').send({ email: 'not-an-email' });
+    const response = await request(app)
+      .post(`${apiPrefix}/players`)
+      .send({ email: 'not-an-email' });
 
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
