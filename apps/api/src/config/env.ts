@@ -5,9 +5,9 @@ import { config } from 'dotenv';
 import { z } from 'zod';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
-
-config({ path: resolve(currentDirectory, '../../.env') });
-
+if (process.env['NODE_ENV'] !== 'production') {
+  config({ path: resolve(currentDirectory, '../../.env') });
+}
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
