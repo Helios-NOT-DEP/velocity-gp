@@ -86,7 +86,7 @@ interface SeedSummary {
 const hour = 60 * 60 * 1000;
 
 function addHours(base: Date, hours: number): Date {
-  return new Date(base.getTime() + (hours * hour));
+  return new Date(base.getTime() + hours * hour);
 }
 
 function buildTeams(prefix: string, scores: readonly number[]): readonly TeamSeed[] {
@@ -101,10 +101,32 @@ function buildPlayers(
   prefix: string,
   teamKeys: readonly string[],
   statuses: readonly PlayerStatus[],
-  count: number,
+  count: number
 ): readonly PlayerSeed[] {
-  const firstNames = ['Alex', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery', 'Skyler', 'Logan', 'Jamie'];
-  const lastNames = ['Velocity', 'Apex', 'Drift', 'Pulse', 'Rocket', 'Vortex', 'Nitro', 'Zenith', 'Spark', 'Orbit'];
+  const firstNames = [
+    'Alex',
+    'Jordan',
+    'Taylor',
+    'Morgan',
+    'Casey',
+    'Riley',
+    'Avery',
+    'Skyler',
+    'Logan',
+    'Jamie',
+  ];
+  const lastNames = [
+    'Velocity',
+    'Apex',
+    'Drift',
+    'Pulse',
+    'Rocket',
+    'Vortex',
+    'Nitro',
+    'Zenith',
+    'Spark',
+    'Orbit',
+  ];
 
   return Array.from({ length: count }, (_value, index) => {
     const teamKey = index % 5 === 4 ? undefined : teamKeys[index % teamKeys.length];
@@ -130,30 +152,149 @@ function buildEventSeeds(): readonly EventSeed[] {
   const activeTeams = buildTeams('Helios Prime', [620, 585, 540, 505]);
   const upcomingTeams = buildTeams('Helios Future', [0, 0, 0, 0]);
 
-  const completedPlayers = buildPlayers('completed', completedTeams.map((team) => team.key), ['FINISHED', 'FINISHED', 'IN_PIT', 'RACING'], 12);
-  const activePlayers = buildPlayers('active', activeTeams.map((team) => team.key), ['RACING', 'IN_PIT', 'FINISHED', 'RACING'], 16);
-  const upcomingPlayers = buildPlayers('upcoming', upcomingTeams.map((team) => team.key), ['RACING', 'RACING', 'IN_PIT'], 10);
+  const completedPlayers = buildPlayers(
+    'completed',
+    completedTeams.map((team) => team.key),
+    ['FINISHED', 'FINISHED', 'IN_PIT', 'RACING'],
+    12
+  );
+  const activePlayers = buildPlayers(
+    'active',
+    activeTeams.map((team) => team.key),
+    ['RACING', 'IN_PIT', 'FINISHED', 'RACING'],
+    16
+  );
+  const upcomingPlayers = buildPlayers(
+    'upcoming',
+    upcomingTeams.map((team) => team.key),
+    ['RACING', 'RACING', 'IN_PIT'],
+    10
+  );
 
   const completedHazards: readonly HazardSeed[] = [
-    { key: 'completed-hz-1', name: 'Downtown Congestion', ratio: 10, description: 'Traffic surge near central plaza', location: 'Downtown', qrCode: 'QR-COMP-1', isActive: true },
-    { key: 'completed-hz-2', name: 'Rain Burst', ratio: 15, description: 'Sudden rain affecting grip', location: 'Harbor Route', qrCode: 'QR-COMP-2', isActive: true },
-    { key: 'completed-hz-3', name: 'Tunnel Echo', ratio: 2.25, description: 'Signal bounce in tunnel', location: 'North Tunnel', qrCode: 'QR-COMP-3', isActive: false },
-    { key: 'completed-hz-4', name: 'Bridge Bottleneck', ratio: 20, description: 'Heavy bridge queue', location: 'Unity Bridge', qrCode: 'QR-COMP-4', isActive: true },
+    {
+      key: 'completed-hz-1',
+      name: 'Downtown Congestion',
+      ratio: 10,
+      description: 'Traffic surge near central plaza',
+      location: 'Downtown',
+      qrCode: 'QR-COMP-1',
+      isActive: true,
+    },
+    {
+      key: 'completed-hz-2',
+      name: 'Rain Burst',
+      ratio: 15,
+      description: 'Sudden rain affecting grip',
+      location: 'Harbor Route',
+      qrCode: 'QR-COMP-2',
+      isActive: true,
+    },
+    {
+      key: 'completed-hz-3',
+      name: 'Tunnel Echo',
+      ratio: 2.25,
+      description: 'Signal bounce in tunnel',
+      location: 'North Tunnel',
+      qrCode: 'QR-COMP-3',
+      isActive: false,
+    },
+    {
+      key: 'completed-hz-4',
+      name: 'Bridge Bottleneck',
+      ratio: 20,
+      description: 'Heavy bridge queue',
+      location: 'Unity Bridge',
+      qrCode: 'QR-COMP-4',
+      isActive: true,
+    },
   ];
 
   const activeHazards: readonly HazardSeed[] = [
-    { key: 'active-hz-1', name: 'Metro Gridlock', ratio: 10, description: 'Core city congestion', location: 'Metro Core', qrCode: 'QR-ACT-1', isActive: true },
-    { key: 'active-hz-2', name: 'Helios Pulse Zone', ratio: 15, description: 'High scan pressure corridor', location: 'Pulse Sector', qrCode: 'QR-ACT-2', isActive: true },
-    { key: 'active-hz-3', name: 'Signal Jitter', ratio: 1.5, description: 'Intermittent route sync issues', location: 'Tech Ring', qrCode: 'QR-ACT-3', isActive: true },
-    { key: 'active-hz-4', name: 'Highway Windshear', ratio: 20, description: 'Crosswind penalties', location: 'Aero Highway', qrCode: 'QR-ACT-4', isActive: true },
-    { key: 'active-hz-5', name: 'Old Town Maze', ratio: 12, description: 'Detours through narrow blocks', location: 'Old Town', qrCode: 'QR-ACT-5', isActive: false },
-    { key: 'active-hz-6', name: 'Harbor Lift Delay', ratio: 8, description: 'Drawbridge timing windows', location: 'Harbor Lift', qrCode: 'QR-ACT-6', isActive: true },
+    {
+      key: 'active-hz-1',
+      name: 'Metro Gridlock',
+      ratio: 10,
+      description: 'Core city congestion',
+      location: 'Metro Core',
+      qrCode: 'QR-ACT-1',
+      isActive: true,
+    },
+    {
+      key: 'active-hz-2',
+      name: 'Helios Pulse Zone',
+      ratio: 15,
+      description: 'High scan pressure corridor',
+      location: 'Pulse Sector',
+      qrCode: 'QR-ACT-2',
+      isActive: true,
+    },
+    {
+      key: 'active-hz-3',
+      name: 'Signal Jitter',
+      ratio: 1.5,
+      description: 'Intermittent route sync issues',
+      location: 'Tech Ring',
+      qrCode: 'QR-ACT-3',
+      isActive: true,
+    },
+    {
+      key: 'active-hz-4',
+      name: 'Highway Windshear',
+      ratio: 20,
+      description: 'Crosswind penalties',
+      location: 'Aero Highway',
+      qrCode: 'QR-ACT-4',
+      isActive: true,
+    },
+    {
+      key: 'active-hz-5',
+      name: 'Old Town Maze',
+      ratio: 12,
+      description: 'Detours through narrow blocks',
+      location: 'Old Town',
+      qrCode: 'QR-ACT-5',
+      isActive: false,
+    },
+    {
+      key: 'active-hz-6',
+      name: 'Harbor Lift Delay',
+      ratio: 8,
+      description: 'Drawbridge timing windows',
+      location: 'Harbor Lift',
+      qrCode: 'QR-ACT-6',
+      isActive: true,
+    },
   ];
 
   const upcomingHazards: readonly HazardSeed[] = [
-    { key: 'upcoming-hz-1', name: 'Sunline Glare', ratio: 10, description: 'Visibility drop at dusk', location: 'Sunline Loop', qrCode: 'QR-UP-1', isActive: true },
-    { key: 'upcoming-hz-2', name: 'Arena Funnel', ratio: 15, description: 'Narrowing near arena gates', location: 'Arena Approach', qrCode: 'QR-UP-2', isActive: true },
-    { key: 'upcoming-hz-3', name: 'Dockside Crosswind', ratio: 2, description: 'Wind drift near docks', location: 'Dockside', qrCode: 'QR-UP-3', isActive: true },
+    {
+      key: 'upcoming-hz-1',
+      name: 'Sunline Glare',
+      ratio: 10,
+      description: 'Visibility drop at dusk',
+      location: 'Sunline Loop',
+      qrCode: 'QR-UP-1',
+      isActive: true,
+    },
+    {
+      key: 'upcoming-hz-2',
+      name: 'Arena Funnel',
+      ratio: 15,
+      description: 'Narrowing near arena gates',
+      location: 'Arena Approach',
+      qrCode: 'QR-UP-2',
+      isActive: true,
+    },
+    {
+      key: 'upcoming-hz-3',
+      name: 'Dockside Crosswind',
+      ratio: 2,
+      description: 'Wind drift near docks',
+      location: 'Dockside',
+      qrCode: 'QR-UP-3',
+      isActive: true,
+    },
   ];
 
   const completedRaces: readonly RaceSeed[] = [
@@ -188,15 +329,21 @@ function buildEventSeeds(): readonly EventSeed[] {
   ];
 
   const activeRaces: readonly RaceSeed[] = activePlayers.slice(0, 8).map((player, index) => {
-    const raceStatus: RaceStatus = index % 3 === 0 ? 'RACING' : index % 3 === 1 ? 'IN_PIT' : 'FINISHED';
-    const startedAt = addHours(activeStart, 1 + (index * 0.5));
+    const raceStatus: RaceStatus =
+      index % 3 === 0 ? 'RACING' : index % 3 === 1 ? 'IN_PIT' : 'FINISHED';
+    const startedAt = addHours(activeStart, 1 + index * 0.5);
 
     return {
       playerKey: player.key,
       teamKey: player.teamKey ?? activeTeams[index % activeTeams.length].key,
       status: raceStatus,
-      currentLocation: raceStatus === 'FINISHED' ? 'Victory Lane' : raceStatus === 'IN_PIT' ? 'Pit Delta' : 'Metro Core',
-      score: 180 + (index * 35),
+      currentLocation:
+        raceStatus === 'FINISHED'
+          ? 'Victory Lane'
+          : raceStatus === 'IN_PIT'
+            ? 'Pit Delta'
+            : 'Metro Core',
+      score: 180 + index * 35,
       startedAt,
       endedAt: raceStatus === 'FINISHED' ? addHours(startedAt, 1.25) : undefined,
       encounteredHazardKeys: [
@@ -211,7 +358,7 @@ function buildEventSeeds(): readonly EventSeed[] {
     teamKey: player.teamKey ?? upcomingTeams[index % upcomingTeams.length].key,
     status: 'RACING',
     currentLocation: 'Grid Staging',
-    score: 50 + (index * 15),
+    score: 50 + index * 15,
     startedAt: addHours(upcomingStart, -2 + index),
     encounteredHazardKeys: [upcomingHazards[index % upcomingHazards.length].key],
   }));

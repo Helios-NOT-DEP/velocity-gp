@@ -76,16 +76,16 @@ docs/
 
 ## Key Commands
 
-| Command             | Purpose                               |
-| ------------------- | ------------------------------------- |
-| `npm run dev`       | Start frontend and backend together |
-| `npm run dev:web`   | Start only the web app              |
-| `npm run dev:api`   | Start only the backend BFF          |
-| `npm run build`     | Build all workspaces                |
-| `npm run db:seed`   | Seed API database test data         |
-| `npm run lint`      | Run ESLint across workspaces        |
-| `npm run format`    | Format the web workspace            |
-| `npm test`          | Run workspace test suites           |
+| Command           | Purpose                             |
+| ----------------- | ----------------------------------- |
+| `npm run dev`     | Start frontend and backend together |
+| `npm run dev:web` | Start only the web app              |
+| `npm run dev:api` | Start only the backend BFF          |
+| `npm run build`   | Build all workspaces                |
+| `npm run db:seed` | Seed API database test data         |
+| `npm run lint`    | Run ESLint across workspaces        |
+| `npm run format`  | Format the web workspace            |
+| `npm test`        | Run workspace test suites           |
 
 ## Coding Conventions
 
@@ -234,7 +234,7 @@ The backend package has its own `apps/api/.env.example` file for server-side con
 | ---------------------- | --------------------------------------------------------- |
 | Hot reload not working | Restart `npm run dev`                                     |
 | Styles not applying    | Check Tailwind class names, run `npm run build` to verify |
-| Import errors          | Verify the workspace `tsconfig.json` and package exports |
+| Import errors          | Verify the workspace `tsconfig.json` and package exports  |
 | Tests failing          | Check fixtures in the owning workspace                    |
 
 ## Documentation
