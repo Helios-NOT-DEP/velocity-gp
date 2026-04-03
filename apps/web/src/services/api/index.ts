@@ -12,10 +12,7 @@ export type { ApiRequestOptions, ApiResponse } from '@velocity-gp/api-client';
 export * from '@velocity-gp/api-contract';
 
 class ObservableApiClient extends ApiClient {
-  override async request<T>(
-    endpoint: string,
-    options: Parameters<ApiClient['request']>[1] = {}
-  ) {
+  override async request<T>(endpoint: string, options: Parameters<ApiClient['request']>[1] = {}) {
     return withTelemetrySpan(
       'api.request',
       {

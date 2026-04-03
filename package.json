@@ -17,6 +17,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run test --workspaces --if-present",
     "format": "npm run format --workspace=@velocity-gp/web",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,css,scss,sass,less,html}\"",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

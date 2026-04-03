@@ -38,10 +38,7 @@ export class RaceEventLog {
  * Validate hazard scan (QR code)
  * Returns true if hazard is valid for current location
  */
-export function validateHazardScan(
-  expectedHazardId: string,
-  scannedHazardId: string
-): boolean {
+export function validateHazardScan(expectedHazardId: string, scannedHazardId: string): boolean {
   // TODO: Implement location-aware validation when backend provides
   // current location data
   return expectedHazardId === scannedHazardId;

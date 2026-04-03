@@ -6,9 +6,7 @@ import { observabilityConfig } from './config';
 let analyticsInitialized = false;
 
 function toProperties(properties: AnalyticsProperties = {}) {
-  return Object.fromEntries(
-    Object.entries(properties).filter(([, value]) => value !== undefined)
-  );
+  return Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== undefined));
 }
 
 export function initializeAnalytics() {
@@ -43,10 +41,7 @@ export function trackAnalyticsEvent(
   posthog.capture(eventName, toProperties(properties));
 }
 
-export function identifyAnalyticsUser(
-  distinctId: string,
-  properties?: AnalyticsProperties
-) {
+export function identifyAnalyticsUser(distinctId: string, properties?: AnalyticsProperties) {
   if (!analyticsInitialized) {
     return;
   }
