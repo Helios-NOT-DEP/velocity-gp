@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/api && npm run build --workspace=@velocity-gp/web",
+    "build:api": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api",
+    "build:web": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/web",
     "dev": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && concurrently -k -n contract,client,ui,web,api -c magenta,cyan,yellow,green,blue \"npm run dev --workspace=@velocity-gp/api-contract\" \"npm run dev --workspace=@velocity-gp/api-client\" \"npm run dev --workspace=@velocity-gp/ui\" \"npm run dev --workspace=@velocity-gp/web\" \"npm run dev --workspace=@velocity-gp/api\"",
     "dev:web": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && concurrently -k -n contract,client,ui,web -c magenta,cyan,yellow,green \"npm run dev --workspace=@velocity-gp/api-contract\" \"npm run dev --workspace=@velocity-gp/api-client\" \"npm run dev --workspace=@velocity-gp/ui\" \"npm run dev --workspace=@velocity-gp/web\"",
     "dev:api": "npm run build --workspace=@velocity-gp/api-contract && concurrently -k -n contract,api -c magenta,blue \"npm run dev --workspace=@velocity-gp/api-contract\" \"npm run dev --workspace=@velocity-gp/api\"",

@@ -40,7 +40,7 @@ services:
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
     name: api
-    run_command: node dist/server/api/server.js
+    run_command: node apps/api/dist/src/server.js
     source_dir: /
     envs:
       - key: NODE_ENV
@@ -130,13 +130,13 @@ services:
     #   failure_threshold: 3
     #   timeout_seconds: 5
 static_sites:
-  - build_command: NODE_ENV=development npm install && NODE_ENV=development npm run build:client
+  - build_command: NODE_ENV=development npm install && NODE_ENV=development npm run build:web
     environment_slug: node-js
     github:
         branch: ${GITHUB_BRANCH}
         repo: ${GITHUB_REPOSITORY}
     name: client
-    output_dir: ./dist/client
+    output_dir: ./apps/web/dist
     catchall_document: index.html
     source_dir: /
     envs:

@@ -45,7 +45,7 @@ export default function Login() {
               VELOCITY GP
             </h1>
           </div>
-          <p className="text-gray-400 text-sm">High-speed gamified racing event</p>
+          <p className="text-gray-400 text-sm">High-speed race to the checkered code.</p>
         </div>
 
         {/* Form Card */}
