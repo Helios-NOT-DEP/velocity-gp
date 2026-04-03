@@ -186,7 +186,28 @@ jobs:
         run: npm run build
 
       - name: Run all tests with coverage
-        run: npm run test
+        run: |
+          mkdir -p test-results coverage/api coverage/web
+
+          npm run test --workspace=@velocity-gp/api -- \
+            --coverage.enabled=true \
+            --coverage.provider=v8 \
+            --coverage.reportsDirectory=coverage/api \
+            --coverage.reporter=json-summary \
+            --coverage.reporter=json \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile.junit=test-results/api-junit.xml
+
+          npm run test --workspace=@velocity-gp/web -- \
+            --coverage.enabled=true \
+            --coverage.provider=v8 \
+            --coverage.reportsDirectory=coverage/web \
+            --coverage.reporter=json-summary \
+            --coverage.reporter=json \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile.junit=test-results/web-junit.xml
 
       - name: Publish API Test Results
         uses: dorny/test-reporter@v1
