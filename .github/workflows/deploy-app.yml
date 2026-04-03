@@ -61,22 +61,6 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Get Action IP
-        id: ip
-        run: |
-          IPV4=$(curl -s https://api.ipify.org)
-          echo "ipv4=$IPV4" >> $GITHUB_OUTPUT
-
-      - name: Whitelist Runner IP
-        id: whitelist
-        run: |
-          IP_ADDR="${{ steps.ip.outputs.ipv4 }}/32"
-          # Run the command and capture output
-          OUTPUT=$(doctl databases firewalls append ${{ vars.DB_CLUSTER_ID }} --rule "ip_addr:$IP_ADDR")
-          echo "$OUTPUT"
-          # Extract UUID for the specific IP
-          UUID=$(echo "$OUTPUT" | grep "$IP_ADDR" | awk '{print $1}')
-          echo "uuid=$UUID" >> $GITHUB_OUTPUT
 
       - name: Run Database Migrations
         env:
@@ -86,11 +70,7 @@ jobs:
           SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
         run: npm run db:deploy
-
-      - name: Remove IP from Whitelist
-        if: always() && steps.whitelist.outputs.uuid != ''
-        run: doctl databases firewalls remove ${{ vars.DB_CLUSTER_ID }} --uuid ${{ steps.whitelist.outputs.uuid }}
-
+        
       # - if: vars.DO_APP_ID == ' '
       #   name: Deploy App
       #   run: doctl apps create-deployment ${{ vars.DO_APP_ID }} --verbose --wait
