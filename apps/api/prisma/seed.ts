@@ -94,16 +94,46 @@ interface SeedSummary {
 }
 
 const hour = 60 * 60 * 1000;
+const presetTeamNames = [
+  'Apex Comets',
+  'Blaze Falcons',
+  'Crimson Foxes',
+  'Drift Panthers',
+  'Echo Wolves',
+  'Flux Mustangs',
+  'Glide Hawks',
+  'Hyper Lynx',
+  'Ion Jaguars',
+  'Jetstream Cobras',
+  'Kinetic Raptors',
+  'Lightning Bulls',
+  'Meteor Sharks',
+  'Nova Tigers',
+  'Orbit Owls',
+  'Pulse Vipers',
+  'Quantum Bears',
+  'Rift Rhinos',
+  'Solar Stingrays',
+  'Turbo Cougars',
+  'Ultraviolet Hornets',
+  'Vector Lions',
+  'Warp Badgers',
+  'Xenon Ravens',
+  'Yield Scorpions',
+  'Zenith Dragons',
+] as const;
+const presetPlayerCount = 203;
+const seededMaxPlayers = 203;
 
 function addHours(base: Date, hours: number): Date {
   return new Date(base.getTime() + hours * hour);
 }
 
-function buildTeams(prefix: string, scores: readonly number[]): readonly TeamSeed[] {
-  return scores.map((score, index) => ({
+function buildTeams(prefix: string, topScore: number, scoreStep: number): readonly TeamSeed[] {
+  return presetTeamNames.map((teamName, index) => ({
     key: `${prefix}-team-${index + 1}`,
-    name: `${prefix} Team ${index + 1}`,
-    score,
+    name: `${prefix} ${teamName}`,
+    score: Math.max(0, topScore - index * scoreStep),
   }));
 }
 
@@ -124,6 +154,22 @@ function buildPlayers(
     'Skyler',
     'Logan',
     'Jamie',
+    'Cameron',
+    'Drew',
+    'Elliot',
+    'Finley',
+    'Harper',
+    'Hayden',
+    'Jules',
+    'Kendall',
+    'Lane',
+    'Micah',
+    'Parker',
+    'Quinn',
+    'Reese',
+    'Sawyer',
+    'Tatum',
+    'Wren',
   ];
   const lastNames = [
     'Velocity',
@@ -136,17 +182,35 @@ function buildPlayers(
     'Zenith',
     'Spark',
     'Orbit',
+    'Blitz',
+    'Cruise',
+    'Dash',
+    'Edge',
+    'Fusion',
+    'Glide',
+    'Heat',
+    'Ignite',
+    'Jet',
+    'Kickstart',
+    'Launch',
+    'Momentum',
+    'Overdrive',
+    'Pinnacle',
+    'Quickshift',
+    'Redline',
   ];
+  const nameVariants = firstNames.length * lastNames.length;
 
   return Array.from({ length: count }, (_value, index) => {
-    const teamKey = index % 5 === 4 ? undefined : teamKeys[index % teamKeys.length];
+    const teamKey = teamKeys[index % teamKeys.length];
     const firstName = firstNames[index % firstNames.length];
     const lastName = lastNames[(index + 3) % lastNames.length];
+    const duplicateSuffix = index >= nameVariants ? ` ${Math.floor(index / nameVariants) + 1}` : '';
 
     return {
       key: `${prefix}-player-${index + 1}`,
       email: `${prefix}.player${index + 1}@velocity.local`,
-      name: `${firstName} ${lastName}`,
+      name: `${firstName} ${lastName}${duplicateSuffix}`,
       teamKey,
       status: statuses[index % statuses.length],
     };
@@ -158,27 +222,27 @@ function buildEventSeeds(): readonly EventSeed[] {
   const activeStart = new Date('2026-04-01T10:00:00.000Z');
   const upcomingStart = new Date('2026-04-10T12:00:00.000Z');
 
-  const completedTeams = buildTeams('Helios Retro', [920, 860, 790, 740]);
-  const activeTeams = buildTeams('Helios Prime', [620, 585, 540, 505]);
-  const upcomingTeams = buildTeams('Helios Future', [0, 0, 0, 0]);
+  const completedTeams = buildTeams('Helios Retro', 920, 24);
+  const activeTeams = buildTeams('Helios Prime', 620, 18);
+  const upcomingTeams = buildTeams('Helios Future', 0, 0);
 
   const completedPlayers = buildPlayers(
     'completed',
     completedTeams.map((team) => team.key),
     ['FINISHED', 'FINISHED', 'IN_PIT', 'RACING'],
-    12
+    presetPlayerCount
   );
   const activePlayers = buildPlayers(
     'active',
     activeTeams.map((team) => team.key),
     ['RACING', 'IN_PIT', 'FINISHED', 'RACING'],
-    16
+    presetPlayerCount
   );
   const upcomingPlayers = buildPlayers(
     'upcoming',
     upcomingTeams.map((team) => team.key),
     ['RACING', 'RACING', 'IN_PIT'],
-    10
+    presetPlayerCount
   );
 
   const completedHazards: readonly HazardSeed[] = [
@@ -427,7 +491,7 @@ function buildEventSeeds(): readonly EventSeed[] {
       startDate: completedStart,
       endDate: addHours(completedStart, 48),
       status: 'COMPLETED',
-      maxPlayers: 48,
+      maxPlayers: seededMaxPlayers,
       isPublic: true,
       teams: completedTeams,
       players: completedPlayers,
@@ -441,7 +505,7 @@ function buildEventSeeds(): readonly EventSeed[] {
       startDate: activeStart,
       endDate: addHours(activeStart, 72),
       status: 'ACTIVE',
-      maxPlayers: 64,
+      maxPlayers: seededMaxPlayers,
       isPublic: true,
       teams: activeTeams,
       players: activePlayers,
@@ -455,7 +519,7 @@ function buildEventSeeds(): readonly EventSeed[] {
       startDate: upcomingStart,
       endDate: addHours(upcomingStart, 36),
       status: 'UPCOMING',
-      maxPlayers: 40,
+      maxPlayers: seededMaxPlayers,
       isPublic: false,
       teams: upcomingTeams,
       players: upcomingPlayers,
