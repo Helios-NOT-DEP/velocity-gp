@@ -21,28 +21,38 @@ _As an attendee, I want a frictionless login to join the multi-day event without
 - **When** the Player clicks the secure link
 - **Then** the Player should be authenticated
 - **And** the System should check if the Player is already assigned to a team
-- **And** the Player should be redirected to either the **AI Design Studio** (if first on team) or **Race Hub** (if team is already setup).
+- **And** the Player should be redirected to either the **AI Design Studio** (if their team's shared logo is still pending) or **Race Hub** (if their team identity is already active).
 
 ### Feature: AI Design Studio (The Garage)
 
-_As a Player, I want to establish our team's identity using GenAI so that we have a unique F1-style presence._
+_As a Player, I want our team's logo to be generated from every teammate's self-description and our assigned team name so that the final identity represents the whole team._
 
-#### Scenario: Custom Design Generation & Policy Check (First Joiner)
+#### Scenario: Submitting My Self-Description for Team Logo Generation
 
-- **Given** the first Player to join a team arrives at the AI Design Studio (/team-setup)
-- **And** the Player chooses to provide custom keywords (e.g., "Fast, Corporate, Tiger")
-- **When** the Player clicks "Generate Design"
-- **Then** the System should check the keywords against a "Policy Safety Filter"
-- **And If** keywords violate policy, display "Inappropriate terms detected. Please try again."
-- **And If** keywords are safe, the System should show an "AI Processing" animation
-- **Then** the screen should display a newly generated Car Image and Team Slogan
-- **And** the Player can choose to "Finalize" to make the team "ACTIVE".
+- **Given** a Player logs in for the first time and arrives at the AI Design Studio (/team-setup)
+- **And** the Player belongs to a preassigned team with an auto-created team name
+- **When** the Player enters words that describe themself
+- **And** the Player submits their self-description
+- **Then** the System should check the submitted words against a "Policy Safety Filter"
+- **And If** the words violate policy, display "Inappropriate terms detected. Please try again."
+- **And If** the words are safe, save the Player's self-description to the team's pending logo inputs
+- **And** the UI should show whether the team is still waiting for more teammate descriptions or ready to generate the final logo.
 
-#### Scenario: Subsequent Players Joining a Setup Team
+#### Scenario: Generating the Shared Team Logo After All Teammates Submit
 
-- **Given** a Player joins a team that has already been "Activated" by a teammate
+- **Given** every Player on a preassigned team has logged in and submitted a policy-approved self-description
+- **When** the final teammate's self-description is saved
+- **Then** the System should show an "AI Processing" animation
+- **And** generate a single shared team logo using all teammate descriptions and the team's preassigned name
+- **And** display the generated Team Logo with the preassigned Team Name
+- **And** the team status should change to "ACTIVE"
+- **And** all Players on that team should be routed to the **Main Race Hub**.
+
+#### Scenario: Subsequent Players Joining an Already Active Team
+
+- **Given** a Player joins a team that already has a generated logo and status "ACTIVE"
 - **When** they complete their login
-- **Then** they should be shown a 5-second "Welcome to the Paddock" screen featuring their team's custom car and name
+- **Then** they should be shown a 5-second "Welcome to the Paddock" screen featuring their team's generated logo and preassigned team name
 - **And** they should be automatically redirected to the **Main Race Hub**.
 
 ### Feature: Scavenger Hunt & The "Hot Potato" Hazard

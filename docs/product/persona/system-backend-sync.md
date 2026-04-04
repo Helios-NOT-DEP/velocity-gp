@@ -6,6 +6,25 @@
 
 _The system must strictly enforce team assignments, statuses, and hazard ratios during every scan._
 
+#### Scenario: Persisting Teammate Self-Descriptions for Team Logo Generation
+
+- **Given** a Player submits words describing themself in the AI Design Studio
+- **When** the System receives the self-description for that Player's assigned team
+- **Then** the System should validate the terms against the Policy Safety Filter
+- **And If** the terms violate policy, reject the submission and do not count it toward team completion
+- **And If** the terms are safe, persist the self-description for that Player and team
+- **And** recalculate whether all teammates on that preassigned team have submitted approved descriptions.
+
+#### Scenario: Generating a Shared Team Logo Once All Teammates Have Submitted
+
+- **Given** a preassigned team has an auto-created team name
+- **And** every member of that team has submitted an approved self-description
+- **When** the final required self-description is saved
+- **Then** the System should generate one shared Team Logo from all teammate descriptions and the preassigned team name
+- **And** persist the generated Team Logo as the team's shared identity
+- **And** transition the team status to "ACTIVE"
+- **And** make the updated team identity available to all team members for routing into the Main Race Hub.
+
 #### Scenario: Evaluating the "Hot Potato" Modulo
 
 - **Given** a scan request is received for QR Code UUID-XYZ
