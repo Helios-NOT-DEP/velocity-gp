@@ -4,23 +4,17 @@ import React, { useState } from 'react';
 import { Zap } from 'lucide-react';
 
 export default function Signup() {
-	const [fullName, setFullName] = useState('');
-	const [gmfEmail, setGmfEmail] = useState('');
+	const [fullName, setFullName] = useState('');	
 	const [phoneOrEmail, setPhoneOrEmail] = useState('');
-	const [errors, setErrors] = useState<{ fullName?: string; gmfEmail?: string; phoneOrEmail?: string }>({});
+	const [errors, setErrors] = useState<{ fullName?: string; phoneOrEmail?: string }>({});
 	const [submitted, setSubmitted] = useState(false);
 
 	const isValidEmail = (email: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.toLowerCase());
 	const isValidPhone = (phone: string) => /^\d{10}$/.test(phone);
 
 	const validate = () => {
-		const newErrors: { fullName?: string; gmfEmail?: string; phoneOrEmail?: string } = {};
+		const newErrors: { fullName?: string; phoneOrEmail?: string } = {};
 		if (!fullName.trim()) newErrors.fullName = 'Full name is required.';
-		if (!gmfEmail.trim()) {
-			newErrors.gmfEmail = 'GM Financial email is required.';
-		} else if (!isValidEmail(gmfEmail) || !gmfEmail.toLowerCase().endsWith('@gmfinancial.com')) {
-			newErrors.gmfEmail = 'Enter a valid GM Financial email (must end with @gmfinancial.com).';
-		}
 		if (!phoneOrEmail.trim()) {
 			newErrors.phoneOrEmail = 'This field is required.';
 		} else if (!isValidEmail(phoneOrEmail) && !isValidPhone(phoneOrEmail)) {
@@ -35,7 +29,7 @@ export default function Signup() {
 		setErrors(validationErrors);
 		if (Object.keys(validationErrors).length === 0) {
 			// TODO: Call signup service here
-			// await signupService({ fullName, gmfEmail, phoneOrEmail });
+			// await signupService({ fullName, phoneOrEmail });
 			setSubmitted(true);
 		}
 	};
@@ -43,7 +37,6 @@ export default function Signup() {
 	const handleBackToSignup = () => {
 		setSubmitted(false);
 		setFullName('');
-		setGmfEmail('');
 		setPhoneOrEmail('');
 		setErrors({});
 	};
@@ -96,18 +89,7 @@ export default function Signup() {
 								{errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>}
 							</div>
 
-							<div>
-								<label className="block text-sm font-medium text-gray-300 mb-2">GMF Email</label>
-								<input
-									type="email"
-									placeholder="your@gmfinancial.com"
-									value={gmfEmail}
-									onChange={(e) => setGmfEmail(e.target.value)}
-									className={`w-full px-4 py-3 bg-black border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all ${errors.gmfEmail ? 'border-red-500' : 'border-gray-700'}`}
-									style={{ fontFamily: 'var(--font-body)' }}
-								/>
-								{errors.gmfEmail && <p className="text-red-500 text-xs mt-1">{errors.gmfEmail}</p>}
-							</div>
+							{/* GMF Email field removed */}
 
 							<div>
 								<label className="block text-sm font-medium text-gray-300 mb-2">Personal Email or Phone</label>
@@ -136,7 +118,7 @@ export default function Signup() {
 					) : (
 						<div className="text-center py-12">
 							<h2 className="text-2xl font-bold mb-4 text-white">Check your inbox</h2>
-							<p className="text-gray-300 mb-6">A secure login link has been sent to your GMF email and personal email/phone.</p>
+							<p className="text-gray-300 mb-6">A secure login link has been sent to your email or phone.</p>
 							<button
 								onClick={handleBackToSignup}
 								className="mt-4 px-6 py-2 rounded-xl bg-gray-800 text-white font-medium hover:bg-gray-700 transition-all"
