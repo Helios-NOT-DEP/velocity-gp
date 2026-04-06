@@ -2,100 +2,187 @@
 
 ## The Admin (Event Organizer)
 
-### Feature: Event & Hazard Management
+### Feature: Admin Operations Console
 
-_As an organizer, I need to manage the multi-day race flow, designate 'Creators', and tweak game difficulty._
+_As an organizer, I need a single operational console to control the live race, manage scoring assets, inspect teams and players, and monitor event health from one place._
+
+#### Scenario: Navigating the Admin Console by Operational Section
+
+- **Given** the Admin opens the `/admin` route
+- **When** the Admin views the console
+- **Then** the interface should expose distinct sections for **Game Control**, **QR Codes**, **Teams**, **Players**, and **Statistics**
+- **And** the active section should remain visually clear on both mobile and desktop layouts.
+
+#### Scenario: Viewing the Global Race Status at a Glance
+
+- **Given** the Admin is on the "Game Control" section
+- **When** the console loads current race state
+- **Then** the header should display whether the race is currently `ACTIVE` or `PAUSED`
+- **And** the quick summary should show total teams, active penalties, and total QR codes.
+
+#### Scenario: Pausing or Resuming the Entire Race
+
+- **Given** the Admin is on the "Game Control" section
+- **When** the Admin toggles the primary race-state control
+- **Then** the global game state should switch between `ACTIVE` and `PAUSED`
+- **And** the UI should explain whether scanning is enabled or disabled for all teams.
+
+#### Scenario: Resetting All Team Scores with Confirmation
+
+- **Given** the Admin is on the "Game Control" section
+- **When** the Admin selects "Reset All Scores"
+- **Then** the console should require an explicit confirmation step before applying the reset
+- **And** only after confirmation should every team's score return to zero.
+
+### Feature: QR Code Operations
+
+_As an organizer, I need to create and manage the QR scoring assets used during the event._
 
 #### Scenario: Creating a New QR Code from the Admin Portal
 
-- **Given** the Admin is on the "QR Control Center" tab of the Admin Portal
-- **When** the Admin clicks "Create QR"
-- **And** enters a label, point value, zone, and activation window
-- **And** selects "Generate"
-- **Then** the System should create a unique QR identifier and render a downloadable QR asset
-- **And** the QR code should appear in the QR inventory table with status "ACTIVE".
+- **Given** the Admin is on the "QR Codes" section
+- **When** the Admin enters a QR code name and point value
+- **And** clicks "Generate QR Code"
+- **Then** the System should create a unique QR scoring asset
+- **And** the console should render a scannable QR preview card for that asset
+- **And** the new QR code should appear in the QR code grid with status `ACTIVE`.
 
-#### Scenario: Bulk Generating QR Codes for a Venue Zone
+#### Scenario: Reviewing QR Code Performance in the Grid
 
-- **Given** the Admin is preparing the event floor for launch day
-- **When** the Admin uploads a CSV template with zone, value, and label fields
-- **And** clicks "Generate Batch"
-- **Then** the System should validate each row and create QR codes for valid records
-- **And** invalid rows should be returned in an error report with line-level reasons
-- **And** the Admin should be able to download a zip of all generated QR assets.
+- **Given** QR codes already exist in the system
+- **When** the Admin views the "QR Codes" section
+- **Then** each QR card should show the QR's name, point value, active status, and scan count
+- **And** the Admin should be able to distinguish enabled and disabled codes visually.
 
 #### Scenario: Disabling a Compromised or Duplicated QR Code
 
 - **Given** the Admin identifies a leaked or duplicated QR code in circulation
-- **When** the Admin toggles that QR's status from "ACTIVE" to "DISABLED"
-- **Then** all future scans of that QR should be rejected
-- **And** the Player should see "Code disabled by race control. Find another checkpoint."
-- **And** the action should be recorded in an audit log with admin identity and timestamp.
+- **When** the Admin disables that QR code from its QR card
+- **Then** the QR code should switch from `ACTIVE` to `DISABLED`
+- **And** future player scans of that code should be rejected
+- **And** the console should visibly reflect that the code is no longer active.
 
-#### Scenario: Configuring the Global "Hot Potato" Ratio
+#### Scenario: Re-enabling a Previously Disabled QR Code
 
-- **Given** the Admin is on the "Game Settings" tab of the Admin Dashboard
-- **When** the Admin inputs "10" into the "Global Hazard Scan Ratio" field
-- **And** clicks "Save Configuration"
-- **Then** the System updates the configuration database
-- **And** moving forward, any QR code in the venue that reaches a multiple of 10 in its global scan count (10th, 20th, 30th scan) will automatically trigger a Pit Stop penalty for the unlucky scanner.
+- **Given** a QR code is currently `DISABLED`
+- **When** the Admin enables that QR code from its QR card
+- **Then** the QR code should return to `ACTIVE`
+- **And** it should once again be eligible for player scanning.
 
-#### Scenario: Configuring Hazard Rules Per QR Code
+#### Scenario: Deleting an Obsolete QR Code
 
-- **Given** the Admin is on a specific QR code's detail drawer
-- **When** the Admin enables "Custom Hazard Rule"
-- **And** sets a hazard ratio of 8 with a pit penalty duration of 10 minutes
-- **And** clicks "Save Rule"
-- **Then** the System should store the per-QR hazard policy
-- **And** future scans of that QR should use the custom policy instead of the global default
-- **And** the change should be reflected immediately on the Admin preview simulator.
+- **Given** a QR code should no longer be used in the event
+- **When** the Admin deletes the QR code from its QR card
+- **Then** the QR asset should be removed from the admin grid
+- **And** it should no longer participate in future scoring activity.
 
-#### Scenario: Applying a Temporary Hazard Multiplier During Peak Hours
+### Feature: Team Operations
 
-- **Given** the Admin expects high scan traffic between 1 PM and 3 PM
-- **When** the Admin creates a scheduled rule for Zone C with hazard multiplier 1.5x
-- **Then** the System should automatically apply the multiplier only within the configured window
-- **And** once the window ends, the hazard behavior should revert to baseline configuration.
+_As an organizer, I need to inspect and intervene on team performance and penalty state during the race._
 
-#### Scenario: Pausing the Race for the Night
+#### Scenario: Browsing Teams in Ranked Order
 
-- **Given** the Admin is on the Admin Dashboard
-- **And** the multi-day race is currently "Active"
-- **When** the Admin clicks "PAUSE RACE (Overnight Lock)"
-- **Then** the global game state should update to "Paused"
-- **And** all Players' camera scanners should be disabled with a message "Race resumes tomorrow at 9 AM!"
+- **Given** the Admin is on the "Teams" section
+- **When** the team list loads
+- **Then** teams should be presented in score-ranked order
+- **And** each team row should show rank, team name, score, member count, and whether the team is currently racing or in a pit stop.
 
-#### Scenario: Assigning Helios Permissions
+#### Scenario: Opening a Team Detail View
 
-- **Given** the Admin is on the "User Management" tab of the Admin Dashboard
-- **When** the Admin searches for a user by email or name
-- **And** toggles the "Helios Status" switch to "ON"
-- **Then** the System should update that user's record with is_helios: true
-- **And** the next time that user's app refreshes, it should display their "Superpower QR" in their profile.
+- **Given** the Admin is reviewing teams
+- **When** the Admin selects a specific team from the ranked list
+- **Then** the console should open a detailed team view
+- **And** that view should show the team's score, rank, keywords, pit-stop state, and member roster.
 
-### Feature: Admin Game Health Dashboard
+#### Scenario: Adjusting a Team Score Manually
 
-_As an organizer, I want a real-time health dashboard so I can quickly detect risk, engagement drops, and fairness anomalies during the race._
+- **Given** the Admin is viewing a specific team's detail view
+- **When** the Admin edits and saves that team's score
+- **Then** the team's score should update immediately
+- **And** the team's leaderboard position should reflect the new value.
 
-#### Scenario: Viewing Core Health Metrics in Real Time
+#### Scenario: Triggering a Manual Pit Stop for a Team
 
-- **Given** the Admin opens the "Game Health" dashboard
-- **When** live data is available
-- **Then** the dashboard should show active players, scans per minute, hazard hit rate, average pit duration, and invalid scan rate
-- **And** each metric tile should display a trend indicator versus the previous 15-minute window.
+- **Given** the Admin is viewing a specific team's detail view
+- **And** the team is not currently in a pit stop
+- **When** the Admin triggers a pit stop manually
+- **Then** that team should enter the `IN_PIT` state
+- **And** the team detail should display the active pit-stop timer.
 
-#### Scenario: Alerting on Abnormal Invalid Scan Spikes
+#### Scenario: Clearing an Active Pit Stop for a Team
 
-- **Given** the baseline invalid scan rate is below 3%
-- **When** the invalid scan rate rises above a configured threshold (e.g., 8%) for 5 continuous minutes
-- **Then** the dashboard should raise a "Potential Abuse / Signage Issue" warning
-- **And** highlight the top zones and codes contributing to the spike
-- **And** recommend operational actions (disable suspected code, inspect venue signage, dispatch staff).
+- **Given** the Admin is viewing a specific team's detail view
+- **And** the team is currently in a pit stop
+- **When** the Admin clears the penalty manually
+- **Then** the team should return to the active race state
+- **And** the pit-stop timer should be removed from the team view.
 
-#### Scenario: Monitoring Fairness Through Team Risk Distribution
+#### Scenario: Removing a Team from the Event
 
-- **Given** the race has been active for at least 30 minutes
-- **When** one team's hazard-hit frequency is statistically higher than venue average
-- **Then** the dashboard should flag a fairness warning
-- **And** surface contributing QR codes and zones
-- **And** allow the Admin to open hazard controls directly from the warning panel.
+- **Given** the Admin is viewing a specific team's detail view
+- **When** the Admin deletes the team
+- **Then** the team should be removed from the ranked team list
+- **And** the admin console should no longer show that team in active event operations.
+
+### Feature: Player Directory and Detail Review
+
+_As an organizer, I need player-level visibility so I can audit participation, contact information, and scoring history._
+
+#### Scenario: Browsing Players Across All Teams
+
+- **Given** the Admin is on the "Players" section
+- **When** the player directory loads
+- **Then** players should be shown in score-ranked order across all teams
+- **And** each player row should show player name, team affiliation, and individual score.
+
+#### Scenario: Opening a Player Detail View
+
+- **Given** the Admin is reviewing the player directory
+- **When** the Admin selects a specific player
+- **Then** the console should open a player detail view
+- **And** that view should show the player's global rank, team rank, joined date, team affiliation, and individual score.
+
+#### Scenario: Reviewing Player Contact Information
+
+- **Given** the Admin is on a player's detail view
+- **When** the player has contact data on file
+- **Then** the console should show the player's email address and phone number
+- **And** missing optional contact data should be displayed clearly rather than omitted silently.
+
+#### Scenario: Editing Player Contact Information
+
+- **Given** the Admin is on a player's detail view
+- **When** the Admin edits and saves that player's email address or phone number
+- **Then** the player record should update immediately in the admin console
+- **And** the revised contact information should persist as the latest player contact record.
+
+#### Scenario: Reviewing a Player's Scan History
+
+- **Given** the Admin is on a player's detail view
+- **When** scan history exists for that player
+- **Then** the console should show a chronological list of the QR codes that player scanned
+- **And** each entry should include the QR name, timestamp, and points awarded.
+
+### Feature: Statistics and Event Summary
+
+_As an organizer, I want an event summary view that highlights the live competition picture and major operational counts._
+
+#### Scenario: Viewing Core Event Totals
+
+- **Given** the Admin opens the "Statistics" section
+- **When** current event data is available
+- **Then** the summary cards should show total teams, total points scored, total scans, and active penalties.
+
+#### Scenario: Viewing the Current Top Teams
+
+- **Given** the Admin opens the "Statistics" section
+- **When** team ranking data is available
+- **Then** the interface should highlight the top three teams prominently
+- **And** each top-team card should show the team name and current score.
+
+#### Scenario: Reviewing Active QR Codes from the Statistics View
+
+- **Given** the Admin opens the "Statistics" section
+- **When** QR code data is available
+- **Then** the section should show the currently active QR codes
+- **And** each row should display the QR's name, scan count, and point value.
