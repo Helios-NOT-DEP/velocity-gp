@@ -7,18 +7,20 @@ import type {
 import { createIsoDate, placeholderPlayer } from './placeholderData.js';
 
 export function createPlayer(request: CreatePlayerRequest): PlayerProfile {
-  // TODO: Save player to database and generate real ID
   return {
+    ...placeholderPlayer,
     id: 'player-generated-placeholder',
+    userId: 'user-generated-placeholder',
     email: request.email,
     name: request.name,
     eventId: request.eventId,
+    teamId: request.teamId ?? null,
+    joinedAt: createIsoDate(1),
     createdAt: createIsoDate(1),
   };
 }
 
 export function getPlayerProfile(playerId: string): PlayerProfile {
-  // TODO: Query player profile from database
   return {
     ...placeholderPlayer,
     id: playerId,
@@ -26,10 +28,10 @@ export function getPlayerProfile(playerId: string): PlayerProfile {
 }
 
 export function updatePlayerProfile(playerId: string, request: UpdatePlayerRequest): PlayerProfile {
-  // TODO: Persist player profile updates to database
   return {
     ...placeholderPlayer,
     id: playerId,
     name: request.name ?? placeholderPlayer.name,
+    teamId: request.teamId === undefined ? placeholderPlayer.teamId : request.teamId,
   };
 }

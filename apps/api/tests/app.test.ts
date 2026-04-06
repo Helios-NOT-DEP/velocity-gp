@@ -25,6 +25,35 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.playerId).toBe('player-123');
     expect(response.body.data.eventId).toBe('event-123');
+    expect(response.body.data).toMatchObject({
+      scannerEnabled: true,
+      raceControlState: 'ACTIVE',
+      teamStatus: 'ACTIVE',
+    });
+  });
+
+  it('accepts canonical scan submissions and returns typed outcomes', async () => {
+    const safeResponse = await request(app)
+      .post(`${apiPrefix}/events/event-123/scans`)
+      .send({ playerId: 'player-123', qrPayload: 'VG-GAMMA-03' });
+
+    expect(safeResponse.status).toBe(200);
+    expect(safeResponse.body.success).toBe(true);
+    expect(safeResponse.body.data.outcome).toBe('SAFE');
+    expect(safeResponse.body.data.pointsAwarded).toBeGreaterThan(0);
+  });
+
+  it('supports legacy /hazards/scan alias with matching contract shape', async () => {
+    const response = await request(app).post(`${apiPrefix}/hazards/scan`).send({
+      playerId: 'player-123',
+      eventId: 'event-123',
+      qrCode: 'VG-UNKNOWN-404',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.outcome).toBe('INVALID');
+    expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
   });
 
   it('validates request bodies', async () => {
@@ -67,5 +96,30 @@ describe('velocity gp backend', () => {
     expect(response.body.data.scope).toBe('admin');
     expect(response.body.data.userId).toBe('admin-1');
     expect(response.body.data.role).toBe('admin');
+  });
+
+  it('updates race control through admin endpoints', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/event-123/race-control`)
+      .set('x-user-id', 'admin-1')
+      .set('x-user-role', 'admin')
+      .send({ state: 'PAUSED', reason: 'scheduled break' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.eventId).toBe('event-123');
+    expect(response.body.data.state).toBe('PAUSED');
+  });
+
+  it('validates admin payloads for manual pit control', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/event-123/teams/team-1/pit-control`)
+      .set('x-user-id', 'admin-1')
+      .set('x-user-role', 'admin')
+      .send({ action: 'INVALID_ACTION' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
 });
