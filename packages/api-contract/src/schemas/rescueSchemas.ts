@@ -7,5 +7,6 @@ export const rescuePlayerParamsSchema = z.object({
 export const initiateRescueSchema = z.object({
   playerId: z.string().min(1),
   eventId: z.string().min(1),
+  heliosQrId: z.string().min(1).optional(),
   reason: z.string().min(2).optional(),
 });

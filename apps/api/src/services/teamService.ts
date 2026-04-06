@@ -5,21 +5,26 @@ import type {
   Team,
 } from '@velocity-gp/api-contract';
 
-import { createIsoDate, placeholderPlayer, placeholderTeam } from './placeholderData.js';
+import {
+  createIsoDate,
+  placeholderPlayer,
+  placeholderTeam,
+  withTeamStatus,
+} from './placeholderData.js';
 
 export function createTeam(request: CreateTeamRequest): Team {
-  // TODO: Save team to database and generate real ID
   return {
     id: 'team-generated-placeholder',
     name: request.name,
     eventId: request.eventId,
+    status: 'PENDING',
+    pitStopExpiresAt: null,
     members: [],
     score: 0,
   };
 }
 
 export function getTeam(teamId: string): Team {
-  // TODO: Query team from database
   return {
     ...placeholderTeam,
     id: teamId,
@@ -27,16 +32,14 @@ export function getTeam(teamId: string): Team {
 }
 
 export function joinTeam(teamId: string, request: JoinTeamRequest): Team {
-  // TODO: Persist team membership to database
   return {
-    ...placeholderTeam,
+    ...withTeamStatus(placeholderTeam, 'ACTIVE', null),
     id: teamId,
     members: [...placeholderTeam.members, request.playerId],
   };
 }
 
 export function getTeamMembers(teamId: string): PlayerProfile[] {
-  // TODO: Query team members from database
   return [
     {
       ...placeholderPlayer,

@@ -7,119 +7,294 @@ datasource db {
     provider = "postgresql"
 }
 
+enum UserRole {
+    ADMIN
+    HELIOS
+    PLAYER
+}
+
+enum EventStatus {
+    UPCOMING
+    ACTIVE
+    COMPLETED
+}
+
+enum TeamStatus {
+    PENDING
+    ACTIVE
+    IN_PIT
+}
+
+enum PlayerStatus {
+    RACING
+    IN_PIT
+    FINISHED
+}
+
+enum RaceControlState {
+    ACTIVE
+    PAUSED
+}
+
+enum QRCodeStatus {
+    ACTIVE
+    DISABLED
+}
+
+enum ScanOutcome {
+    SAFE
+    HAZARD_PIT
+    INVALID
+    DUPLICATE
+    BLOCKED
+}
+
+enum RescueStatus {
+    REQUESTED
+    IN_PROGRESS
+    COMPLETED
+    REJECTED
+}
+
+enum TeamTransitionReason {
+    HAZARD_TRIGGER
+    RESCUE_CLEARED
+    TIMER_EXPIRED
+    ADMIN_MANUAL
+    SYSTEM_RESET
+}
+
+enum AdminActionType {
+    RACE_PAUSED
+    RACE_RESUMED
+    HELIOS_ASSIGNED
+    HELIOS_REVOKED
+    PIT_MANUAL_ENTER
+    PIT_MANUAL_CLEAR
+    SCORE_RESET
+}
+
+model User {
+    id          String             @id @default(cuid())
+    email       String             @unique
+    displayName String
+    role        UserRole           @default(PLAYER)
+    isHelios    Boolean            @default(false)
+    createdAt   DateTime           @default(now())
+    updatedAt   DateTime           @updatedAt
+
+    players           Player[]
+    adminActionAudits AdminActionAudit[] @relation("AdminActionActor")
+    rescuesGiven      Rescue[]           @relation("RescueScannedBy")
+    teamTransitions   TeamStateTransition[] @relation("TeamTransitionTriggeredByUser")
+}
+
 model Event {
-    id                 String   @id @default(cuid())
+    id                 String      @id @default(cuid())
     name               String
     description        String?
     startDate          DateTime
     endDate            DateTime
-    status             String   @default("UPCOMING") // UPCOMING | ACTIVE | COMPLETED
+    status             EventStatus @default(UPCOMING)
     maxPlayers         Int?
-    currentPlayerCount Int      @default(0)
+    currentPlayerCount Int         @default(0)
     venueId            String?
-    isPublic           Boolean  @default(true)
-    createdAt          DateTime @default(now())
-    updatedAt          DateTime @updatedAt
+    isPublic           Boolean     @default(true)
+    createdAt          DateTime    @default(now())
+    updatedAt          DateTime    @updatedAt
 
-    players Player[]
-    teams   Team[]
-    races   Race[]
-    hazards Hazard[]
-    rescues Rescue[]
+    config            EventConfig?
+    teams             Team[]
+    players           Player[]
+    qrCodes           QRCode[]
+    qrCodeClaims      QRCodeClaim[]
+    scanRecords       ScanRecord[]
+    rescues           Rescue[]
+    teamTransitions   TeamStateTransition[]
+    adminActionAudits AdminActionAudit[]
 }
 
-model Player {
-    id        String   @id @default(cuid())
-    email     String   @unique
-    name      String
-    eventId   String
-    teamId    String?
-    status    String   @default("RACING") // IN_PIT | RACING | FINISHED
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+model EventConfig {
+    id                     String           @id @default(cuid())
+    eventId                String           @unique
+    globalHazardRatio      Int              @default(15)
+    pitStopDurationSeconds Int              @default(900)
+    invalidScanPenalty     Int              @default(1)
+    raceControlState       RaceControlState @default(ACTIVE)
+    createdAt              DateTime         @default(now())
+    updatedAt              DateTime         @updatedAt
 
-    event   Event    @relation(fields: [eventId], references: [id])
-    team    Team?    @relation(fields: [teamId], references: [id])
-    races   Race[]
-    rescues Rescue[]
-
-    @@unique([eventId, email])
+    event Event @relation(fields: [eventId], references: [id])
 }
 
 model Team {
-    id        String   @id @default(cuid())
-    name      String
-    eventId   String
-    score     Int      @default(0)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    id               String     @id @default(cuid())
+    name             String
+    eventId          String
+    score            Int        @default(0)
+    status           TeamStatus @default(PENDING)
+    pitStopExpiresAt DateTime?
+    createdAt        DateTime   @default(now())
+    updatedAt        DateTime   @updatedAt
 
-    event   Event    @relation(fields: [eventId], references: [id])
-    players Player[]
-    races   Race[]
+    event            Event                 @relation(fields: [eventId], references: [id])
+    players          Player[]
+    scanRecords      ScanRecord[]
+    rescuesRequested Rescue[]             @relation("RescueRequestingTeam")
+    teamTransitions  TeamStateTransition[]
 
     @@unique([eventId, name])
-}
-
-model Race {
-    id              String    @id @default(cuid())
-    eventId         String
-    playerId        String
-    teamId          String
-    startedAt       DateTime  @default(now())
-    endedAt         DateTime?
-    status          String    @default("RACING") // IN_PIT | RACING | FINISHED
-    currentLocation String?
-    score           Int       @default(0)
-    updatedAt       DateTime  @updatedAt
-
-    event   Event        @relation(fields: [eventId], references: [id])
-    player  Player       @relation(fields: [playerId], references: [id])
-    team    Team         @relation(fields: [teamId], references: [id])
-    hazards RaceHazard[]
-
     @@index([eventId])
-    @@index([playerId])
+    @@index([eventId, status])
 }
 
-model Hazard {
-    id          String   @id @default(cuid())
-    name        String
-    ratio       Float
-    description String?
+model Player {
+    id                String       @id @default(cuid())
+    userId            String
+    eventId           String
+    teamId            String?
+    status            PlayerStatus @default(RACING)
+    individualScore   Int          @default(0)
+    isFlaggedForReview Boolean     @default(false)
+    joinedAt          DateTime     @default(now())
+    createdAt         DateTime     @default(now())
+    updatedAt         DateTime     @updatedAt
+
+    user            User                  @relation(fields: [userId], references: [id])
+    event           Event                 @relation(fields: [eventId], references: [id])
+    team            Team?                 @relation(fields: [teamId], references: [id])
+    qrClaims        QRCodeClaim[]
+    scanRecords     ScanRecord[]
+    rescuesRequested Rescue[]             @relation("RescueRequestingPlayer")
+    teamTransitions TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
+
+    @@unique([eventId, userId])
+    @@index([eventId])
+    @@index([teamId])
+}
+
+model QRCode {
+    id                String       @id @default(cuid())
+    eventId           String
+    label             String
+    value             Int
+    zone              String?
+    payload           String       @unique
+    status            QRCodeStatus @default(ACTIVE)
+    activationStartsAt DateTime?
+    activationEndsAt  DateTime?
+    hazardRatioOverride Int?
+    scanCount         Int          @default(0)
+    createdAt         DateTime     @default(now())
+    updatedAt         DateTime     @updatedAt
+
+    event       Event        @relation(fields: [eventId], references: [id])
+    claims      QRCodeClaim[]
+    scanRecords ScanRecord[]
+
+    @@unique([eventId, label])
+    @@index([eventId])
+    @@index([eventId, status])
+}
+
+model QRCodeClaim {
+    id        String   @id @default(cuid())
+    eventId   String
+    qrCodeId  String
+    playerId  String
+    claimedAt DateTime @default(now())
+
+    event  Event  @relation(fields: [eventId], references: [id])
+    qrCode QRCode @relation(fields: [qrCodeId], references: [id])
+    player Player @relation(fields: [playerId], references: [id])
+
+    @@unique([qrCodeId, playerId])
+    @@index([eventId, playerId])
+}
+
+model ScanRecord {
+    id                   String      @id @default(cuid())
+    eventId              String
+    qrCodeId             String?
+    playerId             String
+    teamId               String?
+    outcome              ScanOutcome
+    pointsAwarded        Int         @default(0)
+    hazardRatioUsed      Int?
+    globalScanCountBefore Int?
+    globalScanCountAfter Int?
+    scannedPayload       String
+    message              String?
+    createdAt            DateTime    @default(now())
+
+    event  Event   @relation(fields: [eventId], references: [id])
+    qrCode QRCode? @relation(fields: [qrCodeId], references: [id])
+    player Player  @relation(fields: [playerId], references: [id])
+    team   Team?   @relation(fields: [teamId], references: [id])
+
+    @@index([eventId, createdAt])
+    @@index([playerId, createdAt])
+    @@index([outcome])
+}
+
+model TeamStateTransition {
+    id                  String               @id @default(cuid())
+    eventId             String
+    teamId              String
+    fromStatus          TeamStatus?
+    toStatus            TeamStatus
+    reason              TeamTransitionReason
+    triggeredByUserId   String?
+    triggeredByPlayerId String?
+    notes               String?
+    createdAt           DateTime             @default(now())
+
+    event              Event   @relation(fields: [eventId], references: [id])
+    team               Team    @relation(fields: [teamId], references: [id])
+    triggeredByUser    User?   @relation("TeamTransitionTriggeredByUser", fields: [triggeredByUserId], references: [id])
+    triggeredByPlayer  Player? @relation("TeamTransitionTriggeredByPlayer", fields: [triggeredByPlayerId], references: [id])
+
+    @@index([eventId, createdAt])
+    @@index([teamId, createdAt])
+}
+
+model AdminActionAudit {
+    id          String          @id @default(cuid())
     eventId     String
-    location    String?
-    qrCode      String?
-    isActive    Boolean  @default(true)
-    createdAt   DateTime @default(now())
+    actorUserId String
+    actionType  AdminActionType
+    targetType  String
+    targetId    String?
+    details     Json?
+    createdAt   DateTime        @default(now())
 
-    event Event        @relation(fields: [eventId], references: [id])
-    races RaceHazard[]
+    event     Event @relation(fields: [eventId], references: [id])
+    actorUser User  @relation("AdminActionActor", fields: [actorUserId], references: [id])
 
-    @@index([eventId])
-}
-
-model RaceHazard {
-    id            String   @id @default(cuid())
-    raceId        String
-    hazardId      String
-    encounteredAt DateTime @default(now())
-
-    race   Race   @relation(fields: [raceId], references: [id])
-    hazard Hazard @relation(fields: [hazardId], references: [id])
+    @@index([eventId, createdAt])
+    @@index([actorUserId, createdAt])
 }
 
 model Rescue {
-    id          String    @id @default(cuid())
-    playerId    String
-    eventId     String
-    initiatedAt DateTime  @default(now())
-    completedAt DateTime?
-    status      String    @default("REQUESTED") // REQUESTED | IN_PROGRESS | COMPLETED
-    reason      String?
+    id                 String       @id @default(cuid())
+    eventId            String
+    requestingPlayerId String
+    requestingTeamId   String
+    rescuerUserId      String
+    status             RescueStatus @default(REQUESTED)
+    reason             String?
+    initiatedAt        DateTime     @default(now())
+    completedAt        DateTime?
+    cooldownExpiresAt  DateTime?
+    createdAt          DateTime     @default(now())
+    updatedAt          DateTime     @updatedAt
 
-    player Player @relation(fields: [playerId], references: [id])
-    event  Event  @relation(fields: [eventId], references: [id])
+    event            Event  @relation(fields: [eventId], references: [id])
+    requestingPlayer Player @relation("RescueRequestingPlayer", fields: [requestingPlayerId], references: [id])
+    requestingTeam   Team   @relation("RescueRequestingTeam", fields: [requestingTeamId], references: [id])
+    rescuerUser      User   @relation("RescueScannedBy", fields: [rescuerUserId], references: [id])
 
-    @@index([playerId])
+    @@index([eventId, initiatedAt])
+    @@index([requestingPlayerId])
+    @@index([requestingTeamId])
 }
