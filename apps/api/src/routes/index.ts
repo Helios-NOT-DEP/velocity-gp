@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { adminRouter } from './admin.js';
 import { eventRouter } from './event.js';
 import { gameRouter } from './game.js';
 import { hazardRouter } from './hazard.js';
@@ -9,6 +10,7 @@ import { teamRouter } from './team.js';
 
 export const apiRouter = Router();
 
+apiRouter.use(adminRouter);
 apiRouter.use(eventRouter);
 apiRouter.use(gameRouter);
 apiRouter.use(hazardRouter);
