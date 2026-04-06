@@ -118,7 +118,9 @@ export async function releaseTeamFromPit(
   input: ReleaseTeamFromPitInput,
   publisher: PitReleasePublisher = getPitReleasePublisher()
 ): Promise<TeamPitReleasedEvent | null> {
-  const releaseEvent = await prisma.$transaction((tx) => releaseTeamFromPitInTransaction(tx, input));
+  const releaseEvent = await prisma.$transaction((tx) =>
+    releaseTeamFromPitInTransaction(tx, input)
+  );
 
   if (!releaseEvent) {
     return null;

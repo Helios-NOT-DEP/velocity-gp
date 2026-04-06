@@ -12,10 +12,7 @@ import type { Prisma } from '../../prisma/generated/client.js';
 import { prisma } from '../db/client.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
-import {
-  publishTeamReleaseEvent,
-  releaseTeamFromPitInTransaction,
-} from './pitReleaseService.js';
+import { publishTeamReleaseEvent, releaseTeamFromPitInTransaction } from './pitReleaseService.js';
 
 interface AdminActionContext {
   readonly actorUserId?: string;
@@ -370,8 +367,11 @@ export async function updateHeliosRole(
           throw new ValidationError('User does not exist.', { userId });
         }
 
-        const nextRole =
-          request.isHelios ? 'HELIOS' : currentUser.role === 'HELIOS' ? 'PLAYER' : currentUser.role;
+        const nextRole = request.isHelios
+          ? 'HELIOS'
+          : currentUser.role === 'HELIOS'
+            ? 'PLAYER'
+            : currentUser.role;
 
         const updatedUser = await tx.user.update({
           where: {

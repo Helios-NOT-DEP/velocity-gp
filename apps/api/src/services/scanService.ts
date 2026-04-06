@@ -157,7 +157,8 @@ async function processScanInTransaction(
   }
 
   const blockedTeamInPit =
-    team.status === 'IN_PIT' && (!team.pitStopExpiresAt || team.pitStopExpiresAt.getTime() > now.getTime());
+    team.status === 'IN_PIT' &&
+    (!team.pitStopExpiresAt || team.pitStopExpiresAt.getTime() > now.getTime());
 
   if (eventConfig.raceControlState === 'PAUSED') {
     return createBlockedScanResponse(tx, {
@@ -458,40 +459,44 @@ export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResp
     });
   }
 
-  return withTraceSpan('scan.submit', { eventId: input.eventId, playerId: input.request.playerId }, async () => {
-    let attempt = 0;
-    while (attempt < SERIALIZATION_RETRY_LIMIT) {
-      try {
-        const result = await prisma.$transaction(
-          (tx) => processScanInTransaction(tx, input, qrPayload, new Date()),
-          {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  return withTraceSpan(
+    'scan.submit',
+    { eventId: input.eventId, playerId: input.request.playerId },
+    async () => {
+      let attempt = 0;
+      while (attempt < SERIALIZATION_RETRY_LIMIT) {
+        try {
+          const result = await prisma.$transaction(
+            (tx) => processScanInTransaction(tx, input, qrPayload, new Date()),
+            {
+              isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            }
+          );
+          incrementCounter('scan.outcome.total', { outcome: result.outcome });
+          return result;
+        } catch (error) {
+          if (!isSerializationFailure(error) || attempt === SERIALIZATION_RETRY_LIMIT - 1) {
+            throw error;
           }
-        );
-        incrementCounter('scan.outcome.total', { outcome: result.outcome });
-        return result;
-      } catch (error) {
-        if (!isSerializationFailure(error) || attempt === SERIALIZATION_RETRY_LIMIT - 1) {
-          throw error;
+
+          attempt += 1;
+          logger.warn(
+            {
+              eventId: input.eventId,
+              playerId: input.request.playerId,
+              attempt,
+            },
+            'serialization conflict during scan processing, retrying'
+          );
         }
-
-        attempt += 1;
-        logger.warn(
-          {
-            eventId: input.eventId,
-            playerId: input.request.playerId,
-            attempt,
-          },
-          'serialization conflict during scan processing, retrying'
-        );
       }
-    }
 
-    throw new ValidationError('Scan processing failed after retries.', {
-      eventId: input.eventId,
-      playerId: input.request.playerId,
-    });
-  });
+      throw new ValidationError('Scan processing failed after retries.', {
+        eventId: input.eventId,
+        playerId: input.request.playerId,
+      });
+    }
+  );
 }
 
 export async function submitLegacyScan(request: ScanHazardRequest): Promise<SubmitScanResponse> {

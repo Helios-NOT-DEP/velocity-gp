@@ -15,17 +15,15 @@ rescueRouter.post(
   asyncHandler(async (request, response) => {
     const authContext = resolveRequestAuthContext(request);
 
-    response
-      .status(202)
-      .json(
-        successResponse(
-          await initiateRescue({
-            ...request.body,
-            scannerUserId: authContext?.userId,
-          }),
-          { requestId: response.locals.requestId }
-        )
-      );
+    response.status(202).json(
+      successResponse(
+        await initiateRescue({
+          ...request.body,
+          scannerUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
   })
 );
 

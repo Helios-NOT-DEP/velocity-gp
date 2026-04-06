@@ -9,10 +9,7 @@ import { prisma } from '../db/client.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { AppError, ValidationError } from '../utils/appError.js';
 import { placeholderEvent, placeholderRescue } from './placeholderData.js';
-import {
-  publishTeamReleaseEvent,
-  releaseTeamFromPitInTransaction,
-} from './pitReleaseService.js';
+import { publishTeamReleaseEvent, releaseTeamFromPitInTransaction } from './pitReleaseService.js';
 
 interface InitiateRescueInput extends InitiateRescueRequest {
   readonly scannerUserId?: string;
@@ -28,13 +25,11 @@ async function resolveRescuer(
   tx: Prisma.TransactionClient,
   request: InitiateRescueInput
 ): Promise<RescuerResolution> {
-  let scannerPlayer:
-    | {
-        id: string;
-        userId: string;
-        teamId: string | null;
-      }
-    | null = null;
+  let scannerPlayer: {
+    id: string;
+    userId: string;
+    teamId: string | null;
+  } | null = null;
 
   if (request.scannerUserId) {
     scannerPlayer = await tx.player.findFirst({
