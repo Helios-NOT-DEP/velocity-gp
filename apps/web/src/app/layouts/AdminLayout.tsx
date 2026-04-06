@@ -21,7 +21,10 @@ export default function AdminLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white pb-20 md:pb-0" style={{ fontFamily: 'var(--font-body)' }}>
+    <div
+      className="min-h-screen bg-black text-white pb-20 md:pb-0"
+      style={{ fontFamily: 'var(--font-body)' }}
+    >
       <header className="border-b border-gray-800 bg-gradient-to-r from-[#0B1E3B] to-black sticky top-0 z-40">
         <div className="mx-auto max-w-7xl px-4 py-4 md:px-6 md:py-6">
           <div className="flex items-center justify-between gap-3">

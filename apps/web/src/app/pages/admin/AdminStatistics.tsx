@@ -47,7 +47,10 @@ export default function AdminStatistics() {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {sortedTeams.slice(0, 3).map((team, index) => (
-            <div key={team.id} className="bg-black/50 border border-gray-800 rounded-lg p-6 text-center">
+            <div
+              key={team.id}
+              className="bg-black/50 border border-gray-800 rounded-lg p-6 text-center"
+            >
               <div
                 className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center font-['Space_Grotesk'] text-2xl font-bold ${rankBadgeClass(
                   index

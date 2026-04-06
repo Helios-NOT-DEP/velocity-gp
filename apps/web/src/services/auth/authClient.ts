@@ -74,8 +74,10 @@ function readSessionFromStorage(): AuthSession {
     }
 
     const normalizedRole: AuthRole = role;
-    const userId = typeof parsed.userId === 'string' && parsed.userId.length > 0 ? parsed.userId : null;
-    const isAuthenticated = Boolean(parsed.isAuthenticated) && userId !== null && normalizedRole !== 'anonymous';
+    const userId =
+      typeof parsed.userId === 'string' && parsed.userId.length > 0 ? parsed.userId : null;
+    const isAuthenticated =
+      Boolean(parsed.isAuthenticated) && userId !== null && normalizedRole !== 'anonymous';
 
     return {
       userId,

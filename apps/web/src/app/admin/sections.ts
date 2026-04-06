@@ -43,8 +43,7 @@ export const adminSections: AdminSection[] = [
     id: 'statistics',
     label: 'Statistics',
     path: '/admin/statistics',
-    description:
-      'Event totals and race summary analytics aligned to admin-facing reporting needs.',
+    description: 'Event totals and race summary analytics aligned to admin-facing reporting needs.',
     issueLinks: ['#35'],
   },
 ];

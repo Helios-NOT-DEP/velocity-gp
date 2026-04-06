@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
-import { getSession, isAdminSession, isAuthenticatedSession, anonymousSession } from '@/services/auth';
+import {
+  getSession,
+  isAdminSession,
+  isAuthenticatedSession,
+  anonymousSession,
+} from '@/services/auth';
 import type { AuthSession } from '@/services/auth';
 import ForbiddenAdminAccess from './ForbiddenAdminAccess';
 

@@ -101,9 +101,7 @@ export default function AdminQrCodes() {
               <h3 className="font-['Space_Grotesk'] text-lg">{qrCode.name}</h3>
               <span
                 className={`px-2 py-1 rounded text-xs font-mono ${
-                  qrCode.active
-                    ? 'bg-[#39FF14]/20 text-[#39FF14]'
-                    : 'bg-gray-800 text-gray-400'
+                  qrCode.active ? 'bg-[#39FF14]/20 text-[#39FF14]' : 'bg-gray-800 text-gray-400'
                 }`}
               >
                 {qrCode.active ? 'ACTIVE' : 'DISABLED'}
