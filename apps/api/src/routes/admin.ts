@@ -47,11 +47,17 @@ adminRouter.post(
   validate(updateRaceControlSchema),
   asyncHandler(async (request, response) => {
     const eventId = String(request.params.eventId);
+    const authContext = getRequestAuthContext(response);
 
     response.json(
-      successResponse(updateRaceControl(eventId, request.body), {
-        requestId: response.locals.requestId,
-      })
+      successResponse(
+        await updateRaceControl(eventId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
+      )
     );
   })
 );
@@ -63,11 +69,17 @@ adminRouter.post(
   asyncHandler(async (request, response) => {
     const eventId = String(request.params.eventId);
     const teamId = String(request.params.teamId);
+    const authContext = getRequestAuthContext(response);
 
     response.json(
-      successResponse(manualPitControl(eventId, teamId, request.body), {
-        requestId: response.locals.requestId,
-      })
+      successResponse(
+        await manualPitControl(eventId, teamId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
+      )
     );
   })
 );
@@ -78,11 +90,17 @@ adminRouter.post(
   validate(updateHeliosRoleSchema),
   asyncHandler(async (request, response) => {
     const userId = String(request.params.userId);
+    const authContext = getRequestAuthContext(response);
 
     response.json(
-      successResponse(updateHeliosRole(userId, request.body), {
-        requestId: response.locals.requestId,
-      })
+      successResponse(
+        await updateHeliosRole(userId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
+      )
     );
   })
 );
@@ -94,7 +112,7 @@ adminRouter.get(
     const eventId = String(request.params.eventId);
 
     response.json(
-      successResponse(listAdminAudits(eventId), { requestId: response.locals.requestId })
+      successResponse(await listAdminAudits(eventId), { requestId: response.locals.requestId })
     );
   })
 );

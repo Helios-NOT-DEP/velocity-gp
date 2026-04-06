@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
+import { resolveRequestAuthContext } from '../lib/requestAuth.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import { initiateRescueSchema, rescuePlayerParamsSchema } from '@velocity-gp/api-contract/schemas';
@@ -12,10 +13,18 @@ rescueRouter.post(
   '/rescue/initiate',
   validate(initiateRescueSchema),
   asyncHandler(async (request, response) => {
+    const authContext = resolveRequestAuthContext(request);
+
     response
       .status(202)
       .json(
-        successResponse(initiateRescue(request.body), { requestId: response.locals.requestId })
+        successResponse(
+          await initiateRescue({
+            ...request.body,
+            scannerUserId: authContext?.userId,
+          }),
+          { requestId: response.locals.requestId }
+        )
       );
   })
 );
@@ -27,7 +36,7 @@ rescueRouter.get(
     const playerId = String(request.params.playerId);
 
     response.json(
-      successResponse(getRescueStatus(playerId), { requestId: response.locals.requestId })
+      successResponse(await getRescueStatus(playerId), { requestId: response.locals.requestId })
     );
   })
 );
@@ -39,7 +48,7 @@ rescueRouter.post(
     const playerId = String(request.params.playerId);
 
     response.json(
-      successResponse(completeRescue(playerId), { requestId: response.locals.requestId })
+      successResponse(await completeRescue(playerId), { requestId: response.locals.requestId })
     );
   })
 );

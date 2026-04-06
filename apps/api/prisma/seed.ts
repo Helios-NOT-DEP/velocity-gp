@@ -4,12 +4,9 @@ import { Pool } from 'pg';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/client.js';
+import { resolveSeedDatabaseUrl } from '../src/db/resolveSeedDatabaseUrl.js';
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL is required for seeding.');
-}
+const { url: databaseUrl } = resolveSeedDatabaseUrl();
 
 const prismaPool = new Pool({
   connectionString: databaseUrl,
