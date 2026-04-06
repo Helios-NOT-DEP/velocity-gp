@@ -16,7 +16,7 @@ scanRouter.post(
     const eventId = String(request.params.eventId);
 
     response.json(
-      successResponse(submitScan({ eventId, request: request.body }), {
+      successResponse(await submitScan({ eventId, request: request.body }), {
         requestId: response.locals.requestId,
       })
     );

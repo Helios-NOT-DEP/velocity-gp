@@ -17,7 +17,7 @@ hazardRouter.post(
   validate(scanHazardSchema),
   asyncHandler(async (request, response) => {
     response.json(
-      successResponse(scanHazard(request.body), { requestId: response.locals.requestId })
+      successResponse(await scanHazard(request.body), { requestId: response.locals.requestId })
     );
   })
 );
@@ -28,7 +28,9 @@ hazardRouter.get(
   asyncHandler(async (request, response) => {
     const hazardId = String(request.params.hazardId);
 
-    response.json(successResponse(getHazard(hazardId), { requestId: response.locals.requestId }));
+    response.json(
+      successResponse(await getHazard(hazardId), { requestId: response.locals.requestId })
+    );
   })
 );
 
@@ -38,6 +40,8 @@ hazardRouter.get(
   asyncHandler(async (request, response) => {
     const eventId = String(request.params.eventId);
 
-    response.json(successResponse(listHazards(eventId), { requestId: response.locals.requestId }));
+    response.json(
+      successResponse(await listHazards(eventId), { requestId: response.locals.requestId })
+    );
   })
 );
