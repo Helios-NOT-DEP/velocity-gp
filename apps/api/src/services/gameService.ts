@@ -8,15 +8,23 @@ import type {
 import { createIsoDate, placeholderPlayer, placeholderTeam } from './placeholderData.js';
 
 export function getRaceState(eventId: string, playerId: string): GetRaceStateResponse {
-  // TODO: Query real race state from database
+  const teamStatus = playerId === placeholderPlayer.id ? 'IN_PIT' : placeholderTeam.status;
+
   return {
     playerId,
     eventId,
-    currentLocation: 'PIT_LANE_ALPHA',
     teamId: placeholderTeam.id,
-    hazardsEncountered: ['hazard-001', 'hazard-002'],
-    score: 860,
-    status: playerId === placeholderPlayer.id ? 'IN_PIT' : 'RACING',
+    teamName: placeholderTeam.name,
+    teamStatus,
+    status: teamStatus,
+    raceControlState: 'ACTIVE',
+    scannerEnabled: teamStatus !== 'IN_PIT',
+    pitStopExpiresAt: teamStatus === 'IN_PIT' ? createIsoDate(15) : null,
+    currentLocation: 'PIT_LANE_ALPHA',
+    hazardsEncountered: ['qr-alpha-01'],
+    score: placeholderTeam.score,
+    individualScore: placeholderPlayer.individualScore,
+    updatedAt: createIsoDate(0),
   };
 }
 
@@ -25,7 +33,6 @@ export function updateHazardStatus(
   playerId: string,
   request: HazardStatusUpdateRequest
 ): HazardStatusUpdateResponse {
-  // TODO: Persist hazard status update to database
   return {
     eventId,
     playerId,
@@ -36,7 +43,6 @@ export function updateHazardStatus(
 }
 
 export function getLeaderboard(eventId: string): LeaderboardEntry[] {
-  // TODO: Query real leaderboard data from database
   return [
     {
       rank: 1,
@@ -44,13 +50,23 @@ export function getLeaderboard(eventId: string): LeaderboardEntry[] {
       teamName: placeholderTeam.name,
       score: placeholderTeam.score,
       memberCount: placeholderTeam.members.length,
+      status: placeholderTeam.status,
     },
     {
       rank: 2,
-      teamId: 'team-456',
-      teamName: `${eventId}-Slipstream`,
-      score: 1175,
-      memberCount: 4,
+      teamId: 'team-drift-runners',
+      teamName: `${eventId}-Drift-Runners`,
+      score: 1110,
+      memberCount: 3,
+      status: 'ACTIVE',
+    },
+    {
+      rank: 3,
+      teamId: 'team-nova-thunder',
+      teamName: `${eventId}-Nova-Thunder`,
+      score: 920,
+      memberCount: 2,
+      status: 'IN_PIT',
     },
   ];
 }

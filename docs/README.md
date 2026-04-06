@@ -7,6 +7,7 @@ Quick navigation for all project documentation organized by theme.
 - **[Repository Guidelines & Architecture](./architecture/AGENTS.md)** — Code organization, coding standards, service layer patterns
 - **[Tech Stack Needed](./architecture/Tech%20Stack%20Needed.md)** — Planned infrastructure and backend architecture
 - **[RepoStructure](./architecture/RepoStructure.md)** — Repository organization and conventions
+- **[Realtime Event Contract](./architecture/realtime-event-contract.md)** — Typed event envelope, channel boundaries, and ordering/idempotency rules for #50/#49
 
 ## 📖 Product & Requirements
 

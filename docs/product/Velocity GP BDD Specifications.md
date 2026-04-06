@@ -1,14 +1,14 @@
-# Velocity GP: Master BDD Specifications (v8.1)
+# Velocity GP: Master BDD Specifications (v8.2)
 
 **Project:** Velocity GP (Multi-Day Endurance Event)
 
-**Status:** Complete - Admin Portal Expansion (QR Ops + Hazard Controls + Health Metrics)
+**Status:** Complete - Admin Operations Console Expansion
 
-**Date:** March 2026
+**Date:** April 2026
 
 ## Purpose
 
-This document is now the index for the Velocity GP business behavior specs. The detailed scenarios have been split into persona-specific files under `docs/persona/` so each audience can review its own responsibilities and flows more easily.
+This document is now the index for the Velocity GP business behavior specs. The detailed scenarios have been split into persona-specific files under `docs/product/persona/` so each audience can review its own responsibilities and flows more easily.
 
 ## Persona Specifications
 
@@ -23,7 +23,7 @@ This document is now the index for the Velocity GP business behavior specs. The 
 
 - Start with Persona 1 for the core attendee experience and the main race loop.
 - Review Persona 2 for Helios-specific rescue rules and fairness constraints.
-- Use Persona 3 for organizer workflows, QR management, hazard controls, and health monitoring.
+- Use Persona 3 for organizer workflows across race control, QR operations, team and player review, and event statistics.
 - Use Persona 4 for backend rules, state transitions, and sync behavior.
 - Use Persona 5 for venue display requirements.
 - Use Persona 6 for AI-driven commentary and recap behavior.

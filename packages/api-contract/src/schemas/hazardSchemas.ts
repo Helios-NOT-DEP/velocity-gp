@@ -13,3 +13,8 @@ export const scanHazardSchema = z.object({
   eventId: z.string().min(1),
   qrCode: z.string().min(1),
 });
+
+export const submitScanSchema = z.object({
+  playerId: z.string().min(1),
+  qrPayload: z.string().min(1),
+});

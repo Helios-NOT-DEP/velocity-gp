@@ -1,36 +1,30 @@
 /**
  * API endpoint path builders.
- *
- * Centralized definitions of backend route paths shared by web and API callers.
- * Reference: docs/Tech Stack Needed.md for backend architecture.
- *
- * @module @velocity-gp/api-contract/endpoints
  */
-
-// ============ GAME ENDPOINTS ============
 
 export interface GetRaceStateRequest {
   eventId: string;
   playerId: string;
 }
 
-export const gameEndpoints = {
+export const raceStateEndpoints = {
   getRaceState: (eventId: string, playerId: string) =>
     `/events/${eventId}/players/${playerId}/race-state`,
-  updateHazardStatus: (eventId: string, playerId: string) =>
-    `/events/${eventId}/players/${playerId}/hazard-status`,
   getLeaderboard: (eventId: string) => `/events/${eventId}/leaderboard`,
 };
 
-// ============ PLAYER ENDPOINTS ============
+export const scanEndpoints = {
+  submitScan: (eventId: string) => `/events/${eventId}/scans`,
+  legacySubmitScan: '/hazards/scan',
+  updateHazardStatus: (eventId: string, playerId: string) =>
+    `/events/${eventId}/players/${playerId}/hazard-status`,
+};
 
 export const playerEndpoints = {
   createPlayer: '/players',
   getProfile: (playerId: string) => `/players/${playerId}`,
   updateProfile: (playerId: string) => `/players/${playerId}`,
 };
-
-// ============ TEAM ENDPOINTS ============
 
 export const teamEndpoints = {
   createTeam: '/teams',
@@ -39,26 +33,44 @@ export const teamEndpoints = {
   getTeamMembers: (teamId: string) => `/teams/${teamId}/members`,
 };
 
-// ============ EVENT ENDPOINTS ============
-
 export const eventEndpoints = {
   listEvents: '/events',
   getEvent: (eventId: string) => `/events/${eventId}`,
   getCurrentEvent: '/events/current',
 };
 
-// ============ HAZARD ENDPOINTS ============
-
-export const hazardEndpoints = {
-  scanQR: '/hazards/scan',
-  getHazard: (hazardId: string) => `/hazards/${hazardId}`,
-  listHazards: (eventId: string) => `/events/${eventId}/hazards`,
+export const qrEndpoints = {
+  getQRCode: (qrCodeId: string) => `/qr-codes/${qrCodeId}`,
+  listQRCodes: (eventId: string) => `/events/${eventId}/qr-codes`,
+  createQRCode: (eventId: string) => `/events/${eventId}/qr-codes`,
+  setQRCodeStatus: (eventId: string, qrCodeId: string) =>
+    `/events/${eventId}/qr-codes/${qrCodeId}/status`,
 };
-
-// ============ RESCUE ENDPOINTS ============
 
 export const rescueEndpoints = {
   initiateRescue: '/rescue/initiate',
   getRescueStatus: (playerId: string) => `/rescue/${playerId}/status`,
   completeRescue: (playerId: string) => `/rescue/${playerId}/complete`,
+};
+
+export const adminEndpoints = {
+  getSession: '/admin/session',
+  updateRaceControl: (eventId: string) => `/admin/events/${eventId}/race-control`,
+  manualPitControl: (eventId: string, teamId: string) =>
+    `/admin/events/${eventId}/teams/${teamId}/pit-control`,
+  updateHeliosRole: (userId: string) => `/admin/users/${userId}/helios-role`,
+  listAuditEntries: (eventId: string) => `/admin/events/${eventId}/audits`,
+};
+
+// Legacy aliases retained while callers migrate.
+export const gameEndpoints = {
+  getRaceState: raceStateEndpoints.getRaceState,
+  updateHazardStatus: scanEndpoints.updateHazardStatus,
+  getLeaderboard: raceStateEndpoints.getLeaderboard,
+};
+
+export const hazardEndpoints = {
+  scanQR: scanEndpoints.legacySubmitScan,
+  getHazard: qrEndpoints.getQRCode,
+  listHazards: qrEndpoints.listQRCodes,
 };

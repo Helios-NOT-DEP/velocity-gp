@@ -76,6 +76,7 @@ jobs:
       TZ: America/Chicago
       # Sensitive values (store in repository Secrets)
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
+      SEED_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
       DB_PASSWORD: "postgres"
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       ENV: "DEV"

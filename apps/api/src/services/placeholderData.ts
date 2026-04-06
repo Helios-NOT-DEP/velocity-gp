@@ -1,52 +1,153 @@
-import type { EventSummary, Hazard, PlayerProfile, Team } from '@velocity-gp/api-contract';
+import type {
+  AdminAuditEntry,
+  EventSummary,
+  HeliosRescueFlow,
+  PlayerProfile,
+  QRCodeSummary,
+  Team,
+  TeamStatus,
+} from '@velocity-gp/api-contract';
 
-const baseTimestamp = new Date('2026-04-01T12:00:00.000Z');
+const baseTimestamp = new Date('2026-04-06T12:00:00.000Z');
 
 export function createIsoDate(offsetMinutes: number = 0): string {
   return new Date(baseTimestamp.getTime() + offsetMinutes * 60_000).toISOString();
 }
 
-// TODO: Replace with real event data from database
 export const placeholderEvent: EventSummary = {
-  id: 'event-123',
-  name: 'Velocity GP Spring Qualifier',
+  id: 'event-velocity-active',
+  name: 'Velocity GP Spring Finals',
   startDate: createIsoDate(-180),
   endDate: createIsoDate(360),
   status: 'ACTIVE',
 };
 
-// TODO: Replace with real player data from database
 export const placeholderPlayer: PlayerProfile = {
-  id: 'player-123',
-  email: 'driver@velocitygp.dev',
-  name: 'Avery Apex',
+  id: 'player-lina-active',
+  userId: 'user-player-lina',
+  email: 'lina@velocitygp.dev',
+  name: 'Lina Lane',
   eventId: placeholderEvent.id,
+  teamId: 'team-apex-comets',
+  status: 'RACING',
+  individualScore: 430,
+  isFlaggedForReview: false,
+  joinedAt: createIsoDate(-240),
   createdAt: createIsoDate(-240),
 };
 
-// TODO: Replace with real team data from database
 export const placeholderTeam: Team = {
-  id: 'team-123',
-  name: 'Helios Hyperdrive',
+  id: 'team-apex-comets',
+  name: 'Apex Comets',
   eventId: placeholderEvent.id,
-  members: [placeholderPlayer.id, 'player-456', 'player-789'],
-  score: 1280,
+  status: 'ACTIVE',
+  pitStopExpiresAt: null,
+  members: [placeholderPlayer.id, 'player-mason-active'],
+  score: 1260,
 };
 
-// TODO: Replace with real hazard data from database
-export const placeholderHazards: Hazard[] = [
+export const placeholderQRCodes: QRCodeSummary[] = [
   {
-    id: 'hazard-001',
-    name: 'Battery Drop',
-    ratio: 1.5,
-    description: 'Simulated battery loss that sends racers toward the pit lane.',
+    id: 'qr-alpha-01',
     eventId: placeholderEvent.id,
+    label: 'Atrium Checkpoint Alpha',
+    value: 100,
+    zone: 'Atrium',
+    payload: 'VG-ALPHA-01',
+    status: 'ACTIVE',
+    scanCount: 14,
+    hazardRatioOverride: null,
+    activationStartsAt: createIsoDate(-180),
+    activationEndsAt: null,
   },
   {
-    id: 'hazard-002',
-    name: 'Telemetry Glitch',
-    ratio: 2.25,
-    description: 'A scoring glitch that needs a quick Helios intervention.',
+    id: 'qr-beta-02',
     eventId: placeholderEvent.id,
+    label: 'Rooftop Beta Boost',
+    value: 120,
+    zone: 'Rooftop',
+    payload: 'VG-BETA-02',
+    status: 'ACTIVE',
+    scanCount: 4,
+    hazardRatioOverride: 5,
+    activationStartsAt: createIsoDate(-180),
+    activationEndsAt: null,
+  },
+  {
+    id: 'qr-gamma-03',
+    eventId: placeholderEvent.id,
+    label: 'Lobby Gamma Sprint',
+    value: 80,
+    zone: 'Lobby',
+    payload: 'VG-GAMMA-03',
+    status: 'ACTIVE',
+    scanCount: 28,
+    hazardRatioOverride: null,
+    activationStartsAt: createIsoDate(-180),
+    activationEndsAt: null,
+  },
+  {
+    id: 'qr-disabled-99',
+    eventId: placeholderEvent.id,
+    label: 'Compromised Legacy Code',
+    value: 200,
+    zone: 'Old Stage',
+    payload: 'VG-DISABLED-99',
+    status: 'DISABLED',
+    scanCount: 45,
+    hazardRatioOverride: null,
+    activationStartsAt: createIsoDate(-300),
+    activationEndsAt: createIsoDate(-60),
+  },
+];
+
+export const placeholderRescue: HeliosRescueFlow = {
+  id: 'rescue-completed-1',
+  playerId: 'player-noah-active',
+  eventId: placeholderEvent.id,
+  rescuerUserId: 'user-helios-hugo',
+  initiatedAt: createIsoDate(-7),
+  completedAt: createIsoDate(-6),
+  status: 'COMPLETED',
+};
+
+export function withTeamStatus(
+  team: Team,
+  status: TeamStatus,
+  pitStopExpiresAt: string | null
+): Team {
+  return {
+    ...team,
+    status,
+    pitStopExpiresAt,
+  };
+}
+
+export const placeholderAudits: AdminAuditEntry[] = [
+  {
+    id: 'admin-audit-1',
+    eventId: placeholderEvent.id,
+    actorUserId: 'user-admin-ava',
+    actionType: 'RACE_PAUSED',
+    targetType: 'EVENT_CONFIG',
+    targetId: placeholderEvent.id,
+    details: {
+      previousState: 'ACTIVE',
+      nextState: 'PAUSED',
+    },
+    createdAt: createIsoDate(-30),
+  },
+  {
+    id: 'admin-audit-2',
+    eventId: placeholderEvent.id,
+    actorUserId: 'user-admin-ava',
+    actionType: 'RACE_RESUMED',
+    targetType: 'EVENT_CONFIG',
+    targetId: placeholderEvent.id,
+    details: {
+      previousState: 'PAUSED',
+      nextState: 'ACTIVE',
+    },
+    createdAt: createIsoDate(-28),
   },
 ];
