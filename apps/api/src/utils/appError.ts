@@ -27,3 +27,15 @@ export class ValidationError extends AppError {
     super(400, 'VALIDATION_ERROR', message, details);
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(401, 'UNAUTHORIZED', message, details);
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(403, 'FORBIDDEN', message, details);
+  }
+}

@@ -7,6 +7,14 @@
  * @module services/auth
  */
 
+import {
+  anonymousSession,
+  AUTH_SESSION_STORAGE_KEY,
+  type AuthSession,
+  type AuthRole,
+  isAuthRole,
+} from './authTypes';
+
 interface AuthCredentials {
   email: string;
   password?: string;
@@ -33,15 +41,15 @@ export async function signIn(_credentials: AuthCredentials): Promise<AuthUser> {
  * Sign out current user
  */
 export async function signOut(): Promise<void> {
-  // TODO: Implement with Auth.js
+  getBrowserStorage()?.removeItem(AUTH_SESSION_STORAGE_KEY);
 }
 
 /**
  * Get current session
  */
-export async function getSession(): Promise<AuthUser | null> {
-  // TODO: Implement session retrieval
-  return null;
+export async function getSession(): Promise<AuthSession> {
+  // #TODO(#12): Replace placeholder session logic with Auth.js magic-link session retrieval and role hydration.
+  return readSessionFromStorage();
 }
 
 /**
@@ -50,3 +58,48 @@ export async function getSession(): Promise<AuthUser | null> {
 export async function sendVerificationEmail(_email: string): Promise<void> {
   // TODO: Implement with SendGrid
 }
+
+function readSessionFromStorage(): AuthSession {
+  const rawSession = getBrowserStorage()?.getItem(AUTH_SESSION_STORAGE_KEY);
+  if (!rawSession) {
+    return anonymousSession;
+  }
+
+  try {
+    const parsed = JSON.parse(rawSession) as Partial<AuthSession> & { role?: string };
+    const role = parsed.role ?? 'anonymous';
+
+    if (!isAuthRole(role)) {
+      return anonymousSession;
+    }
+
+    const normalizedRole: AuthRole = role;
+    const userId = typeof parsed.userId === 'string' && parsed.userId.length > 0 ? parsed.userId : null;
+    const isAuthenticated = Boolean(parsed.isAuthenticated) && userId !== null && normalizedRole !== 'anonymous';
+
+    return {
+      userId,
+      role: isAuthenticated ? normalizedRole : 'anonymous',
+      isAuthenticated,
+      email: typeof parsed.email === 'string' ? parsed.email : undefined,
+    };
+  } catch {
+    return anonymousSession;
+  }
+}
+
+interface StorageLike {
+  getItem(key: string): string | null;
+  removeItem(key: string): void;
+}
+
+function getBrowserStorage(): StorageLike | null {
+  if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) {
+    return null;
+  }
+
+  return globalThis.localStorage;
+}
+
+export { AUTH_SESSION_STORAGE_KEY };
+export type { AuthCredentials, AuthUser };

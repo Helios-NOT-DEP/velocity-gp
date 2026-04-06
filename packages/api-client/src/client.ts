@@ -51,6 +51,7 @@ export class ApiClient {
       });
     }
 
+    // #TODO(#12): Attach authenticated session context once Auth.js flow is live.
     const response = await fetch(url.toString(), {
       method: options.method || 'GET',
       headers: {

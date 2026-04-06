@@ -62,3 +62,9 @@ export const rescueEndpoints = {
   getRescueStatus: (playerId: string) => `/rescue/${playerId}/status`,
   completeRescue: (playerId: string) => `/rescue/${playerId}/complete`,
 };
+
+// ============ ADMIN ENDPOINTS ============
+
+export const adminEndpoints = {
+  getSession: '/admin/session',
+};
