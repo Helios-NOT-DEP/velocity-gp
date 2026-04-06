@@ -1,3 +1,4 @@
+export * from './contracts/auth.js';
 export * from './contracts/adminControls.js';
 export * from './contracts/participants.js';
 export * from './contracts/qr.js';

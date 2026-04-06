@@ -51,11 +51,12 @@ export class ApiClient {
       });
     }
 
-    // #TODO(#12): Attach authenticated session context once Auth.js flow is live.
+    const authorizationHeader = readAuthorizationHeaderFromStorage();
     const response = await fetch(url.toString(), {
       method: options.method || 'GET',
       headers: {
         'Content-Type': 'application/json',
+        ...(authorizationHeader ? { Authorization: authorizationHeader } : {}),
         ...options.headers,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
@@ -128,4 +129,17 @@ export class ApiClient {
   private isApiEnvelope<T>(payload: T | ApiEnvelope<T>): payload is ApiEnvelope<T> {
     return typeof payload === 'object' && payload !== null && 'success' in payload;
   }
+}
+
+function readAuthorizationHeaderFromStorage(): string | null {
+  if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) {
+    return null;
+  }
+
+  const token = globalThis.localStorage.getItem('velocitygp.auth.token');
+  if (!token) {
+    return null;
+  }
+
+  return `Bearer ${token}`;
 }

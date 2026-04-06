@@ -6,6 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app/createApp.js';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/db/client.js';
+import { setMagicLinkEmailSenderForTests } from '../src/services/authService.js';
+import { createMagicLinkToken } from '../src/services/authTokens.js';
 
 describe('velocity gp backend', () => {
   const app = createApp();
@@ -16,6 +18,8 @@ describe('velocity gp backend', () => {
     teamId: `team-app-${token}`,
     playerId: `player-app-${token}`,
     playerUserId: `user-player-app-${token}`,
+    unassignedPlayerId: `player-unassigned-app-${token}`,
+    unassignedUserId: `user-unassigned-app-${token}`,
     adminUserId: `user-admin-app-${token}`,
     qrCodeId: `qr-app-${token}`,
     qrPayload: `VG-APP-${token.toUpperCase()}`,
@@ -37,6 +41,13 @@ describe('velocity gp backend', () => {
           id: fixtureIds.playerUserId,
           email: `player-${token}@velocitygp.dev`,
           displayName: 'Player Fixture',
+          role: 'PLAYER',
+          isHelios: false,
+        },
+        {
+          id: fixtureIds.unassignedUserId,
+          email: `unassigned-${token}@velocitygp.dev`,
+          displayName: 'Unassigned Fixture',
           role: 'PLAYER',
           isHelios: false,
         },
@@ -82,6 +93,19 @@ describe('velocity gp backend', () => {
         userId: fixtureIds.playerUserId,
         eventId: fixtureIds.eventId,
         teamId: fixtureIds.teamId,
+        status: 'RACING',
+        individualScore: 0,
+        isFlaggedForReview: false,
+        joinedAt: now,
+      },
+    });
+
+    await prisma.player.create({
+      data: {
+        id: fixtureIds.unassignedPlayerId,
+        userId: fixtureIds.unassignedUserId,
+        eventId: fixtureIds.eventId,
+        teamId: null,
         status: 'RACING',
         individualScore: 0,
         isFlaggedForReview: false,
@@ -158,10 +182,11 @@ describe('velocity gp backend', () => {
     await prisma.user.deleteMany({
       where: {
         id: {
-          in: [fixtureIds.adminUserId, fixtureIds.playerUserId],
+          in: [fixtureIds.adminUserId, fixtureIds.playerUserId, fixtureIds.unassignedUserId],
         },
       },
     });
+    setMagicLinkEmailSenderForTests(null);
   });
 
   it('returns health information', async () => {
@@ -220,6 +245,99 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns non-enumerating magic-link responses for assigned, unknown, and unassigned emails', async () => {
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+    const unknownEmail = `unknown-${token}@velocitygp.dev`;
+    const unassignedEmail = `unassigned-${token}@velocitygp.dev`;
+    const capturedLinks: string[] = [];
+
+    setMagicLinkEmailSenderForTests(async (input) => {
+      capturedLinks.push(input.magicLinkUrl);
+    });
+
+    const [assignedResponse, unknownResponse, unassignedResponse] = await Promise.all([
+      request(app).post(`${apiPrefix}/auth/magic-link/request`).send({ workEmail: assignedEmail }),
+      request(app).post(`${apiPrefix}/auth/magic-link/request`).send({ workEmail: unknownEmail }),
+      request(app)
+        .post(`${apiPrefix}/auth/magic-link/request`)
+        .send({ workEmail: unassignedEmail }),
+    ]);
+
+    expect(assignedResponse.status).toBe(202);
+    expect(unknownResponse.status).toBe(202);
+    expect(unassignedResponse.status).toBe(202);
+    expect(assignedResponse.body.data.accepted).toBe(true);
+    expect(unknownResponse.body.data.accepted).toBe(true);
+    expect(unassignedResponse.body.data.accepted).toBe(true);
+    expect(assignedResponse.body.data.message).toBe(unknownResponse.body.data.message);
+    expect(unassignedResponse.body.data.message).toBe(unknownResponse.body.data.message);
+    expect(capturedLinks.length).toBe(1);
+  });
+
+  it('verifies valid magic links and returns deterministic routing + session payload', async () => {
+    const capturedLinks: string[] = [];
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+
+    setMagicLinkEmailSenderForTests(async (input) => {
+      capturedLinks.push(input.magicLinkUrl);
+    });
+
+    const requestResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: assignedEmail });
+
+    expect(requestResponse.status).toBe(202);
+    expect(capturedLinks.length).toBe(1);
+
+    const tokenFromLink = new URL(capturedLinks[0]).searchParams.get('token');
+    expect(tokenFromLink).toBeTruthy();
+    if (!tokenFromLink) {
+      throw new Error('Expected token in captured magic link URL.');
+    }
+
+    const verifyResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/verify`)
+      .send({ token: tokenFromLink });
+
+    expect(verifyResponse.status).toBe(200);
+    expect(verifyResponse.body.success).toBe(true);
+    expect(verifyResponse.body.data.session.userId).toBe(fixtureIds.playerUserId);
+    expect(verifyResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
+    expect(verifyResponse.body.data.session.assignmentStatus).toBe('ASSIGNED_ACTIVE');
+    expect(verifyResponse.body.data.redirectPath).toBe('/race-hub');
+    expect(typeof verifyResponse.body.data.sessionToken).toBe('string');
+
+    const sessionToken = String(verifyResponse.body.data.sessionToken);
+    const [sessionResponse, routingResponse] = await Promise.all([
+      request(app).get(`${apiPrefix}/auth/session`).set('authorization', `Bearer ${sessionToken}`),
+      request(app)
+        .get(`${apiPrefix}/auth/routing-decision`)
+        .set('authorization', `Bearer ${sessionToken}`),
+    ]);
+
+    expect(sessionResponse.status).toBe(200);
+    expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
+    expect(routingResponse.status).toBe(200);
+    expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
+  });
+
+  it('rejects unassigned players during verify with AUTH_ASSIGNMENT_REQUIRED', async () => {
+    const tokenForUnassigned = createMagicLinkToken({
+      userId: fixtureIds.unassignedUserId,
+      playerId: fixtureIds.unassignedPlayerId,
+      eventId: fixtureIds.eventId,
+      email: `unassigned-${token}@velocitygp.dev`,
+    });
+
+    const verifyResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/verify`)
+      .send({ token: tokenForUnassigned });
+
+    expect(verifyResponse.status).toBe(403);
+    expect(verifyResponse.body.success).toBe(false);
+    expect(verifyResponse.body.error.code).toBe('AUTH_ASSIGNMENT_REQUIRED');
   });
 
   it('rejects admin routes when authentication context is missing', async () => {

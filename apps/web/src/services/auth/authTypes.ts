@@ -1,13 +1,22 @@
 export type AuthRole = 'admin' | 'helios' | 'player' | 'anonymous';
+export type AuthAssignmentStatus = 'ASSIGNED_PENDING' | 'ASSIGNED_ACTIVE' | 'UNASSIGNED';
 
 export interface AuthSession {
   userId: string | null;
+  playerId?: string;
+  eventId?: string;
+  teamId?: string | null;
+  teamStatus?: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null;
+  assignmentStatus?: AuthAssignmentStatus;
   role: AuthRole;
   isAuthenticated: boolean;
   email?: string;
+  displayName?: string;
 }
 
 export const AUTH_SESSION_STORAGE_KEY = 'velocitygp.auth.session';
+export const AUTH_SESSION_TOKEN_STORAGE_KEY = 'velocitygp.auth.token';
+export const AUTH_SESSION_UPDATED_EVENT = 'velocitygp.auth.session.updated';
 
 export const anonymousSession: AuthSession = {
   userId: null,

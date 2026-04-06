@@ -62,6 +62,13 @@ export const adminEndpoints = {
   listAuditEntries: (eventId: string) => `/admin/events/${eventId}/audits`,
 };
 
+export const authEndpoints = {
+  requestMagicLink: '/auth/magic-link/request',
+  verifyMagicLink: '/auth/magic-link/verify',
+  getSession: '/auth/session',
+  getRoutingDecision: '/auth/routing-decision',
+};
+
 // Legacy aliases retained while callers migrate.
 export const gameEndpoints = {
   getRaceState: raceStateEndpoints.getRaceState,

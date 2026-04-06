@@ -1,11 +1,28 @@
 import type { Request, Response } from 'express';
 import type { AuthRole, RequestAuthContext } from '../types/auth.js';
+import { verifySessionToken } from '../services/authTokens.js';
 
 interface AuthResponseLocals {
   auth?: RequestAuthContext;
 }
 
 export function resolveRequestAuthContext(request: Request): RequestAuthContext | null {
+  const authorizationHeader = request.header('authorization');
+  if (authorizationHeader) {
+    const [scheme, token] = authorizationHeader.split(' ');
+    if (scheme?.toLowerCase() === 'bearer' && token) {
+      try {
+        const claims = verifySessionToken(token);
+        return {
+          userId: claims.userId,
+          role: claims.role,
+        };
+      } catch {
+        // Fall back to legacy headers for compatibility in tests/local tooling.
+      }
+    }
+  }
+
   const userIdHeader = request.header('x-user-id');
   const userRoleHeader = request.header('x-user-role');
 

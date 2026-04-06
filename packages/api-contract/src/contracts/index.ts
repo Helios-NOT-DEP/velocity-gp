@@ -1,3 +1,4 @@
+export * from './auth.js';
 export * from './adminControls.js';
 export * from './participants.js';
 export * from './qr.js';

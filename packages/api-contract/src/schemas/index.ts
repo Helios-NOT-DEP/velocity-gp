@@ -1,3 +1,4 @@
+export * from './authSchemas.js';
 export * from './adminSchemas.js';
 export * from './eventSchemas.js';
 export * from './gameSchemas.js';

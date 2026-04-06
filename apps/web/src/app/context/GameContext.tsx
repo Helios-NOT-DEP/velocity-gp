@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { identifyAnalyticsUser, trackAnalyticsEvent } from '@/services/observability';
+import {
+  AUTH_SESSION_UPDATED_EVENT,
+  getSession as getAuthSession,
+  type AuthSession,
+} from '@/services/auth';
 
 export interface Team {
   id: string;
@@ -103,6 +108,34 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 1000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const syncCurrentUserFromSession = async () => {
+      const session = await getAuthSession();
+      if (!active) {
+        return;
+      }
+
+      setGameState((previousState) => ({
+        ...previousState,
+        currentUser: resolveCurrentUserFromSession(session),
+      }));
+    };
+
+    void syncCurrentUserFromSession();
+
+    const handleSessionChange = () => {
+      void syncCurrentUserFromSession();
+    };
+
+    globalThis.addEventListener(AUTH_SESSION_UPDATED_EVENT, handleSessionChange);
+    return () => {
+      active = false;
+      globalThis.removeEventListener(AUTH_SESSION_UPDATED_EVENT, handleSessionChange);
+    };
   }, []);
 
   const login = (name: string, email: string) => {
@@ -239,3 +272,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </GameContext.Provider>
   );
 };
+
+function resolveCurrentUserFromSession(session: AuthSession): GameState['currentUser'] {
+  if (!session.isAuthenticated || !session.userId) {
+    return null;
+  }
+
+  return {
+    name: session.displayName ?? session.email ?? 'Player',
+    email: session.email ?? '',
+    teamId: session.teamId ?? '',
+    isHelios: session.role === 'helios',
+  };
+}
