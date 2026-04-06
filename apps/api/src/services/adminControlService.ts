@@ -33,8 +33,7 @@ export function manualPitControl(
     eventId,
     teamId,
     status,
-    pitStopExpiresAt:
-      status === 'IN_PIT' ? request.pitStopExpiresAt ?? createIsoDate(15) : null,
+    pitStopExpiresAt: status === 'IN_PIT' ? (request.pitStopExpiresAt ?? createIsoDate(15)) : null,
     updatedAt: createIsoDate(2),
     auditId: `audit-pit-${request.action.toLowerCase()}-${teamId}`,
   };

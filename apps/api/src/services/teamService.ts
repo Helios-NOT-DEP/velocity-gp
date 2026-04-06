@@ -5,7 +5,12 @@ import type {
   Team,
 } from '@velocity-gp/api-contract';
 
-import { createIsoDate, placeholderPlayer, placeholderTeam, withTeamStatus } from './placeholderData.js';
+import {
+  createIsoDate,
+  placeholderPlayer,
+  placeholderTeam,
+  withTeamStatus,
+} from './placeholderData.js';
 
 export function createTeam(request: CreateTeamRequest): Team {
   return {

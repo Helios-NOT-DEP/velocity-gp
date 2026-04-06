@@ -111,7 +111,11 @@ export const placeholderRescue: HeliosRescueFlow = {
   status: 'COMPLETED',
 };
 
-export function withTeamStatus(team: Team, status: TeamStatus, pitStopExpiresAt: string | null): Team {
+export function withTeamStatus(
+  team: Team,
+  status: TeamStatus,
+  pitStopExpiresAt: string | null
+): Team {
   return {
     ...team,
     status,

@@ -93,6 +93,8 @@ adminRouter.get(
   asyncHandler(async (request, response) => {
     const eventId = String(request.params.eventId);
 
-    response.json(successResponse(listAdminAudits(eventId), { requestId: response.locals.requestId }));
+    response.json(
+      successResponse(listAdminAudits(eventId), { requestId: response.locals.requestId })
+    );
   })
 );
