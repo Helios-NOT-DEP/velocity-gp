@@ -63,7 +63,14 @@ export const useGame = () => {
 const MOCK_TEAMS: Team[] = [
   { id: 'team-apex-comets', name: 'Apex Comets', score: 1260, rank: 1, inPitStop: false },
   { id: 'team-drift-runners', name: 'Drift Runners', score: 1110, rank: 2, inPitStop: false },
-  { id: 'team-nova-thunder', name: 'Nova Thunder', score: 920, rank: 3, inPitStop: true, pitStopTimeLeft: 660 },
+  {
+    id: 'team-nova-thunder',
+    name: 'Nova Thunder',
+    score: 920,
+    rank: 3,
+    inPitStop: true,
+    pitStopTimeLeft: 660,
+  },
   { id: 'team-turbo-tigers', name: 'Turbo Tigers', score: 880, rank: 4, inPitStop: false },
   { id: 'team-neon-ninjas', name: 'Neon Ninjas', score: 820, rank: 5, inPitStop: false },
 ];
@@ -207,9 +214,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? { ...prev.currentTeam, score: prev.currentTeam.score + points }
         : null;
       const teams = withUpdatedRanks(
-        prev.teams.map((team) =>
-          currentTeam && team.id === currentTeam.id ? currentTeam : team
-        )
+        prev.teams.map((team) => (currentTeam && team.id === currentTeam.id ? currentTeam : team))
       );
 
       return {
@@ -259,14 +264,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hydrateScanIdentity = (identity: ScanIdentity) => {
     setGameState((prev) => {
       const existingTeam = prev.teams.find((team) => team.id === identity.teamId);
-      const seedTeam: Team =
-        existingTeam ?? {
-          id: identity.teamId,
-          name: identity.teamName,
-          score: 0,
-          rank: prev.teams.length + 1,
-          inPitStop: false,
-        };
+      const seedTeam: Team = existingTeam ?? {
+        id: identity.teamId,
+        name: identity.teamName,
+        score: 0,
+        rank: prev.teams.length + 1,
+        inPitStop: false,
+      };
 
       const teams = withUpdatedRanks(
         existingTeam
@@ -312,14 +316,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (resolvedTeamId) {
         const existingTeam = teams.find((team) => team.id === resolvedTeamId);
-        const createdTeam: Team =
-          existingTeam ?? {
-            id: resolvedTeamId,
-            name: prev.currentTeam?.name ?? 'Race Team',
-            score: 0,
-            rank: teams.length + 1,
-            inPitStop: false,
-          };
+        const createdTeam: Team = existingTeam ?? {
+          id: resolvedTeamId,
+          name: prev.currentTeam?.name ?? 'Race Team',
+          score: 0,
+          rank: teams.length + 1,
+          inPitStop: false,
+        };
 
         teams = existingTeam ? teams : [...teams, createdTeam];
 

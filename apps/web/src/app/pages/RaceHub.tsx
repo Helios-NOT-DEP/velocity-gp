@@ -69,7 +69,11 @@ function feedbackClasses(level: ScanFeedback['level']): string {
 }
 
 function formatTimestamp(timestamp: Date): string {
-  return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return timestamp.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 export default function RaceHub() {
@@ -436,20 +440,30 @@ export default function RaceHub() {
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-gray-400 text-sm mb-1">{gameState.currentUser?.name ?? 'Player'}</p>
-            <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+            <h2
+              className="text-xl font-bold text-white"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
               {gameState.currentTeam?.name ?? 'Awaiting Team'}
             </h2>
-            {scanIdentity && <p className="text-xs text-gray-500 mt-1">Event: {scanIdentity.eventId}</p>}
+            {scanIdentity && (
+              <p className="text-xs text-gray-500 mt-1">Event: {scanIdentity.eventId}</p>
+            )}
           </div>
           <div className="px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
             <p className="text-xs text-gray-400 mb-1">Rank</p>
-            <p className="text-2xl font-bold text-blue-400">#{gameState.currentTeam?.rank ?? '—'}</p>
+            <p className="text-2xl font-bold text-blue-400">
+              #{gameState.currentTeam?.rank ?? '—'}
+            </p>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm font-medium mb-1">Total Points</p>
-          <p className="text-4xl font-bold text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+          <p
+            className="text-4xl font-bold text-white"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
             {(gameState.currentTeam?.score ?? 0).toLocaleString()}
           </p>
         </div>
@@ -463,14 +477,21 @@ export default function RaceHub() {
             <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-blue-500 rounded-bl-3xl" />
             <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-blue-500 rounded-br-3xl" />
 
-            <video ref={videoRef} className={`h-full w-full object-cover ${scannerActive ? 'block' : 'hidden'}`} playsInline muted />
+            <video
+              ref={videoRef}
+              className={`h-full w-full object-cover ${scannerActive ? 'block' : 'hidden'}`}
+              playsInline
+              muted
+            />
             <canvas ref={canvasRef} className="hidden" />
 
             {!scannerActive && (
               <div className="w-48 h-48 border-4 border-blue-500 rounded-2xl grid place-items-center">
                 {isHydratingIdentity ? (
                   <Loader2 className="w-16 h-16 text-blue-400/70 animate-spin" />
-                ) : scannerState === 'permission_denied' || scannerState === 'unsupported' || scannerState === 'error' ? (
+                ) : scannerState === 'permission_denied' ||
+                  scannerState === 'unsupported' ||
+                  scannerState === 'error' ? (
                   <CameraOff className="w-16 h-16 text-red-400/70" />
                 ) : (
                   <Camera className="w-16 h-16 text-blue-400/70" />
@@ -530,8 +551,16 @@ export default function RaceHub() {
                 background: 'linear-gradient(135deg, #3B82F6 0%, #F97316 100%)',
               }}
             >
-              {isHydratingIdentity ? <Loader2 className="w-5 h-5 animate-spin" /> : <Scan className="w-5 h-5" />}
-              {scannerActive ? 'Stop Scanner' : scannerState === 'idle' ? 'Start Camera Scan' : 'Retry Camera Access'}
+              {isHydratingIdentity ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Scan className="w-5 h-5" />
+              )}
+              {scannerActive
+                ? 'Stop Scanner'
+                : scannerState === 'idle'
+                  ? 'Start Camera Scan'
+                  : 'Retry Camera Access'}
             </button>
 
             <button
@@ -550,14 +579,18 @@ export default function RaceHub() {
           {!scanIdentity && !isHydratingIdentity && (
             <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-3 text-xs text-yellow-200 flex items-start gap-2">
               <TriangleAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              No seeded player profile is mapped for this session email, so scanner submission is blocked.
+              No seeded player profile is mapped for this session email, so scanner submission is
+              blocked.
             </div>
           )}
         </div>
       </div>
 
       <div className="bg-gray-900 border-t border-gray-800 rounded-t-3xl p-6 max-h-80 overflow-y-auto">
-        <h3 className="text-lg font-bold text-white mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
+        <h3
+          className="text-lg font-bold text-white mb-4"
+          style={{ fontFamily: 'var(--font-heading)' }}
+        >
           Recent Activity
         </h3>
 
@@ -587,7 +620,9 @@ export default function RaceHub() {
                     </p>
                   </div>
                 </div>
-                <span className="text-xs text-gray-500 pl-3">{formatTimestamp(scan.timestamp)}</span>
+                <span className="text-xs text-gray-500 pl-3">
+                  {formatTimestamp(scan.timestamp)}
+                </span>
               </div>
             ))}
           </div>

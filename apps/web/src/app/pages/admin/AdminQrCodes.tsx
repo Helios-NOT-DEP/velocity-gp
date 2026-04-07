@@ -83,7 +83,9 @@ export default function AdminQrCodes() {
         setEventId(null);
         setQrCodes(adminDemoQrCodes);
         setDraftWeights(
-          Object.fromEntries(adminDemoQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0]))
+          Object.fromEntries(
+            adminDemoQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0])
+          )
         );
         setLoadError('Live QR inventory unavailable. Showing local demo data.');
       } finally {
@@ -346,7 +348,11 @@ export default function AdminQrCodes() {
                     disabled={isSaving}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#00D4FF]/15 border border-[#00D4FF]/30 text-[#00D4FF] text-xs font-semibold disabled:opacity-60"
                   >
-                    {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    {isSaving ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Save className="w-3 h-3" />
+                    )}
                     Save
                   </button>
                   <button

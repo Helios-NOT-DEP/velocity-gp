@@ -26,9 +26,8 @@ vi.mock('@/services/observability', () => ({
 }));
 
 vi.mock('@/services/scan', async () => {
-  const actual = await vi.importActual<typeof import('../src/services/scan')>(
-    '../src/services/scan'
-  );
+  const actual =
+    await vi.importActual<typeof import('../src/services/scan')>('../src/services/scan');
 
   return {
     ...actual,
@@ -83,9 +82,9 @@ describe('RaceHub scanner recovery states', () => {
 
     await screen.findByRole('button', { name: /Start Camera Scan/i });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Start Camera Scan/i }).hasAttribute('disabled')).toBe(
-        false
-      );
+      expect(
+        screen.getByRole('button', { name: /Start Camera Scan/i }).hasAttribute('disabled')
+      ).toBe(false);
     });
     const startButton = screen.getByRole('button', { name: /Start Camera Scan/i });
     fireEvent.click(startButton);
@@ -110,9 +109,9 @@ describe('RaceHub scanner recovery states', () => {
 
     await screen.findByRole('button', { name: /Start Camera Scan/i });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Start Camera Scan/i }).hasAttribute('disabled')).toBe(
-        false
-      );
+      expect(
+        screen.getByRole('button', { name: /Start Camera Scan/i }).hasAttribute('disabled')
+      ).toBe(false);
     });
     const startButton = screen.getByRole('button', { name: /Start Camera Scan/i });
     fireEvent.click(startButton);

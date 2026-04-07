@@ -172,11 +172,7 @@ describe('scan dedupe window', () => {
     const previous = createPayloadDedupeState('VG-ABC-01', now);
 
     expect(
-      shouldSuppressDuplicatePayload(
-        'VG-ABC-01',
-        now + DEFAULT_DEDUPE_WINDOW_MS + 1,
-        previous
-      )
+      shouldSuppressDuplicatePayload('VG-ABC-01', now + DEFAULT_DEDUPE_WINDOW_MS + 1, previous)
     ).toBe(false);
   });
 

@@ -461,7 +461,10 @@ export async function updateQrHazardRandomizer(
         });
 
         if (!qrCode) {
-          throw new ValidationError('QR code does not exist for this event.', { eventId, qrCodeId });
+          throw new ValidationError('QR code does not exist for this event.', {
+            eventId,
+            qrCodeId,
+          });
         }
 
         const updatedQrCode = await tx.qRCode.update({

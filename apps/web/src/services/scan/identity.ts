@@ -94,8 +94,7 @@ export async function resolveScanIdentityForEmail(
   } catch {
     return {
       status: 'event_unavailable',
-      message:
-        'Current event could not be loaded. Check connectivity and try scanning again.',
+      message: 'Current event could not be loaded. Check connectivity and try scanning again.',
     };
   }
 
