@@ -121,10 +121,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentTeam:
           prev.currentTeam && prev.currentTeam.inPitStop && prev.currentTeam.pitStopTimeLeft
             ? {
-                ...prev.currentTeam,
-                pitStopTimeLeft: Math.max(0, prev.currentTeam.pitStopTimeLeft - 1),
-                inPitStop: prev.currentTeam.pitStopTimeLeft > 1,
-              }
+              ...prev.currentTeam,
+              pitStopTimeLeft: Math.max(0, prev.currentTeam.pitStopTimeLeft - 1),
+              inPitStop: prev.currentTeam.pitStopTimeLeft > 1,
+            }
             : prev.currentTeam,
       }));
     }, 1000);
@@ -275,8 +275,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const teams = withUpdatedRanks(
         existingTeam
           ? prev.teams.map((team) =>
-              team.id === seedTeam.id ? { ...team, name: identity.teamName } : team
-            )
+            team.id === seedTeam.id ? { ...team, name: identity.teamName } : team
+          )
           : [...prev.teams, seedTeam]
       );
       const currentTeam = teams.find((team) => team.id === identity.teamId) ?? seedTeam;
@@ -337,8 +337,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           if (response.outcome === 'HAZARD_PIT') {
-            nextTeam.inPitStop = true;
-            nextTeam.pitStopTimeLeft = resolvePitStopSeconds(response.pitStopExpiresAt);
+            const pitStopDuration = resolvePitStopSeconds(response.pitStopExpiresAt);
+            if (pitStopDuration > 0) {
+              nextTeam.inPitStop = true;
+              nextTeam.pitStopTimeLeft = pitStopDuration;
+            } else {
+              nextTeam.inPitStop = false;
+              nextTeam.pitStopTimeLeft = undefined;
+            }
           }
 
           if (response.outcome === 'BLOCKED' && response.errorCode === 'TEAM_IN_PIT') {

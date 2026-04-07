@@ -87,8 +87,8 @@ export default function RaceHub() {
   const detectorRef = useRef<BarcodeDetectorInstance | null>(null);
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
-  const lastJsQRDecodeTimeRef = useRef<number>(0);
-  const jsQRThrottleIntervalMs = 200; // Throttle jsQR to ~5 fps
+  // const lastJsQRDecodeTimeRef = useRef<number>(0);
+  // const jsQRThrottleIntervalMs = 200; // Throttle jsQR to ~5 fps
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
@@ -198,7 +198,7 @@ export default function RaceHub() {
     }
 
     const Detector = getBarcodeDetectorConstructor();
-    if (Detector) {
+    if (Detector && detectorRef.current !== false) {
       try {
         if (!detectorRef.current) {
           detectorRef.current = new Detector({ formats: ['qr_code'] });
@@ -213,6 +213,7 @@ export default function RaceHub() {
         trackAnalyticsEvent('scanner_decode_failure', {
           decoder: 'barcode-detector',
         });
+        detectorRef.current = false;
       }
     }
 
