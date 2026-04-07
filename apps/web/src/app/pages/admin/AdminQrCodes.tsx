@@ -102,9 +102,15 @@ export default function AdminQrCodes() {
     };
   }, []);
 
+  const isDemoMode = eventId === null;
+  const canCreateLocalQrCodes = isDemoMode && !isHydrating;
   const activeCount = useMemo(() => qrCodes.filter((code) => code.active).length, [qrCodes]);
 
   function handleCreateQRCode() {
+    if (!canCreateLocalQrCodes) {
+      return;
+    }
+
     if (!newQRName.trim()) {
       return;
     }
@@ -230,6 +236,12 @@ export default function AdminQrCodes() {
           <Plus className="w-6 h-6 text-[#00D4FF]" />
           Create New QR Code
         </h3>
+        {!isDemoMode && (
+          <p className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
+            Live QR creation is disabled because create requests are not persisted by the backend
+            yet.
+          </p>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-gray-400 mb-2">QR Code Name</label>
@@ -254,9 +266,10 @@ export default function AdminQrCodes() {
             <button
               type="button"
               onClick={handleCreateQRCode}
-              className="w-full py-3 px-6 bg-gradient-to-r from-[#00D4FF] to-[#00A3CC] text-black font-['DM_Sans'] font-bold rounded-lg hover:opacity-90 transition-all"
+              disabled={!canCreateLocalQrCodes}
+              className="w-full py-3 px-6 bg-gradient-to-r from-[#00D4FF] to-[#00A3CC] text-black font-['DM_Sans'] font-bold rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Generate QR Code
+              {isDemoMode ? 'Generate QR Code' : 'Creation Disabled In Live Mode'}
             </button>
           </div>
         </div>

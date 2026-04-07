@@ -29,9 +29,12 @@ interface BarcodeDetectorInstance {
 }
 
 interface BarcodeDetectorConstructor {
-  new(options?: { formats?: string[] }): BarcodeDetectorInstance;
+  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
   getSupportedFormats?: () => Promise<string[]>;
 }
+
+// Limit expensive jsQR fallback work to reduce CPU load on devices without BarcodeDetector support.
+const JS_QR_THROTTLE_INTERVAL_MS = 150;
 
 function getBarcodeDetectorConstructor(): BarcodeDetectorConstructor | undefined {
   return (globalThis as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
@@ -90,6 +93,8 @@ export default function RaceHub() {
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
   const scannerEpochRef = useRef<number>(0);
+  // Tracks last fallback decode attempt time so jsQR does not run every animation frame.
+  const lastJsQRDecodeTimeRef = useRef<number>(0);
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
@@ -119,7 +124,9 @@ export default function RaceHub() {
     }
 
     isSubmittingRef.current = false;
+    // Reset fallback throttle when scanner session ends so restart starts with a fresh decode window.
     scannerEpochRef.current += 1;
+    lastJsQRDecodeTimeRef.current = 0;
     setScannerState(nextState);
   }, []);
 
@@ -227,6 +234,13 @@ export default function RaceHub() {
       return null;
     }
 
+    // jsQR fallback is CPU-heavy; avoid doing full-frame pixel reads every animation frame.
+    const now = Date.now();
+    if (now - lastJsQRDecodeTimeRef.current < JS_QR_THROTTLE_INTERVAL_MS) {
+      return null;
+    }
+    lastJsQRDecodeTimeRef.current = now;
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
@@ -259,6 +273,8 @@ export default function RaceHub() {
         return;
       }
 
+      // Snapshot scanner lifecycle so stop/restart can cancel stale async UI transitions.
+      const submitEpoch = scannerEpochRef.current;
       isSubmittingRef.current = true;
       setScannerState('submitting');
 
@@ -275,7 +291,14 @@ export default function RaceHub() {
           throw new Error(`scan submission failed (${response.status})`);
         }
 
+        // Keep team/game state in sync even if scanner UI was canceled while awaiting the API.
         applyScanOutcome(response.data);
+
+        // User stopped or restarted scanner while request was in-flight; ignore stale UI updates.
+        if (scannerEpochRef.current !== submitEpoch) {
+          return;
+        }
+
         const uiAction = mapScanResponseToUiAction(response.data);
         setFeedback(uiAction.feedback);
 
@@ -304,6 +327,12 @@ export default function RaceHub() {
         trackAnalyticsEvent('scanner_submit_failed', {
           event_id: activeScanIdentity.eventId,
         });
+
+        // Avoid surfacing stale error UI after the scanner was explicitly stopped/restarted.
+        if (scannerEpochRef.current !== submitEpoch) {
+          return;
+        }
+
         setFeedback({
           level: 'error',
           title: 'Submission Failed',
@@ -317,6 +346,10 @@ export default function RaceHub() {
         isSubmittingRef.current = false;
       }
 
+      // Do not resume decoding when this submit no longer belongs to the active scanner session.
+      if (scannerEpochRef.current !== submitEpoch) {
+        return;
+      }
       setScannerState('decoding');
     },
     [applyScanOutcome, navigate, scanIdentity, stopScanner]
@@ -389,6 +422,7 @@ export default function RaceHub() {
     });
     setScannerState('requesting_permission');
 
+    // Snapshot startup attempt identity so Stop/Restart can invalidate stale async continuation.
     const currentEpoch = scannerEpochRef.current;
 
     try {
@@ -399,6 +433,7 @@ export default function RaceHub() {
         audio: false,
       });
 
+      // User canceled startup while getUserMedia was pending; stop the late stream and exit.
       if (scannerEpochRef.current !== currentEpoch) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -414,6 +449,18 @@ export default function RaceHub() {
       video.srcObject = stream;
       await video.play();
 
+      // Stop can happen while video.play() is pending; ignore stale startup continuation.
+      if (scannerEpochRef.current !== currentEpoch) {
+        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current === stream) {
+          streamRef.current = null;
+        }
+        if (video.srcObject === stream) {
+          video.srcObject = null;
+        }
+        return;
+      }
+
       trackAnalyticsEvent('scanner_permission_granted', {
         event_id: activeScanIdentity.eventId,
       });
@@ -426,10 +473,19 @@ export default function RaceHub() {
       dedupeRef.current = null;
       setScannerState('ready');
       animationFrameRef.current = window.requestAnimationFrame(() => {
+        // Prevent stale startup attempts from re-entering decoding after a stop/restart action.
+        if (scannerEpochRef.current !== currentEpoch) {
+          return;
+        }
         setScannerState('decoding');
         void decodeLoop();
       });
     } catch (error) {
+      // Ignore errors from startup attempts that were canceled by stop/restart.
+      if (scannerEpochRef.current !== currentEpoch) {
+        return;
+      }
+
       const errorName =
         typeof error === 'object' && error !== null && 'name' in error
           ? String((error as { name?: string }).name)
