@@ -8,6 +8,7 @@ export type AdminActionType =
   | 'HELIOS_REVOKED'
   | 'PIT_MANUAL_ENTER'
   | 'PIT_MANUAL_CLEAR'
+  | 'QR_HAZARD_RANDOMIZER_UPDATED'
   | 'SCORE_RESET';
 
 export interface UpdateRaceControlRequest {
