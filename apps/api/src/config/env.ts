@@ -65,6 +65,7 @@ const envSchema = z.object({
   POSTGRES_PRISMA_URL: z.string().optional(),
   SEED_DATABASE_URL: z.string().optional(),
   AUTH_SECRET: z.string().optional(),
+  MAGIC_LINK_TOKEN_EXPIRY_DATE: z.string().nullable().default(null),
   MAGIC_LINK_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(72),
   SENDGRID_API_KEY: z.string().optional(),
