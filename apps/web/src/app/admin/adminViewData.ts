@@ -6,6 +6,8 @@ export interface AdminQrCode {
   points: number;
   active: boolean;
   scanCount: number;
+  hazardRatioOverride: number | null;
+  hazardWeightOverride: number | null;
 }
 
 export interface AdminPlayerRow {
@@ -16,10 +18,42 @@ export interface AdminPlayerRow {
 }
 
 export const adminDemoQrCodes: AdminQrCode[] = [
-  { id: 'qr-alpha', name: 'Checkpoint Alpha', points: 100, active: true, scanCount: 17 },
-  { id: 'qr-bridge', name: 'Bridge Sprint', points: 150, active: true, scanCount: 13 },
-  { id: 'qr-pitwall', name: 'Pit Wall Bonus', points: 80, active: false, scanCount: 9 },
-  { id: 'qr-grid', name: 'Grid Launch', points: 120, active: true, scanCount: 11 },
+  {
+    id: 'qr-alpha',
+    name: 'Checkpoint Alpha',
+    points: 100,
+    active: true,
+    scanCount: 17,
+    hazardRatioOverride: null,
+    hazardWeightOverride: null,
+  },
+  {
+    id: 'qr-bridge',
+    name: 'Bridge Sprint',
+    points: 150,
+    active: true,
+    scanCount: 13,
+    hazardRatioOverride: 5,
+    hazardWeightOverride: 30,
+  },
+  {
+    id: 'qr-pitwall',
+    name: 'Pit Wall Bonus',
+    points: 80,
+    active: false,
+    scanCount: 9,
+    hazardRatioOverride: null,
+    hazardWeightOverride: null,
+  },
+  {
+    id: 'qr-grid',
+    name: 'Grid Launch',
+    points: 120,
+    active: true,
+    scanCount: 11,
+    hazardRatioOverride: null,
+    hazardWeightOverride: null,
+  },
 ];
 
 export function toSortedTeams(teams: Team[]): Team[] {

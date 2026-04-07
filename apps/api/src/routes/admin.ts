@@ -6,15 +6,18 @@ import { requireAdmin } from '../middleware/requireAdmin.js';
 import { validate } from '../middleware/validate.js';
 import {
   adminEventParamsSchema,
+  adminEventQrCodeParamsSchema,
   adminEventTeamParamsSchema,
   adminUserParamsSchema,
   manualPitControlSchema,
+  updateQrHazardRandomizerSchema,
   updateHeliosRoleSchema,
   updateRaceControlSchema,
 } from '@velocity-gp/api-contract/schemas';
 import {
   listAdminAudits,
   manualPitControl,
+  updateQrHazardRandomizer,
   updateHeliosRole,
   updateRaceControl,
 } from '../services/adminControlService.js';
@@ -74,6 +77,28 @@ adminRouter.post(
     response.json(
       successResponse(
         await manualPitControl(eventId, teamId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
+      )
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/qr-codes/:qrCodeId/hazard-randomizer',
+  validate(adminEventQrCodeParamsSchema, 'params'),
+  validate(updateQrHazardRandomizerSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const qrCodeId = String(request.params.qrCodeId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await updateQrHazardRandomizer(eventId, qrCodeId, request.body, {
           actorUserId: authContext?.userId,
         }),
         {

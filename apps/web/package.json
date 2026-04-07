@@ -16,6 +16,7 @@
     "@velocity-gp/api-contract": "0.1.0",
     "@velocity-gp/ui": "0.1.0",
     "canvas-confetti": "1.9.4",
+    "jsqr": "^1.4.0",
     "lucide-react": "0.487.0",
     "motion": "12.23.24",
     "posthog-js": "^1.364.5",

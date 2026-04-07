@@ -300,6 +300,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 14,
       },
       {
@@ -313,6 +314,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: 5,
+        hazardWeightOverride: 25,
         scanCount: 4,
       },
       {
@@ -326,6 +328,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 28,
       },
       {
@@ -339,6 +342,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 7,
       },
       {
@@ -352,6 +356,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(5)),
         activationEndsAt: new Date(now.getTime() - hours(1)),
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 45,
       },
     ],
