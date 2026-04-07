@@ -1,94 +1,123 @@
 # Velocity GP
 
-Velocity GP is a React + TypeScript + Vite application for a multi-day endurance-style event experience. The product combines attendee gameplay, team identity creation, QR-based scanning mechanics, Helios rescue flows, leaderboard-style race dynamics, and planned admin and backend capabilities documented in the repo.
+Velocity GP is a TypeScript monorepo for a multi-day endurance game experience. It includes a React web app, an Express BFF API, shared API contracts/client packages, and shared UI primitives.
 
-## Repository Overview
-
-The current repository is an npm-workspaces monorepo with an attendee-facing frontend, an Express-based backend-for-frontend (BFF), and shared packages for API contracts, the HTTP client, UI primitives, and TypeScript config. The frontend includes route-level screens for the attendee experience, shared game state via React context, and supporting design and product documentation for planned expansion. The backend currently exposes placeholder endpoints that mirror the planned API contract so future auth, persistence, and integrations can be added cleanly.
-
-Current route-level pages live in `apps/web/src/app/pages/` and include:
-
-- `Login`
-- `Garage`
-- `RaceHub`
-- `PitStop`
-- `HeliosProfile`
-- `Leaderboard`
-- `VictoryLane`
-
-## Tech Direction
-
-The planned stack is documented in [docs/architecture/Tech Stack Needed.md](./docs/architecture/Tech%20Stack%20Needed.md). In summary:
-
-- Frontend: React with TypeScript
-- Database: PostgreSQL
-- ORM: Prisma
-- Infrastructure: DigitalOcean App Platform, DigitalOcean Postgres, and a Droplet for `n8n`
-- AI and services: OpenAI, ElevenLabs, and SendGrid
-- Authentication: Auth.js email authentication
-- Observability: PostHog with OpenTelemetry
-
-## Documentation
-
-Quick links to key docs (full index in [docs/README.md](./docs/README.md)):
-
-- **Setup & Contributing**: [DEVELOPMENT.md](./DEVELOPMENT.md)
-- **Product Spec**: [BDD Specifications](./docs/product/Velocity%20GP%20BDD%20Specifications.md)
-- **Architecture**: [Tech Stack Needed](./docs/architecture/Tech%20Stack%20Needed.md)
-- **Observability**: [Observability Plan](./docs/architecture/observability.md)
-- **Design System**: [Figma Design Prompt](./docs/design/Figma%20Design%20Prompt.md)
-- **Personas**: [Player, Admin, AI Announcer, etc.](./docs/product/persona/)
-- **Testing**: [apps/web/tests/README.md](./apps/web/tests/README.md)
-
-## Backlog and Workflow
-
-GitHub Issues is the backlog of record for this project. Planned work is tracked in the Helios project board:
-
-- `https://github.com/orgs/Helios-NOT-DEP/projects/4`
-
-When implementing features, keep documentation and code aligned with the relevant GitHub Issue, the BDD persona specs, and the planned stack.
-
-## Development
-
-**For full setup instructions, conventions, and workflow see [DEVELOPMENT.md](./DEVELOPMENT.md).**
-
-Quick start:
-
-```bash
-npm install
-npm run dev:web    # Start web app at http://localhost:5173
-npm run dev:api    # Start the backend BFF at http://localhost:4000
-npm run dev        # Start both services together
-npm run db:seed    # Seed API database with deterministic test data
-npm run build      # Create production bundle
-npm run lint       # Check code style
-npm test          # Run test suite
-```
-
-## Project Structure
+## Monorepo Layout
 
 ```
 apps/
-  ├── web/              # React + Vite frontend
-  └── api/              # Express BFF and Prisma schema/client
+  web/                  # React + Vite frontend
+  api/                  # Express BFF + Prisma
 
 packages/
-  ├── api-contract/     # Shared DTOs, endpoint builders, and Zod schemas
-  ├── api-client/       # Reusable HTTP client
-  ├── ui/               # Shared UI primitives
-  └── config-typescript/# Shared TS config presets
+  api-contract/         # Shared endpoints, schemas, contracts, domain types
+  api-client/           # Reusable typed HTTP client
+  ui/                   # Shared React UI primitives
+  config-typescript/    # Shared TS config presets
 
-docs/                   # Complete documentation (see docs/README.md)
-scripts/                # Development scripts
-.mcp/                   # Model Context Protocol config
+docs/                   # Product, architecture, design, and contribution docs
 ```
 
-## Implementation Guidance
+## Prerequisites
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed conventions. Key principles:
+- Node.js 18+
+- npm 9+
+- Docker (for local Postgres)
 
-- ✅ Reuse UI primitives from `packages/ui/src/components/` before adding new patterns
-- ✅ Keep route concerns in pages, share logic via services or custom hooks
-- ✅ Use typed interfaces for clear boundaries (auth, API, state)
-- ✅ Align with the planned stack for future backend integration
-- ❌ Avoid: UI components coupled to backend providers, hardcoded config values
+## Quick Start
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create local env files:
+
+```bash
+cp .env.example .env.local
+cp apps/api/.env.example apps/api/.env
+```
+
+3. Start local Postgres:
+
+```bash
+docker compose up -d
+```
+
+Default local database from `docker-compose.yml`:
+- host: `localhost`
+- port: `16432`
+- user: `postgres`
+- password: `postgres`
+- db: `velocitygp`
+
+4. Run Prisma migrations and seed data:
+
+```bash
+npm run db:deploy
+npm run db:seed
+```
+
+5. Start development:
+
+```bash
+npm run dev
+```
+
+Local URLs:
+- Web: `http://localhost:5173`
+- API: `http://localhost:4000`
+- API prefix: `/api`
+
+## Scripts
+
+Root scripts:
+
+- `npm run dev` - run all workspaces in watch mode
+- `npm run dev:web` - run contract/client/ui + web only
+- `npm run dev:api` - run contract + api only
+- `npm run build` - build all workspaces
+- `npm run build:web` - build web-related workspaces
+- `npm run build:api` - build api-related workspaces
+- `npm run lint` - lint all workspaces
+- `npm test` - run tests across workspaces
+- `npm run format` - format `apps/web`
+- `npm run db:generate` - generate Prisma client
+- `npm run db:deploy` - apply migrations
+- `npm run db:migrate` - create/apply dev migration
+- `npm run db:studio` - open Prisma Studio
+- `npm run db:seed` - seed local database
+
+## API Surface (Current)
+
+Health routes:
+- `GET /health`
+- `GET /ready`
+
+API routes are mounted under `/api` and currently include:
+
+- Events: `/events`, `/events/current`, `/events/:eventId`
+- Game: `/events/:eventId/players/:playerId/race-state`, `/events/:eventId/players/:playerId/hazard-status`, `/events/:eventId/leaderboard`
+- Players: `/players`, `/players/:playerId`
+- Teams: `/teams`, `/teams/:teamId`, `/teams/:teamId/join`, `/teams/:teamId/members`
+- Hazards: `/hazards/scan`, `/hazards/:hazardId`, `/events/:eventId/hazards`
+- Rescue: `/rescue/initiate`, `/rescue/:playerId/status`, `/rescue/:playerId/complete`
+- Scans: `/events/:eventId/scans`
+- Admin (guarded by `requireAdmin`): `/admin/session`, `/admin/events/:eventId/race-control`, `/admin/events/:eventId/teams/:teamId/pit-control`, `/admin/users/:userId/helios-role`, `/admin/events/:eventId/audits`
+
+## Key Documentation
+
+- Development workflow: [DEVELOPMENT.md](./DEVELOPMENT.md)
+- Docs index: [docs/README.md](./docs/README.md)
+- Product spec: [Velocity GP BDD Specifications](./docs/product/Velocity%20GP%20BDD%20Specifications.md)
+- Architecture overview: [RepoStructure](./docs/architecture/RepoStructure.md)
+- Planned stack direction: [Tech Stack Needed](./docs/architecture/Tech%20Stack%20Needed.md)
+- Observability: [observability.md](./docs/architecture/observability.md)
+- Contributing: [CONTRIBUTING.md](./docs/contributing/CONTRIBUTING.md)
+
+## Notes
+
+- The API uses shared contracts/schemas from `packages/api-contract`.
+- Env loading for API supports repo-level and package-level `.env`/`.env.local` files.
+- Do not commit local env files.
