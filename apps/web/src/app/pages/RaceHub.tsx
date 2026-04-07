@@ -84,6 +84,7 @@ export default function RaceHub() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const scanIdentityRef = useRef<ScanIdentity | null>(null);
   const detectorRef = useRef<BarcodeDetectorInstance | null>(null);
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
@@ -125,6 +126,7 @@ export default function RaceHub() {
     resolution: Awaited<ReturnType<typeof resolveScanIdentityForEmail>>
   ) => {
     if (resolution.status === 'resolved') {
+      scanIdentityRef.current = resolution.identity;
       setScanIdentity(resolution.identity);
       hydrateScanIdentity(resolution.identity);
       setFeedback((current) => {
@@ -140,6 +142,7 @@ export default function RaceHub() {
       return;
     }
 
+    scanIdentityRef.current = null;
     setScanIdentity(null);
     setFeedback({
       level: 'warning',
@@ -241,7 +244,8 @@ export default function RaceHub() {
 
   const submitPayload = useCallback(
     async (payload: string) => {
-      if (!scanIdentity) {
+      const activeScanIdentity = scanIdentityRef.current ?? scanIdentity;
+      if (!activeScanIdentity) {
         setFeedback({
           level: 'warning',
           title: 'Scan Profile Missing',
@@ -258,9 +262,9 @@ export default function RaceHub() {
 
       try {
         const response = await apiClient.post<SubmitScanResponse>(
-          scanEndpoints.submitScan(scanIdentity.eventId),
+          scanEndpoints.submitScan(activeScanIdentity.eventId),
           {
-            playerId: scanIdentity.playerId,
+            playerId: activeScanIdentity.playerId,
             qrPayload: payload,
           }
         );
@@ -296,7 +300,7 @@ export default function RaceHub() {
         }
       } catch {
         trackAnalyticsEvent('scanner_submit_failed', {
-          event_id: scanIdentity.eventId,
+          event_id: activeScanIdentity.eventId,
         });
         setFeedback({
           level: 'error',
@@ -351,7 +355,8 @@ export default function RaceHub() {
   }, [detectPayloadFromFrame, submitPayload]);
 
   const startScanner = useCallback(async () => {
-    if (!scanIdentity) {
+    const activeScanIdentity = scanIdentityRef.current ?? scanIdentity;
+    if (!activeScanIdentity) {
       setFeedback({
         level: 'warning',
         title: 'Scan Profile Missing',
@@ -378,7 +383,7 @@ export default function RaceHub() {
     }
 
     trackAnalyticsEvent('scanner_permission_prompted', {
-      event_id: scanIdentity.eventId,
+      event_id: activeScanIdentity.eventId,
     });
     setScannerState('requesting_permission');
 
@@ -401,7 +406,7 @@ export default function RaceHub() {
       await video.play();
 
       trackAnalyticsEvent('scanner_permission_granted', {
-        event_id: scanIdentity.eventId,
+        event_id: activeScanIdentity.eventId,
       });
 
       setFeedback({
