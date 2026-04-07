@@ -23,12 +23,12 @@ function resolveAuthHeaders(): Record<string, string> {
     return {};
   }
 
-  const rawSession = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
-  if (!rawSession) {
-    return {};
-  }
-
   try {
+    const rawSession = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+    if (!rawSession) {
+      return {};
+    }
+
     const parsed = JSON.parse(rawSession) as Partial<StoredAuthSession>;
     if (
       !parsed.isAuthenticated ||
@@ -58,8 +58,8 @@ class ObservableApiClient extends ApiClient {
     const requestOptions = {
       ...options,
       headers: {
-        ...authHeaders,
         ...(options.headers ?? {}),
+        ...authHeaders,
       },
     };
 

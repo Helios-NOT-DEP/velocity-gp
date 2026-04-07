@@ -29,7 +29,7 @@ interface BarcodeDetectorInstance {
 }
 
 interface BarcodeDetectorConstructor {
-  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
+  new(options?: { formats?: string[] }): BarcodeDetectorInstance;
   getSupportedFormats?: () => Promise<string[]>;
 }
 
@@ -87,6 +87,8 @@ export default function RaceHub() {
   const detectorRef = useRef<BarcodeDetectorInstance | null>(null);
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
+  const lastJsQRDecodeTimeRef = useRef<number>(0);
+  const jsQRThrottleIntervalMs = 200; // Throttle jsQR to ~5 fps
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
@@ -95,7 +97,10 @@ export default function RaceHub() {
   const [showGuidance, setShowGuidance] = useState(false);
 
   const scannerActive =
-    scannerState === 'ready' || scannerState === 'decoding' || scannerState === 'submitting';
+    scannerState === 'requesting_permission' ||
+    scannerState === 'ready' ||
+    scannerState === 'decoding' ||
+    scannerState === 'submitting';
 
   const stopScanner = useCallback((nextState: ScannerState = 'idle') => {
     if (animationFrameRef.current !== null) {
@@ -122,7 +127,16 @@ export default function RaceHub() {
     if (resolution.status === 'resolved') {
       setScanIdentity(resolution.identity);
       hydrateScanIdentity(resolution.identity);
-      setFeedback(defaultFeedback());
+      setFeedback((current) => {
+        if (
+          current.title === 'Scan Profile Unavailable' ||
+          current.title === 'Scan Profile Missing'
+        ) {
+          return defaultFeedback();
+        }
+
+        return current;
+      });
       return;
     }
 
@@ -410,7 +424,7 @@ export default function RaceHub() {
         trackAnalyticsEvent('scanner_permission_denied', {
           reason: errorName,
         });
-        setScannerState('permission_denied');
+        stopScanner('permission_denied');
         setFeedback({
           level: 'error',
           title: 'Camera Permission Denied',
@@ -421,7 +435,7 @@ export default function RaceHub() {
         return;
       }
 
-      setScannerState('error');
+      stopScanner('error');
       setFeedback({
         level: 'error',
         title: 'Scanner Error',
