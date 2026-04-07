@@ -29,7 +29,7 @@ interface BarcodeDetectorInstance {
 }
 
 interface BarcodeDetectorConstructor {
-  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
+  new(options?: { formats?: string[] }): BarcodeDetectorInstance;
   getSupportedFormats?: () => Promise<string[]>;
 }
 
@@ -86,8 +86,10 @@ export default function RaceHub() {
   const streamRef = useRef<MediaStream | null>(null);
   const scanIdentityRef = useRef<ScanIdentity | null>(null);
   const detectorRef = useRef<BarcodeDetectorInstance | null>(null);
+  const detectorUnavailableRef = useRef(false);
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
+  const scannerEpochRef = useRef<number>(0);
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
@@ -117,6 +119,7 @@ export default function RaceHub() {
     }
 
     isSubmittingRef.current = false;
+    scannerEpochRef.current += 1;
     setScannerState(nextState);
   }, []);
 
@@ -199,7 +202,7 @@ export default function RaceHub() {
     }
 
     const Detector = getBarcodeDetectorConstructor();
-    if (Detector && detectorRef.current !== false) {
+    if (Detector && !detectorUnavailableRef.current) {
       try {
         if (!detectorRef.current) {
           detectorRef.current = new Detector({ formats: ['qr_code'] });
@@ -214,7 +217,8 @@ export default function RaceHub() {
         trackAnalyticsEvent('scanner_decode_failure', {
           decoder: 'barcode-detector',
         });
-        detectorRef.current = false;
+        detectorRef.current = null;
+        detectorUnavailableRef.current = true;
       }
     }
 
@@ -385,6 +389,8 @@ export default function RaceHub() {
     });
     setScannerState('requesting_permission');
 
+    const currentEpoch = scannerEpochRef.current;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -392,6 +398,11 @@ export default function RaceHub() {
         },
         audio: false,
       });
+
+      if (scannerEpochRef.current !== currentEpoch) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
 
       const video = videoRef.current;
       if (!video) {
