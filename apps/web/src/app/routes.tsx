@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
-import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Garage from './pages/Garage';
 import RaceHub from './pages/RaceHub';
 import PitStop from './pages/PitStop';
@@ -18,7 +18,7 @@ import AdminStatistics from './pages/admin/AdminStatistics';
 export const appRoutes: RouteObject[] = [
   {
     path: '/',
-    Component: Login,
+    Component: Signup,
   },
   {
     path: '/garage',
