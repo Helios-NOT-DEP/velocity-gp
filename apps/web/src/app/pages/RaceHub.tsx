@@ -88,8 +88,6 @@ export default function RaceHub() {
   const detectorRef = useRef<BarcodeDetectorInstance | null>(null);
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
-  // const lastJsQRDecodeTimeRef = useRef<number>(0);
-  // const jsQRThrottleIntervalMs = 200; // Throttle jsQR to ~5 fps
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
