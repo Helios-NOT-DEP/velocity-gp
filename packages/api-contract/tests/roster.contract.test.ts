@@ -64,7 +64,7 @@ describe('roster contract', () => {
         {
           workEmail: 'player@velocitygp.dev',
           displayName: 'Player One',
-          phoneE164: '555-123-4567',
+          phoneE164: '+15551234567',
           teamName: 'Apex',
         },
       ],
@@ -77,6 +77,8 @@ describe('roster contract', () => {
         {
           workEmail: 'two@velocitygp.dev',
           displayName: 'Player Two',
+          phoneE164: '+15551234568',
+          teamName: 'Apex',
         },
       ],
     });

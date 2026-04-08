@@ -101,8 +101,11 @@ export function createMagicLinkToken(input: {
 }): string {
   const now = input.now ?? new Date();
   const issuedAt = now.getTime();
-  const expiresAt = env.MAGIC_LINK_TOKEN_EXPIRY_DATE
-    ? new Date(env.MAGIC_LINK_TOKEN_EXPIRY_DATE).getTime() / 1_000
+  const configuredExpiresAt = env.MAGIC_LINK_TOKEN_EXPIRY_DATE
+    ? Date.parse(env.MAGIC_LINK_TOKEN_EXPIRY_DATE)
+    : Number.NaN;
+  const expiresAt = Number.isFinite(configuredExpiresAt)
+    ? configuredExpiresAt
     : issuedAt + env.MAGIC_LINK_TOKEN_TTL_MINUTES * 60_000;
 
   return createToken({

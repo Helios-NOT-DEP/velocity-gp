@@ -37,7 +37,7 @@ Velocity GP is a TypeScript monorepo for a multi-day endurance game experience. 
 ## Building and Running
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20.19.0+
 - Docker (for local PostgreSQL)
 
 ### Setup

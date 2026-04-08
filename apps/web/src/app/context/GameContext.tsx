@@ -435,7 +435,9 @@ function resolveCurrentUserFromSession(session: AuthSession): GameState['current
   return {
     name: session.displayName ?? session.email ?? 'Player',
     email: session.email ?? '',
-    teamId: session.teamId ?? '',
+    teamId: session.teamId ?? null,
     isHelios: session.role === 'helios',
+    eventId: session.eventId,
+    playerId: session.playerId,
   };
 }

@@ -8,12 +8,12 @@ export const rosterAssignmentStatusSchema = z.enum([
 
 export const phoneE164Schema = z
   .string()
-  .regex(/^\+[1-9]\d{7,14}$/, 'Phone number must be in E.164 format (e.g. +15551234567).');
+  .max(64);
 
 export const rosterImportRowSchema = z.object({
   workEmail: z.string().email(),
   displayName: z.string().min(1),
-  phoneE164: z.string().min(1).max(64).nullable().optional(),
+  phoneE164: phoneE164Schema.nullable().optional(),
   teamName: z.string().min(1).nullable().optional(),
 });
 

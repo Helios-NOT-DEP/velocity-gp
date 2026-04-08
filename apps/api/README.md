@@ -29,6 +29,7 @@ Optional commands:
 - `npm run dev` — starts the backend on `http://localhost:4000`
 - `npm run build` — compiles the backend into `dist/`
 - `npm run test` — runs backend integration tests
+- `npm run auth:magic-link -- --email <user-email>` — prints a local magic-link callback URL/token for an ACTIVE event player
 
 ## Available placeholder endpoints
 
