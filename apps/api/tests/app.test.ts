@@ -139,6 +139,13 @@ describe('velocity gp backend', () => {
   });
 
   afterAll(async () => {
+    await prisma.emailEvent.deleteMany({
+      where: {
+        recipientEmailNormalized: {
+          endsWith: `${token}@velocitygp.dev`,
+        },
+      },
+    });
     await prisma.adminActionAudit.deleteMany({
       where: {
         eventId: fixtureIds.eventId,
@@ -284,6 +291,126 @@ describe('velocity gp backend', () => {
     expect(assignedResponse.body.data.message).toBe(unknownResponse.body.data.message);
     expect(unassignedResponse.body.data.message).toBe(unknownResponse.body.data.message);
     expect(capturedLinks.length).toBe(1);
+  });
+
+  it('ingests Mailtrap events, persists them, and flags return-email accounts on bounce', async () => {
+    const recipientEmail = `player-${token}@velocitygp.dev`;
+    const payload = {
+      processedAt: new Date().toISOString(),
+      events: [
+        {
+          eventType: 'delivered',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-delivered-${token}`,
+          providerEventId: `provider-delivered-${token}`,
+          eventId: fixtureIds.eventId,
+          raw: {
+            provider: 'mailtrap',
+          },
+        },
+        {
+          eventType: 'bounce',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-bounce-${token}`,
+          providerEventId: `provider-bounce-${token}`,
+          eventId: fixtureIds.eventId,
+          raw: {
+            provider: 'mailtrap',
+            reason: 'mailbox_not_found',
+          },
+        },
+      ],
+    };
+
+    const response = await request(app).post(`${apiPrefix}/webhooks/mailtrap/events`).send(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.ingestedCount).toBe(2);
+    expect(response.body.data.returnSignalCount).toBe(1);
+    expect(response.body.data.flaggedUserCount).toBe(1);
+    expect(response.body.data.flaggedPlayerCount).toBeGreaterThanOrEqual(1);
+    expect(response.body.data.auditCount).toBeGreaterThanOrEqual(1);
+
+    const [user, player, events, emailReturnAudit] = await Promise.all([
+      prisma.user.findUnique({
+        where: {
+          id: fixtureIds.playerUserId,
+        },
+        select: {
+          hasReturnEmailIssue: true,
+        },
+      }),
+      prisma.player.findUnique({
+        where: {
+          id: fixtureIds.playerId,
+        },
+        select: {
+          hasReturnEmailIssue: true,
+        },
+      }),
+      prisma.emailEvent.findMany({
+        where: {
+          recipientEmailNormalized: recipientEmail,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          actionType: 'EMAIL_RETURN_FLAGGED',
+          targetId: fixtureIds.playerId,
+        },
+      }),
+    ]);
+
+    expect(user?.hasReturnEmailIssue).toBe(true);
+    expect(player?.hasReturnEmailIssue).toBe(true);
+    expect(events).toHaveLength(2);
+    expect(emailReturnAudit).not.toBeNull();
+  });
+
+  it('handles duplicate Mailtrap events idempotently', async () => {
+    const recipientEmail = `player-${token}@velocitygp.dev`;
+    const duplicatePayload = {
+      events: [
+        {
+          eventType: 'delivered',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-delivered-${token}`,
+          providerEventId: `provider-delivered-${token}`,
+          eventId: fixtureIds.eventId,
+        },
+        {
+          eventType: 'bounce',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-bounce-${token}`,
+          providerEventId: `provider-bounce-${token}`,
+          eventId: fixtureIds.eventId,
+        },
+      ],
+    };
+
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .send(duplicatePayload);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.ingestedCount).toBe(0);
+    expect(response.body.data.duplicateCount).toBe(2);
+    expect(response.body.data.auditCount).toBe(0);
+
+    const events = await prisma.emailEvent.findMany({
+      where: {
+        recipientEmailNormalized: recipientEmail,
+      },
+    });
+
+    expect(events).toHaveLength(2);
   });
 
   it('verifies valid magic links and returns deterministic routing + session payload', async () => {
