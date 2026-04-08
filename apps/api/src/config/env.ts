@@ -70,6 +70,7 @@ const envSchema = z.object({
   AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(72),
   SENDGRID_API_KEY: z.string().optional(),
   SENDGRID_FROM_EMAIL: z.string().email().optional(),
+  N8N_WEBHOOK_TOKEN: z.string().min(16).optional(),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
   PIT_RELEASE_BATCH_SIZE: z.coerce.number().int().positive().default(50),

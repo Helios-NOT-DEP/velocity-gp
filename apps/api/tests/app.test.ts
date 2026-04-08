@@ -12,6 +12,7 @@ import { createMagicLinkToken } from '../src/services/authTokens.js';
 describe('velocity gp backend', () => {
   const app = createApp();
   const apiPrefix = env.API_PREFIX;
+  const n8nWebhookToken = env.N8N_WEBHOOK_TOKEN ?? 'velocity-gp-dev-webhook-token';
   const token = randomUUID().slice(0, 8);
   const fixtureIds = {
     eventId: `event-app-${token}`,
@@ -293,6 +294,23 @@ describe('velocity gp backend', () => {
     expect(capturedLinks.length).toBe(1);
   });
 
+  it('rejects Mailtrap webhook requests without a valid bearer token', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .send({
+        events: [
+          {
+            eventType: 'delivered',
+            recipientEmail: `player-${token}@velocitygp.dev`,
+          },
+        ],
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+  });
+
   it('ingests Mailtrap events, persists them, and flags return-email accounts on bounce', async () => {
     const recipientEmail = `player-${token}@velocitygp.dev`;
     const payload = {
@@ -324,7 +342,10 @@ describe('velocity gp backend', () => {
       ],
     };
 
-    const response = await request(app).post(`${apiPrefix}/webhooks/mailtrap/events`).send(payload);
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set('authorization', `Bearer ${n8nWebhookToken}`)
+      .send(payload);
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -396,6 +417,7 @@ describe('velocity gp backend', () => {
 
     const response = await request(app)
       .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set('authorization', `Bearer ${n8nWebhookToken}`)
       .send(duplicatePayload);
 
     expect(response.status).toBe(200);
