@@ -5,4 +5,5 @@ export * from './gameSchemas.js';
 export * from './hazardSchemas.js';
 export * from './playerSchemas.js';
 export * from './rescueSchemas.js';
+export * from './rosterSchemas.js';
 export * from './teamSchemas.js';

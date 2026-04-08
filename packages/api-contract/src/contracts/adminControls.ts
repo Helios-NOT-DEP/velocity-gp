@@ -9,7 +9,11 @@ export type AdminActionType =
   | 'PIT_MANUAL_ENTER'
   | 'PIT_MANUAL_CLEAR'
   | 'QR_HAZARD_RANDOMIZER_UPDATED'
-  | 'SCORE_RESET';
+  | 'SCORE_RESET'
+  | 'ROSTER_IMPORTED'
+  | 'ROSTER_ASSIGNED'
+  | 'ROSTER_REASSIGNED'
+  | 'ROSTER_UNASSIGNED';
 
 export interface UpdateRaceControlRequest {
   readonly state: RaceControlState;

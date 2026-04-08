@@ -16,6 +16,7 @@ describe('velocity gp backend', () => {
   const fixtureIds = {
     eventId: `event-app-${token}`,
     teamId: `team-app-${token}`,
+    secondTeamId: `team-app-second-${token}`,
     playerId: `player-app-${token}`,
     playerUserId: `user-player-app-${token}`,
     unassignedPlayerId: `player-unassigned-app-${token}`,
@@ -77,14 +78,23 @@ describe('velocity gp backend', () => {
       },
     });
 
-    await prisma.team.create({
-      data: {
-        id: fixtureIds.teamId,
-        eventId: fixtureIds.eventId,
-        name: `App Team ${token}`,
-        score: 0,
-        status: 'ACTIVE',
-      },
+    await prisma.team.createMany({
+      data: [
+        {
+          id: fixtureIds.teamId,
+          eventId: fixtureIds.eventId,
+          name: `App Team ${token}`,
+          score: 0,
+          status: 'ACTIVE',
+        },
+        {
+          id: fixtureIds.secondTeamId,
+          eventId: fixtureIds.eventId,
+          name: `App Pending Team ${token}`,
+          score: 0,
+          status: 'PENDING',
+        },
+      ],
     });
 
     await prisma.player.create({
@@ -181,8 +191,8 @@ describe('velocity gp backend', () => {
     });
     await prisma.user.deleteMany({
       where: {
-        id: {
-          in: [fixtureIds.adminUserId, fixtureIds.playerUserId, fixtureIds.unassignedUserId],
+        email: {
+          endsWith: `${token}@velocitygp.dev`,
         },
       },
     });
@@ -338,6 +348,195 @@ describe('velocity gp backend', () => {
     expect(verifyResponse.status).toBe(403);
     expect(verifyResponse.body.success).toBe(false);
     expect(verifyResponse.body.error.code).toBe('AUTH_ASSIGNMENT_REQUIRED');
+  });
+
+  it('lists admin roster and supports assignment-status filtering', async () => {
+    const allRosterResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(allRosterResponse.status).toBe(200);
+    expect(allRosterResponse.body.success).toBe(true);
+    expect(allRosterResponse.body.data.items.length).toBeGreaterThanOrEqual(2);
+
+    const unassignedResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
+      .query({ assignmentStatus: 'UNASSIGNED' })
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(unassignedResponse.status).toBe(200);
+    expect(unassignedResponse.body.success).toBe(true);
+    expect(unassignedResponse.body.data.items).toHaveLength(1);
+    expect(unassignedResponse.body.data.items[0].playerId).toBe(fixtureIds.unassignedPlayerId);
+    expect(unassignedResponse.body.data.items[0].assignmentStatus).toBe('UNASSIGNED');
+  });
+
+  it('updates roster assignments and writes roster audit rows', async () => {
+    const response = await request(app)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players/${fixtureIds.unassignedPlayerId}/assignment`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ teamId: fixtureIds.secondTeamId, reason: 'seeded test assignment' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.playerId).toBe(fixtureIds.unassignedPlayerId);
+    expect(response.body.data.previousTeamId).toBeNull();
+    expect(response.body.data.teamId).toBe(fixtureIds.secondTeamId);
+    expect(response.body.data.assignmentStatus).toBe('ASSIGNED_PENDING');
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const [updatedPlayer, audit] = await Promise.all([
+      prisma.player.findUnique({
+        where: {
+          id: fixtureIds.unassignedPlayerId,
+        },
+        select: {
+          teamId: true,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          actionType: 'ROSTER_ASSIGNED',
+          targetId: fixtureIds.unassignedPlayerId,
+        },
+      }),
+    ]);
+
+    expect(updatedPlayer?.teamId).toBe(fixtureIds.secondTeamId);
+    expect(audit).not.toBeNull();
+  });
+
+  it('previews roster imports with duplicate-email and invalid-phone validation', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/import/preview`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        rows: [
+          {
+            workEmail: `dupe-${token}@velocitygp.dev`,
+            displayName: 'Dupe One',
+          },
+          {
+            workEmail: `dupe-${token}@velocitygp.dev`,
+            displayName: 'Dupe Two',
+          },
+          {
+            workEmail: `invalid-phone-${token}@velocitygp.dev`,
+            displayName: 'Invalid Phone',
+            phoneE164: '555-0100',
+          },
+          {
+            workEmail: `player-${token}@velocitygp.dev`,
+            displayName: 'Player Fixture Updated',
+            teamName: `App Pending Team ${token}`,
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.summary.total).toBe(4);
+    expect(response.body.data.summary.invalid).toBe(3);
+    expect(response.body.data.summary.valid).toBe(1);
+    expect(response.body.data.rows[3].action).toBe('reassign');
+  });
+
+  it('applies roster imports with upsert, assignment preservation, and team auto-create', async () => {
+    const newStandaloneEmail = `new-standalone-${token}@velocitygp.dev`;
+    const newAssignedEmail = `new-assigned-${token}@velocitygp.dev`;
+
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/import/apply`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        rows: [
+          {
+            workEmail: newStandaloneEmail,
+            displayName: 'Standalone Import',
+          },
+          {
+            workEmail: `player-${token}@velocitygp.dev`,
+            displayName: 'Player Fixture Renamed',
+          },
+          {
+            workEmail: `unassigned-${token}@velocitygp.dev`,
+            displayName: 'Unassigned Fixture',
+            teamName: `App Pending Team ${token}`,
+          },
+          {
+            workEmail: newAssignedEmail,
+            displayName: 'New Assigned Import',
+            teamName: `New Import Team ${token}`,
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.summary.total).toBe(4);
+    expect(response.body.data.summary.invalid).toBe(0);
+    expect(response.body.data.summary.createdUsers).toBe(2);
+    expect(response.body.data.summary.updatedUsers).toBe(1);
+    expect(response.body.data.summary.createdPlayers).toBe(2);
+    expect(response.body.data.summary.assigned).toBeGreaterThanOrEqual(1);
+    expect(response.body.data.summary.createdTeams).toBe(1);
+
+    const [renamedPlayerUser, preservedPlayer, newlyAssignedUnassigned, createdTeam, importAudit] =
+      await Promise.all([
+        prisma.user.findUnique({
+          where: {
+            email: `player-${token}@velocitygp.dev`,
+          },
+          select: {
+            displayName: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: fixtureIds.playerId,
+          },
+          select: {
+            teamId: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: fixtureIds.unassignedPlayerId,
+          },
+          select: {
+            teamId: true,
+          },
+        }),
+        prisma.team.findFirst({
+          where: {
+            eventId: fixtureIds.eventId,
+            name: `New Import Team ${token}`,
+          },
+          select: {
+            id: true,
+          },
+        }),
+        prisma.adminActionAudit.findFirst({
+          where: {
+            eventId: fixtureIds.eventId,
+            actionType: 'ROSTER_IMPORTED',
+          },
+        }),
+      ]);
+
+    expect(renamedPlayerUser?.displayName).toBe('Player Fixture Renamed');
+    expect(preservedPlayer?.teamId).toBe(fixtureIds.teamId);
+    expect(newlyAssignedUnassigned?.teamId).toBe(fixtureIds.secondTeamId);
+    expect(createdTeam).not.toBeNull();
+    expect(importAudit).not.toBeNull();
   });
 
   it('rejects admin routes when authentication context is missing', async () => {
