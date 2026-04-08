@@ -2,6 +2,8 @@
 
 Issue: `#42 - [Foundation] Establish observability with PostHog and OpenTelemetry`
 
+ADR reference: [ADR-0001](../adr/0001-observability-posthog-opentelemetry-split.md)
+
 ## Responsibilities
 
 - **PostHog** owns product analytics: page views, player funnel steps, feature usage, and persona adoption.

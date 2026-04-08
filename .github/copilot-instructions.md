@@ -20,10 +20,13 @@
 
 ## Build and Test
 
-- Install dependencies: `npm install`
-- Start development server: `npm run dev`
-- Create production build: `npm run build`
-- There is currently no test runner configured; if adding tests, scaffold Vitest + React Testing Library first and keep tests close to feature files.
+- `npm run dev`: run full local stack (shared packages + web + api in watch mode).
+- `npm run dev:web`: run frontend-focused stack only.
+- `npm run dev:api`: run backend-focused stack only.
+- `npm run build`: build all workspaces in dependency order.
+- `npm run lint`: run ESLint in all workspaces.
+- `npm test`: run tests across workspaces (after building shared packages).
+- `npm run db:deploy` / `npm run db:seed`: apply Prisma migrations and seed local DB.
 
 ## Conventions
 
@@ -32,6 +35,8 @@
 - GitHub Issues is the backlog of record for this repo. Planned work should align with the Helios project board: `https://github.com/orgs/Helios-NOT-DEP/projects/4`.
 - For planned backend and integration direction, reference `docs/Tech Stack Needed.md` instead of hardcoding assumptions in frontend code.
 - Prefer linking to existing docs instead of duplicating long requirements in code comments.
+- All architecture decisions must be documented as Markdown ADRs in `docs/adr/`.
+- The Velocity GP design source is the Figma Make file: `https://www.figma.com/make/PobyEVqOy3IKJ8EUPUr6Vh/Velocity-GP-v1?t=UvkDEfpEreGXp1p3-1`.
 
 ## Planned Stack
 
@@ -57,3 +62,4 @@
 - Product behavior: `docs/Velocity GP BDD Specifications.md`
 - Technology direction: `docs/Tech Stack Needed.md`
 - Design prompt/context: `docs/Figma Design Prompt.md`
+- Figma Make source: `https://www.figma.com/make/PobyEVqOy3IKJ8EUPUr6Vh/Velocity-GP-v1?t=UvkDEfpEreGXp1p3-1`

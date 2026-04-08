@@ -2,6 +2,8 @@
 
 This document defines the typed event contract that downstream runtime transport work in Issue #49 must implement.
 
+ADR reference: [ADR-0003](../adr/0003-realtime-event-contract-before-transport.md)
+
 ## Purpose
 
 - Establish one canonical envelope for live race events.
