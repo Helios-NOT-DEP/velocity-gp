@@ -1,3 +1,5 @@
+import { randomInt } from 'node:crypto';
+
 import type {
   ScanHazardRequest,
   StableErrorCode,
@@ -22,13 +24,71 @@ function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRe
   return error instanceof Prisma.PrismaClientKnownRequestError;
 }
 
+interface AdapterSerializationCause {
+  readonly originalCode?: string;
+  readonly kind?: string;
+}
+
+interface AdapterSerializationErrorShape {
+  readonly name?: string;
+  readonly cause?: AdapterSerializationCause;
+  readonly message?: string;
+}
+
+function isAdapterSerializationFailure(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const adapterError = error as AdapterSerializationErrorShape;
+  if (adapterError.name !== 'DriverAdapterError') {
+    return false;
+  }
+
+  const originalCode = adapterError.cause?.originalCode;
+  if (originalCode === '40001') {
+    return true;
+  }
+
+  const kind = adapterError.cause?.kind;
+  if (kind === 'TransactionWriteConflict') {
+    return true;
+  }
+
+  return adapterError.message?.includes('TransactionWriteConflict') ?? false;
+}
+
 function isSerializationFailure(error: unknown): boolean {
-  return isKnownPrismaError(error) && error.code === 'P2034';
+  return (
+    (isKnownPrismaError(error) && error.code === 'P2034') || isAdapterSerializationFailure(error)
+  );
 }
 
 function resolveHazardRatio(hazardRatioOverride: number | null, globalHazardRatio: number): number {
   const configuredRatio = hazardRatioOverride ?? globalHazardRatio;
   return configuredRatio > 0 ? configuredRatio : 1;
+}
+
+interface ResolveHazardDecisionInput {
+  readonly globalScanCountAfter: number;
+  readonly hazardRatioUsed: number;
+  readonly hazardWeightOverride: number | null;
+}
+
+function resolveHazardDecision(input: ResolveHazardDecisionInput): boolean {
+  if (input.hazardWeightOverride !== null) {
+    if (input.hazardWeightOverride <= 0) {
+      return false;
+    }
+
+    if (input.hazardWeightOverride >= 100) {
+      return true;
+    }
+
+    return randomInt(100) < input.hazardWeightOverride;
+  }
+
+  return input.globalScanCountAfter % input.hazardRatioUsed === 0;
 }
 
 async function processScanInTransaction(
@@ -106,6 +166,7 @@ async function processScanInTransaction(
       status: true,
       value: true,
       hazardRatioOverride: true,
+      hazardWeightOverride: true,
     },
   });
 
@@ -264,7 +325,11 @@ async function processScanInTransaction(
     },
   });
 
-  const hazardTriggered = globalScanCountAfter % hazardRatioUsed === 0;
+  const hazardTriggered = resolveHazardDecision({
+    globalScanCountAfter,
+    hazardRatioUsed,
+    hazardWeightOverride: qrCode.hazardWeightOverride,
+  });
   if (hazardTriggered) {
     const pitStopExpiresAt = new Date(now.getTime() + eventConfig.pitStopDurationSeconds * 1_000);
 

@@ -14,6 +14,7 @@ function toHazardRecord(hazard: {
   status: 'ACTIVE' | 'DISABLED';
   scanCount: number;
   hazardRatioOverride: number | null;
+  hazardWeightOverride: number | null;
   activationStartsAt: Date | null;
   activationEndsAt: Date | null;
 }): Hazard {
@@ -43,6 +44,7 @@ export async function getHazard(hazardId: string): Promise<Hazard> {
       status: true,
       scanCount: true,
       hazardRatioOverride: true,
+      hazardWeightOverride: true,
       activationStartsAt: true,
       activationEndsAt: true,
     },
@@ -81,6 +83,7 @@ export async function listHazards(eventId: string): Promise<Hazard[]> {
       status: true,
       scanCount: true,
       hazardRatioOverride: true,
+      hazardWeightOverride: true,
       activationStartsAt: true,
       activationEndsAt: true,
     },

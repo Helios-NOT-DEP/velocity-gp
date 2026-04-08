@@ -385,6 +385,59 @@ describe('velocity gp backend', () => {
     expect(response.body.data.state).toBe('PAUSED');
   });
 
+  it('updates per-QR hazard randomizer weight through admin endpoints', async () => {
+    const response = await request(app)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}/hazard-randomizer`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ hazardWeightOverride: 80 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.eventId).toBe(fixtureIds.eventId);
+    expect(response.body.data.qrCodeId).toBe(fixtureIds.qrCodeId);
+    expect(response.body.data.hazardWeightOverride).toBe(80);
+
+    const [qrCode, audit] = await Promise.all([
+      prisma.qRCode.findUnique({
+        where: {
+          id: fixtureIds.qrCodeId,
+        },
+        select: {
+          hazardWeightOverride: true,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          targetId: fixtureIds.qrCodeId,
+          actionType: 'QR_HAZARD_RANDOMIZER_UPDATED',
+        },
+      }),
+    ]);
+
+    expect(qrCode?.hazardWeightOverride).toBe(80);
+    expect(audit).not.toBeNull();
+  });
+
+  it('validates per-QR hazard randomizer payload bounds and integer format', async () => {
+    for (const invalidWeight of [101, -1, 12.5]) {
+      const response = await request(app)
+        .patch(
+          `${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}/hazard-randomizer`
+        )
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({ hazardWeightOverride: invalidWeight });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
   it('validates admin payloads for manual pit control', async () => {
     const response = await request(app)
       .post(`${apiPrefix}/admin/events/event-123/teams/team-1/pit-control`)

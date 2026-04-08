@@ -4,6 +4,8 @@ import type {
   ManualPitControlResponse,
   UpdateHeliosRoleRequest,
   UpdateHeliosRoleResponse,
+  UpdateQrHazardRandomizerRequest,
+  UpdateQrHazardRandomizerResponse,
   UpdateRaceControlRequest,
   UpdateRaceControlResponse,
 } from '@velocity-gp/api-contract';
@@ -428,6 +430,87 @@ export async function updateHeliosRole(
       });
 
       incrementCounter('admin.helios_role.updated', { isHelios: result.isHelios });
+      return result;
+    }
+  );
+}
+
+export async function updateQrHazardRandomizer(
+  eventId: string,
+  qrCodeId: string,
+  request: UpdateQrHazardRandomizerRequest,
+  context: AdminActionContext = {}
+): Promise<UpdateQrHazardRandomizerResponse> {
+  return withTraceSpan(
+    'admin.qr_hazard_randomizer.update',
+    { eventId, qrCodeId, hazardWeightOverride: request.hazardWeightOverride ?? -1 },
+    async () => {
+      const result = await prisma.$transaction(async (tx) => {
+        const actorId = await resolveActorUserId(tx, context.actorUserId);
+
+        const qrCode = await tx.qRCode.findFirst({
+          where: {
+            id: qrCodeId,
+            eventId,
+          },
+          select: {
+            id: true,
+            eventId: true,
+            hazardWeightOverride: true,
+          },
+        });
+
+        if (!qrCode) {
+          throw new ValidationError('QR code does not exist for this event.', {
+            eventId,
+            qrCodeId,
+          });
+        }
+
+        const updatedQrCode = await tx.qRCode.update({
+          where: {
+            id: qrCode.id,
+          },
+          data: {
+            hazardWeightOverride: request.hazardWeightOverride,
+          },
+          select: {
+            id: true,
+            eventId: true,
+            hazardWeightOverride: true,
+            updatedAt: true,
+          },
+        });
+
+        const audit = await tx.adminActionAudit.create({
+          data: {
+            eventId,
+            actorUserId: actorId,
+            actionType: 'QR_HAZARD_RANDOMIZER_UPDATED',
+            targetType: 'QR_CODE',
+            targetId: qrCode.id,
+            details: {
+              previousHazardWeightOverride: qrCode.hazardWeightOverride,
+              nextHazardWeightOverride: updatedQrCode.hazardWeightOverride,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        return {
+          eventId: updatedQrCode.eventId,
+          qrCodeId: updatedQrCode.id,
+          hazardWeightOverride: updatedQrCode.hazardWeightOverride,
+          updatedAt: updatedQrCode.updatedAt.toISOString(),
+          auditId: audit.id,
+        };
+      });
+
+      incrementCounter('admin.qr_hazard_randomizer.updated', {
+        overrideMode: result.hazardWeightOverride === null ? 'fallback' : 'weighted',
+      });
       return result;
     }
   );

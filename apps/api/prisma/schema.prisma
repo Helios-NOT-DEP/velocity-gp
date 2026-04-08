@@ -71,6 +71,7 @@ enum AdminActionType {
     HELIOS_REVOKED
     PIT_MANUAL_ENTER
     PIT_MANUAL_CLEAR
+    QR_HAZARD_RANDOMIZER_UPDATED
     SCORE_RESET
 }
 
@@ -184,6 +185,7 @@ model QRCode {
     activationStartsAt DateTime?
     activationEndsAt  DateTime?
     hazardRatioOverride Int?
+    hazardWeightOverride Int?
     scanCount         Int          @default(0)
     createdAt         DateTime     @default(now())
     updatedAt         DateTime     @updatedAt
