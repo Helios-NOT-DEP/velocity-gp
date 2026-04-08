@@ -6,9 +6,7 @@ export const rosterAssignmentStatusSchema = z.enum([
   'UNASSIGNED',
 ]);
 
-export const phoneE164Schema = z
-  .string()
-  .max(64);
+export const phoneE164Schema = z.string().max(64);
 
 export const rosterImportRowSchema = z.object({
   workEmail: z.string().email(),
