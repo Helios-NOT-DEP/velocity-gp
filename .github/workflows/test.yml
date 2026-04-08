@@ -76,7 +76,7 @@ jobs:
       TZ: America/Chicago
       # Sensitive values (store in repository Secrets)
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
-      SEED_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
+      SEED_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
       DB_PASSWORD: "postgres"
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       ENV: "DEV"
@@ -95,6 +95,8 @@ jobs:
       CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://dev.velocity.app' }}
       LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
       LOG_FORMAT: ${{ vars.LOG_FORMAT || 'json' }}
+      DIRECT_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
+      MAGIC_LINK_TOKEN_EXPIRY_DATE: ${{ '2026-04-16T12:00:00-05:00' }}
       GITHUB_BRANCH: "${{ github.ref_name }}"
       GITHUB_REPOSITORY: "${{ github.repository }}"
       VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY || '' }}

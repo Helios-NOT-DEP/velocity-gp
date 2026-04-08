@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Zap } from 'lucide-react';
 import { requestMagicLink } from '@/services/auth';
+import backgroundImage from '@/assets/login-background.png';
+import logoImage from '@/assets/velocity-gp-logo.png';
 
 export default function Login() {
   const [workEmail, setWorkEmail] = useState('');
@@ -30,34 +31,27 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-6 bg-black"
+      className="min-h-screen flex flex-col items-center justify-center p-6 bg-black relative overflow-hidden"
       style={{ fontFamily: 'var(--font-body)' }}
     >
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-black to-orange-600/10" />
+      {/* Background image */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${backgroundImage})` }}
+      />
+      <div className="absolute inset-0 bg-black/40" />
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
-        <div className="mb-12 text-center">
-          <div className="inline-flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-orange-500 rounded-lg flex items-center justify-center">
-              <Zap className="w-7 h-7 text-white" fill="white" />
-            </div>
-            <h1
-              className="text-5xl font-bold tracking-tight"
-              style={{
-                fontFamily: 'var(--font-heading)',
-                background: 'linear-gradient(135deg, #3B82F6 0%, #F97316 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              VELOCITY GP
-            </h1>
-          </div>
-          <p className="text-gray-400 text-sm">High-speed race to the checkered code.</p>
+        <div className="mb-3 relative h-[100px]">
+          <img
+            src={logoImage}
+            alt="Velocity GP"
+            className="absolute left-1/2 -translate-x-1/2 top-0 w-[550px] max-w-none h-auto pointer-events-none select-none"
+          />
         </div>
+        <p className="text-gray-400 text-sm text-center mb-8">High-speed race to the checkered code.</p>
 
         {/* Form Card */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
