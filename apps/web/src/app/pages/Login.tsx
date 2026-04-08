@@ -51,7 +51,9 @@ export default function Login() {
             className="absolute left-1/2 -translate-x-1/2 top-0 w-[550px] max-w-none h-auto pointer-events-none select-none"
           />
         </div>
-        <p className="text-gray-400 text-sm text-center mb-8">High-speed race to the checkered code.</p>
+        <p className="text-gray-400 text-sm text-center mb-8">
+          High-speed race to the checkered code.
+        </p>
 
         {/* Form Card */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
