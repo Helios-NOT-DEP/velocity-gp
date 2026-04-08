@@ -41,6 +41,9 @@ jobs:
       LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
       LOG_FORMAT: ${{ vars.LOG_FORMAT || 'json' }}
       DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:15432/cda?schema=public&connection_limit=20&pool_timeout=20&connect_timeout=10' }}
+      SEED_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
+      DIRECT_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
+      MAGIC_LINK_TOKEN_EXPIRY_DATE: ${{ '2026-04-16T12:00:00-05:00' }}
       GITHUB_BRANCH: "${{ github.ref_name }}"
       GITHUB_REPOSITORY: "${{ github.repository }}"
       VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY || '' }}

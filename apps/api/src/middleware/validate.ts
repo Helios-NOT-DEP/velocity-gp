@@ -16,7 +16,12 @@ export function validate<T>(
       return;
     }
 
-    request[source] = result.data;
+    Object.defineProperty(request, source, {
+      value: result.data,
+      configurable: true,
+      writable: true,
+      enumerable: true,
+    });
     next();
   };
 }

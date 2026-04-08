@@ -1,11 +1,13 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import Login from './pages/Login';
+import LoginCallback from './pages/LoginCallback';
 import Garage from './pages/Garage';
 import RaceHub from './pages/RaceHub';
 import PitStop from './pages/PitStop';
 import HeliosProfile from './pages/HeliosProfile';
 import Leaderboard from './pages/Leaderboard';
 import VictoryLane from './pages/VictoryLane';
+import WaitingAssignment from './pages/WaitingAssignment';
 import RootLayout from './layouts/RootLayout';
 import AdminLayout from './layouts/AdminLayout';
 import AdminRouteGuard from './components/auth/AdminRouteGuard';
@@ -19,6 +21,18 @@ export const appRoutes: RouteObject[] = [
   {
     path: '/',
     Component: Login,
+  },
+  {
+    path: '/login/callback',
+    Component: LoginCallback,
+  },
+  {
+    path: '/signup',
+    element: <Navigate to="/" replace />,
+  },
+  {
+    path: '/waiting-assignment',
+    Component: WaitingAssignment,
   },
   {
     path: '/garage',

@@ -73,12 +73,17 @@ enum AdminActionType {
     PIT_MANUAL_CLEAR
     QR_HAZARD_RANDOMIZER_UPDATED
     SCORE_RESET
+    ROSTER_IMPORTED
+    ROSTER_ASSIGNED
+    ROSTER_REASSIGNED
+    ROSTER_UNASSIGNED
 }
 
 model User {
     id          String             @id @default(cuid())
     email       String             @unique
     displayName String
+    phoneE164   String?
     role        UserRole           @default(PLAYER)
     isHelios    Boolean            @default(false)
     createdAt   DateTime           @default(now())

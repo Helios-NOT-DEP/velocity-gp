@@ -35,7 +35,15 @@ describe('admin route guards', () => {
     renderWithRoute('/admin/game-control');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Continue to Event' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeTruthy();
+    });
+  });
+
+  it('redirects legacy /signup path to the login experience', async () => {
+    renderWithRoute('/signup');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeTruthy();
     });
   });
 
@@ -63,8 +71,7 @@ describe('admin route guards', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Players' })).toBeTruthy();
     });
-
-    expect(screen.getAllByText(/Driver/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Roster Filters')).toBeTruthy();
   });
 
   it('keeps deep links active in section navigation', async () => {

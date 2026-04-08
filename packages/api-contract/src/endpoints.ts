@@ -58,10 +58,23 @@ export const adminEndpoints = {
   updateRaceControl: (eventId: string) => `/admin/events/${eventId}/race-control`,
   manualPitControl: (eventId: string, teamId: string) =>
     `/admin/events/${eventId}/teams/${teamId}/pit-control`,
+  listRoster: (eventId: string) => `/admin/events/${eventId}/roster`,
+  listRosterTeams: (eventId: string) => `/admin/events/${eventId}/roster/teams`,
+  updateRosterAssignment: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/roster/players/${playerId}/assignment`,
+  previewRosterImport: (eventId: string) => `/admin/events/${eventId}/roster/import/preview`,
+  applyRosterImport: (eventId: string) => `/admin/events/${eventId}/roster/import/apply`,
   updateQrHazardRandomizer: (eventId: string, qrCodeId: string) =>
     `/admin/events/${eventId}/qr-codes/${qrCodeId}/hazard-randomizer`,
   updateHeliosRole: (userId: string) => `/admin/users/${userId}/helios-role`,
   listAuditEntries: (eventId: string) => `/admin/events/${eventId}/audits`,
+};
+
+export const authEndpoints = {
+  requestMagicLink: '/auth/magic-link/request',
+  verifyMagicLink: '/auth/magic-link/verify',
+  getSession: '/auth/session',
+  getRoutingDecision: '/auth/routing-decision',
 };
 
 // Legacy aliases retained while callers migrate.
