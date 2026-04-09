@@ -56,7 +56,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    environment: "copilot" # variable grouping for secrets and environment settings
+    environment: "dev" # variable grouping for secrets and environment settings
     services:
       postgres:
         image: postgres:16
@@ -280,7 +280,7 @@ jobs:
 
   web-e2e:
     runs-on: ubuntu-latest
-    environment: "copilot"
+    environment: "dev"
 
     steps:
       - name: Checkout code
