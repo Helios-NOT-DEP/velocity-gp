@@ -1,17 +1,20 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createApp } from '../src/app/createApp.js';
-import { env } from '../src/config/env.js';
-import { prisma } from '../src/db/client.js';
-import { setMagicLinkEmailSenderForTests } from '../src/services/authService.js';
-import { createMagicLinkToken } from '../src/services/authTokens.js';
+import { createApp } from '../../src/app/createApp.js';
+import { env } from '../../src/config/env.js';
+import { prisma } from '../../src/db/client.js';
+import { setEmailDispatcherForTests } from '../../src/services/emailDispatchService.js';
+import { createMagicLinkToken } from '../../src/services/authTokens.js';
 
 describe('velocity gp backend', () => {
   const app = createApp();
   const apiPrefix = env.API_PREFIX;
+  const n8nWebhookToken = env.N8N_WEBHOOK_TOKEN ?? 'velocity-gp-dev-webhook-token';
+  const mailtrapWebhookSecret = env.MAILTRAP_WEBHOOK_SECRET ?? 'velocity-gp-dev-mailtrap-secret';
+  const mailtrapAuditActorEmail = env.MAILTRAP_AUDIT_ACTOR_EMAIL;
   const token = randomUUID().slice(0, 8);
   const fixtureIds = {
     eventId: `event-app-${token}`,
@@ -25,6 +28,19 @@ describe('velocity gp backend', () => {
     qrCodeId: `qr-app-${token}`,
     qrPayload: `VG-APP-${token.toUpperCase()}`,
   };
+
+  function buildMailtrapSignatureHeaders(payload: unknown): Record<string, string> {
+    const timestamp = String(Math.floor(Date.now() / 1_000));
+    const serializedPayload = JSON.stringify(payload);
+    const signature = createHmac('sha256', mailtrapWebhookSecret)
+      .update(`${timestamp}.${serializedPayload}`)
+      .digest('hex');
+
+    return {
+      'x-mailtrap-signature': `sha256=${signature}`,
+      'x-mailtrap-timestamp': timestamp,
+    };
+  }
 
   beforeAll(async () => {
     const now = new Date();
@@ -139,6 +155,13 @@ describe('velocity gp backend', () => {
   });
 
   afterAll(async () => {
+    await prisma.emailEvent.deleteMany({
+      where: {
+        recipientEmailNormalized: {
+          endsWith: `${token}@velocitygp.dev`,
+        },
+      },
+    });
     await prisma.adminActionAudit.deleteMany({
       where: {
         eventId: fixtureIds.eventId,
@@ -196,7 +219,7 @@ describe('velocity gp backend', () => {
         },
       },
     });
-    setMagicLinkEmailSenderForTests(null);
+    setEmailDispatcherForTests(null);
   });
 
   it('returns health information', async () => {
@@ -263,8 +286,12 @@ describe('velocity gp backend', () => {
     const unassignedEmail = `unassigned-${token}@velocitygp.dev`;
     const capturedLinks: string[] = [];
 
-    setMagicLinkEmailSenderForTests(async (input) => {
-      capturedLinks.push(input.magicLinkUrl);
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
     });
 
     const [assignedResponse, unknownResponse, unassignedResponse] = await Promise.all([
@@ -286,12 +313,214 @@ describe('velocity gp backend', () => {
     expect(capturedLinks.length).toBe(1);
   });
 
+  it('returns accepted magic-link response when email dispatch fails', async () => {
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        throw new Error('simulated dispatch failure');
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: assignedEmail });
+
+    expect(response.status).toBe(202);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.accepted).toBe(true);
+    expect(typeof response.body.data.message).toBe('string');
+  });
+
+  it('rejects Mailtrap webhook requests without a valid bearer token', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .send({
+        events: [
+          {
+            eventType: 'delivered',
+            recipientEmail: `player-${token}@velocitygp.dev`,
+          },
+        ],
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('ingests Mailtrap events, persists them, and flags return-email accounts on bounce', async () => {
+    const recipientEmail = `player-${token}@velocitygp.dev`;
+    const payload = {
+      processedAt: new Date().toISOString(),
+      events: [
+        {
+          eventType: 'delivered',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-delivered-${token}`,
+          providerEventId: `provider-delivered-${token}`,
+          eventId: fixtureIds.eventId,
+          raw: {
+            provider: 'mailtrap',
+          },
+        },
+        {
+          eventType: 'bounce',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-bounce-${token}`,
+          providerEventId: `provider-bounce-${token}`,
+          eventId: fixtureIds.eventId,
+          raw: {
+            provider: 'mailtrap',
+            reason: 'mailbox_not_found',
+          },
+        },
+      ],
+    };
+
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set(buildMailtrapSignatureHeaders(payload))
+      .set('authorization', `Bearer ${n8nWebhookToken}`)
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.ingestedCount).toBe(2);
+    expect(response.body.data.returnSignalCount).toBe(1);
+    expect(response.body.data.flaggedUserCount).toBe(1);
+    expect(response.body.data.flaggedPlayerCount).toBeGreaterThanOrEqual(1);
+    expect(response.body.data.auditCount).toBeGreaterThanOrEqual(1);
+
+    const [user, player, events, emailReturnAudit] = await Promise.all([
+      prisma.user.findUnique({
+        where: {
+          id: fixtureIds.playerUserId,
+        },
+        select: {
+          hasReturnEmailIssue: true,
+        },
+      }),
+      prisma.player.findUnique({
+        where: {
+          id: fixtureIds.playerId,
+        },
+        select: {
+          hasReturnEmailIssue: true,
+        },
+      }),
+      prisma.emailEvent.findMany({
+        where: {
+          recipientEmailNormalized: recipientEmail,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          actionType: 'EMAIL_RETURN_FLAGGED',
+          targetId: fixtureIds.playerId,
+        },
+        select: {
+          actorUserId: true,
+          actorUser: {
+            select: {
+              email: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    expect(user?.hasReturnEmailIssue).toBe(true);
+    expect(player?.hasReturnEmailIssue).toBe(true);
+    expect(events).toHaveLength(2);
+    expect(emailReturnAudit).not.toBeNull();
+    expect(emailReturnAudit?.actorUser.email).toBe(mailtrapAuditActorEmail);
+    expect(emailReturnAudit?.actorUserId).not.toBe(fixtureIds.adminUserId);
+  });
+
+  it('handles duplicate Mailtrap events idempotently', async () => {
+    const recipientEmail = `player-${token}@velocitygp.dev`;
+    const duplicatePayload = {
+      events: [
+        {
+          eventType: 'delivered',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-delivered-${token}`,
+          providerEventId: `provider-delivered-${token}`,
+          eventId: fixtureIds.eventId,
+        },
+        {
+          eventType: 'bounce',
+          timestamp: new Date().toISOString(),
+          recipientEmail,
+          messageId: `message-bounce-${token}`,
+          providerEventId: `provider-bounce-${token}`,
+          eventId: fixtureIds.eventId,
+        },
+      ],
+    };
+
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set(buildMailtrapSignatureHeaders(duplicatePayload))
+      .set('authorization', `Bearer ${n8nWebhookToken}`)
+      .send(duplicatePayload);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.ingestedCount).toBe(0);
+    expect(response.body.data.duplicateCount).toBe(2);
+    expect(response.body.data.auditCount).toBe(0);
+
+    const events = await prisma.emailEvent.findMany({
+      where: {
+        recipientEmailNormalized: recipientEmail,
+      },
+    });
+
+    expect(events).toHaveLength(2);
+  });
+
+  it('rejects Mailtrap webhook requests when signature is tampered', async () => {
+    const payload = {
+      events: [
+        {
+          eventType: 'delivered',
+          recipientEmail: `player-${token}@velocitygp.dev`,
+          eventId: fixtureIds.eventId,
+        },
+      ],
+    };
+
+    const headers = buildMailtrapSignatureHeaders(payload);
+
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set({
+        ...headers,
+        'x-mailtrap-signature': 'sha256=deadbeef',
+      })
+      .send(payload);
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+  });
+
   it('verifies valid magic links and returns deterministic routing + session payload', async () => {
     const capturedLinks: string[] = [];
     const assignedEmail = `player-${token}@velocitygp.dev`;
 
-    setMagicLinkEmailSenderForTests(async (input) => {
-      capturedLinks.push(input.magicLinkUrl);
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
     });
 
     const requestResponse = await request(app)

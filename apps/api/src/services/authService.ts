@@ -8,7 +8,6 @@ import type {
   VerifyMagicLinkResponse,
 } from '@velocity-gp/api-contract';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
-import { logger } from '../lib/logger.js';
 import { prisma } from '../db/client.js';
 import { env } from '../config/env.js';
 import { AppError } from '../utils/appError.js';
@@ -18,16 +17,11 @@ import {
   verifyMagicLinkToken,
   verifySessionToken,
 } from './authTokens.js';
+import { getEmailDispatcher } from './emailDispatchService.js';
+import { logger } from '../lib/logger.js';
 
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
-
-interface MagicLinkEmailSenderInput {
-  readonly toEmail: string;
-  readonly magicLinkUrl: string;
-  readonly eventName: string;
-  readonly expiresInMinutes: number;
-}
 
 interface EligiblePlayer {
   readonly userId: string;
@@ -40,10 +34,6 @@ interface EligiblePlayer {
   readonly teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null;
   readonly eventName: string;
 }
-
-type MagicLinkEmailSender = (input: MagicLinkEmailSenderInput) => Promise<void>;
-
-let magicLinkEmailSenderOverride: MagicLinkEmailSender | null = null;
 
 function normalizeWorkEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -225,63 +215,13 @@ async function loadEligiblePlayerByClaims(claims: {
   };
 }
 
-async function sendMagicLinkEmailWithSendGrid(input: MagicLinkEmailSenderInput): Promise<void> {
-  if (!env.SENDGRID_API_KEY || !env.SENDGRID_FROM_EMAIL) {
-    logger.info(
-      {
-        toEmail: input.toEmail,
-        magicLinkUrl: input.magicLinkUrl,
-      },
-      'magic link generated; SendGrid is not configured, skipping email delivery'
-    );
-    return;
-  }
-
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${env.SENDGRID_API_KEY}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      personalizations: [
-        {
-          to: [{ email: input.toEmail }],
-          subject: `Your Velocity GP sign-in link for ${input.eventName}`,
-        },
-      ],
-      from: {
-        email: env.SENDGRID_FROM_EMAIL,
-      },
-      content: [
-        {
-          type: 'text/plain',
-          value: `Use this secure sign-in link (expires in ${input.expiresInMinutes} minutes): ${input.magicLinkUrl}`,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`SendGrid email delivery failed with status ${response.status}`);
-  }
-}
-
-function getMagicLinkEmailSender(): MagicLinkEmailSender {
-  return magicLinkEmailSenderOverride ?? sendMagicLinkEmailWithSendGrid;
-}
-
-export function setMagicLinkEmailSenderForTests(sender: MagicLinkEmailSender | null): void {
-  magicLinkEmailSenderOverride = sender;
-}
-
 export async function requestMagicLink(
   request: RequestMagicLinkRequest
 ): Promise<RequestMagicLinkResponse> {
   return withTraceSpan('auth.magic_link.request', { workEmail: request.workEmail }, async () => {
     const normalizedEmail = normalizeWorkEmail(request.workEmail);
     const eligiblePlayer = await loadEligiblePlayerByEmail(normalizedEmail);
-
+    logger.debug('Eligible player loaded', { eligiblePlayer });
     if (!eligiblePlayer || !eligiblePlayer.teamId || !eligiblePlayer.teamStatus) {
       incrementCounter('auth.magic_link.request.denied.total');
       return {
@@ -298,14 +238,30 @@ export async function requestMagicLink(
     });
 
     const magicLinkUrl = resolveFrontendMagicLinkUrl(magicLinkToken);
-    await getMagicLinkEmailSender()({
-      toEmail: eligiblePlayer.email,
-      magicLinkUrl,
-      eventName: eligiblePlayer.eventName,
-      expiresInMinutes: env.MAGIC_LINK_TOKEN_TTL_MINUTES,
-    });
+    try {
+      await getEmailDispatcher().dispatch({
+        templateKey: 'magic_link_login',
+        toEmail: eligiblePlayer.email,
+        variables: {
+          magicLinkUrl,
+          eventName: eligiblePlayer.eventName,
+          expiresInMinutes: env.MAGIC_LINK_TOKEN_TTL_MINUTES,
+        },
+      });
+    } catch (error) {
+      incrementCounter('auth.magic_link.request.dispatch.failure.total');
+      logger.error('Magic link dispatch failed', {
+        userId: eligiblePlayer.userId,
+        playerId: eligiblePlayer.playerId,
+        eventId: eligiblePlayer.eventId,
+        templateKey: 'magic_link_login',
+        errorMessage: error instanceof Error ? error.message : 'unknown error',
+      });
+    }
 
     incrementCounter('auth.magic_link.request.accepted.total');
+    logger.debug('Magic link request accepted', { eligiblePlayer });
+
     return {
       accepted: true,
       message: GENERIC_MAGIC_LINK_MESSAGE,
@@ -333,6 +289,7 @@ export async function verifyMagicLink(
 
     if (!eligiblePlayer) {
       incrementCounter('auth.magic_link.verify.invalid.total');
+      logger.debug('Magic link verification failed: eligible player not found', { claims });
       throw new AppError(401, 'AUTH_INVALID_LINK', 'Magic link is invalid or expired.');
     }
 
@@ -385,6 +342,12 @@ export async function getSessionFromAuthorizationHeader(
   return withTraceSpan('auth.session.get', {}, async () => {
     const token = parseBearerToken(authorizationHeaderValue);
     if (!token) {
+      const authorizationScheme =
+        authorizationHeaderValue?.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? null;
+      logger.debug('Missing bearer token in authorization header', {
+        hasAuthorizationHeader: Boolean(authorizationHeaderValue),
+        authorizationScheme,
+      });
       throw new AppError(401, 'AUTH_MISSING_TOKEN', 'Authentication is required.');
     }
 

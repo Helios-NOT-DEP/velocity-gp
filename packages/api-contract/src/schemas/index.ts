@@ -7,3 +7,4 @@ export * from './playerSchemas.js';
 export * from './rescueSchemas.js';
 export * from './rosterSchemas.js';
 export * from './teamSchemas.js';
+export * from './emailWebhookSchemas.js';

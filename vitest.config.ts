@@ -11,8 +11,6 @@ export default defineConfig({
       enabled: true,
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov', 'json-summary'],
-      all: true,
-      include: ['apps/api/src/**/*.{ts,tsx}', 'apps/web/src/**/*.{ts,tsx}'],
       exclude: [
         'node_modules/',
         'dist/',

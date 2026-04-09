@@ -6,7 +6,7 @@ import {
   mapScanResponseToUiAction,
   resolveScanIdentityForEmail,
   shouldSuppressDuplicatePayload,
-} from '../src/services/scan';
+} from '@/services/scan';
 
 const { getCurrentEventMock } = vi.hoisted(() => ({
   getCurrentEventMock: vi.fn(),

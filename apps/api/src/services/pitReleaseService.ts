@@ -109,7 +109,7 @@ export async function publishTeamReleaseEvent(
     return true;
   } catch (error) {
     incrementCounter('pit_release.publish.failure', { reason: event.reason });
-    logger.error({ err: error, event }, 'failed to publish team pit release event');
+    logger.error('failed to publish team pit release event', { err: error, event });
     return false;
   }
 }
@@ -186,14 +186,11 @@ export async function releaseExpiredTeamsFromPit(
       }
 
       if (released > 0) {
-        logger.info(
-          {
-            scanned: candidates.length,
-            released,
-            publishFailures,
-          },
-          'pit release sweep completed'
-        );
+        logger.info('pit release sweep completed', {
+          scanned: candidates.length,
+          released,
+          publishFailures,
+        });
       }
 
       return {

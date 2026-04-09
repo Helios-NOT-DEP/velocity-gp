@@ -149,13 +149,24 @@ const score = calculateScore(100, hazards);
 
 ## Testing
 
-Tests live in each workspace, such as `apps/web/tests/`, `apps/api/tests/`, and `packages/api-client/tests/`:
+Tests live in each workspace, such as `apps/web/tests/`, `apps/api/tests/`, and `packages/api-client/tests/`.
+
+Current taxonomy:
+- API: `apps/api/tests/unit/` and `apps/api/tests/integration/`
+- Web: `apps/web/tests/unit/`, `apps/web/tests/component/`, and `apps/web/tests/e2e/`
+
+Common commands:
 
 ```bash
 npm test                  # Run all tests
 npm test -- --ui          # Run with UI
 npm test -- --watch       # Watch mode
 npm test -- game.test.ts  # Run specific test
+npm run test:api:unit
+npm run test:api:integration
+npm run test:web:unit
+npm run test:web:component
+npm run test:web:e2e
 ```
 
 Tests should cover:

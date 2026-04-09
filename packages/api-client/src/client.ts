@@ -28,14 +28,34 @@ interface ApiEnvelope<T> {
   success?: boolean;
 }
 
+export interface ApiClientConfig {
+  baseUrl?: string;
+}
+
 /**
  * Base API client for making requests to backend
  */
 export class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = 'http://localhost:4000/api') {
-    this.baseUrl = baseUrl;
+  constructor(config: ApiClientConfig | string = {}) {
+    if (typeof config === 'string') {
+      this.baseUrl = config;
+    } else {
+      this.baseUrl = config.baseUrl || this.getDefaultBaseUrl();
+    }
+  }
+
+  private getDefaultBaseUrl(): string {
+    if (typeof globalThis !== 'undefined' && 'process' in globalThis) {
+      const processEnv = (
+        globalThis as unknown as { process: { env: Record<string, string | undefined> } }
+      ).process.env;
+      const host = processEnv.API_HOST || 'localhost';
+      const port = processEnv.API_PORT || '3000';
+      return `http://${host}:${port}/api`;
+    }
+    return 'http://localhost:3000/api';
   }
 
   /**

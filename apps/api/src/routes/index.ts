@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { adminRouter } from './admin.js';
 import { authRouter } from './auth.js';
+import { emailWebhookRouter } from './emailWebhook.js';
 import { eventRouter } from './event.js';
 import { gameRouter } from './game.js';
 import { hazardRouter } from './hazard.js';
@@ -14,6 +15,7 @@ export const apiRouter = Router();
 
 apiRouter.use(adminRouter);
 apiRouter.use(authRouter);
+apiRouter.use(emailWebhookRouter);
 apiRouter.use(eventRouter);
 apiRouter.use(gameRouter);
 apiRouter.use(hazardRouter);

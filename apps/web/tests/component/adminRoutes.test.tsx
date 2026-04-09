@@ -4,10 +4,10 @@ import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { render, screen, waitFor } from '@testing-library/react';
-import { appRoutes } from '../src/app/routes';
-import { AUTH_SESSION_STORAGE_KEY } from '../src/services/auth';
-import type { AuthSession } from '../src/services/auth';
-import { GameProvider } from '../src/app/context/GameContext';
+import { appRoutes } from '@/app/routes';
+import { AUTH_SESSION_STORAGE_KEY } from '@/services/auth';
+import type { AuthSession } from '@/services/auth';
+import { GameProvider } from '@/app/context/GameContext';
 
 function renderWithRoute(pathname: string, session?: AuthSession) {
   window.localStorage.clear();

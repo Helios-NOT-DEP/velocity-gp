@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
-import RaceHub from '../src/app/pages/RaceHub';
-import { GameProvider } from '../src/app/context/GameContext';
+import RaceHub from '@/app/pages/RaceHub';
+import { GameProvider } from '@/app/context/GameContext';
 
 const { getSessionMock, resolveScanIdentityForEmailMock, trackAnalyticsEventMock } = vi.hoisted(
   () => ({
@@ -26,8 +26,7 @@ vi.mock('@/services/observability', () => ({
 }));
 
 vi.mock('@/services/scan', async () => {
-  const actual =
-    await vi.importActual<typeof import('../src/services/scan')>('../src/services/scan');
+  const actual = await vi.importActual<typeof import('@/services/scan')>('@/services/scan');
 
   return {
     ...actual,

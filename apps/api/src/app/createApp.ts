@@ -1,6 +1,8 @@
+import { Buffer } from 'node:buffer';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
+import type { Request } from 'express';
 
 import { env } from '../config/env.js';
 import { errorHandler } from '../middleware/errorHandler.js';
@@ -9,6 +11,10 @@ import { requestContext } from '../middleware/requestContext.js';
 import { requestLogger } from '../middleware/requestLogger.js';
 import { apiRouter } from '../routes/index.js';
 import { healthRouter } from '../routes/health.js';
+
+interface RequestWithRawBody extends Request {
+  rawBody?: Buffer;
+}
 
 export function createApp() {
   const app = express();
@@ -23,7 +29,14 @@ export function createApp() {
   );
   app.use(requestContext);
   app.use(requestLogger);
-  app.use(express.json({ limit: '1mb' }));
+  app.use(
+    express.json({
+      limit: '1mb',
+      verify: (request, _response, buffer) => {
+        (request as RequestWithRawBody).rawBody = Buffer.from(buffer);
+      },
+    })
+  );
 
   app.use(healthRouter);
   app.use(env.API_PREFIX, apiRouter);

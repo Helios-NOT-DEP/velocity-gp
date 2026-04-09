@@ -82,6 +82,11 @@ Root scripts:
 - `npm run build:api` - build api-related workspaces
 - `npm run lint` - lint all workspaces
 - `npm test` - run tests across workspaces
+- `npm run test:api:unit` - run API unit tests
+- `npm run test:api:integration` - run API integration tests
+- `npm run test:web:unit` - run web unit tests
+- `npm run test:web:component` - run web component tests
+- `npm run test:web:e2e` - run web end-to-end tests (Playwright)
 - `npm run format` - format `apps/web`
 - `npm run db:generate` - generate Prisma client
 - `npm run db:deploy` - apply migrations

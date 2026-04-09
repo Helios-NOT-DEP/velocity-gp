@@ -3,8 +3,8 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import AdminQrCodes from '../src/app/pages/admin/AdminQrCodes';
-import { AUTH_SESSION_STORAGE_KEY, type AuthSession } from '../src/services/auth';
+import AdminQrCodes from '@/app/pages/admin/AdminQrCodes';
+import { AUTH_SESSION_STORAGE_KEY, type AuthSession } from '@/services/auth';
 
 function buildJsonResponse(payload: unknown, status: number = 200): Response {
   return new Response(JSON.stringify(payload), {

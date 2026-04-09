@@ -11,6 +11,20 @@ interface CliOptions {
   json: boolean;
 }
 
+interface PlayerContext {
+  id: string;
+  eventId: string;
+  teamId: string | null;
+  team: { status: 'PENDING' | 'ACTIVE' | 'IN_PIT' } | null;
+  event: { name: string };
+  user: {
+    id: string;
+    email: string;
+    displayName: string;
+    role: 'ADMIN' | 'HELIOS' | 'PLAYER';
+  };
+}
+
 function printUsage(): void {
   console.log(
     [
@@ -55,10 +69,7 @@ function parseArgs(argv: string[]): CliOptions {
 
     if (arg === '--email') {
       const nextValue = argv[index + 1];
-      if (!nextValue) {
-        throw new Error('Missing value for --email.');
-      }
-
+      if (!nextValue) throw new Error('Missing value for --email.');
       email = nextValue;
       index += 1;
       continue;
@@ -66,10 +77,7 @@ function parseArgs(argv: string[]): CliOptions {
 
     if (arg === '--event-id') {
       const nextValue = argv[index + 1];
-      if (!nextValue) {
-        throw new Error('Missing value for --event-id.');
-      }
-
+      if (!nextValue) throw new Error('Missing value for --event-id.');
       eventId = nextValue;
       index += 1;
       continue;
@@ -82,76 +90,136 @@ function parseArgs(argv: string[]): CliOptions {
     throw new Error('Missing required --email argument.');
   }
 
-  return {
-    email: email.trim().toLowerCase(),
-    eventId,
-    allowUnassigned,
-    json,
-  };
+  return { email: email.trim().toLowerCase(), eventId, allowUnassigned, json };
 }
 
 function resolveAssignmentStatus(
   teamId: string | null,
   teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null
 ) {
-  if (!teamId || !teamStatus) {
-    return 'UNASSIGNED' as const;
-  }
-
-  if (teamStatus === 'PENDING') {
-    return 'ASSIGNED_PENDING' as const;
-  }
-
+  if (!teamId || !teamStatus) return 'UNASSIGNED' as const;
+  if (teamStatus === 'PENDING') return 'ASSIGNED_PENDING' as const;
   return 'ASSIGNED_ACTIVE' as const;
 }
 
-async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
+function resolvePlayerStatusFromTeamStatus(
+  status: 'PENDING' | 'ACTIVE' | 'IN_PIT'
+): 'RACING' | 'IN_PIT' {
+  return status === 'IN_PIT' ? 'IN_PIT' : 'RACING';
+}
 
-  const player = await prisma.player.findFirst({
+async function findEligiblePlayer(options: CliOptions): Promise<PlayerContext | null> {
+  return prisma.player.findFirst({
     where: {
-      user: {
-        email: options.email,
-      },
-      event: {
-        status: 'ACTIVE',
-      },
+      user: { email: options.email },
+      event: { status: 'ACTIVE' },
       ...(options.eventId ? { eventId: options.eventId } : {}),
     },
-    orderBy: {
-      joinedAt: 'desc',
-    },
+    orderBy: { joinedAt: 'desc' },
     select: {
       id: true,
       eventId: true,
       teamId: true,
-      team: {
-        select: {
-          status: true,
-        },
-      },
-      event: {
-        select: {
-          name: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-        },
-      },
+      team: { select: { status: true } },
+      event: { select: { name: true } },
+      user: { select: { id: true, email: true, displayName: true, role: true } },
     },
   });
+}
 
-  if (!player) {
+async function ensureAdminPlayerContext(options: CliOptions): Promise<PlayerContext> {
+  const user = await prisma.user.findUnique({
+    where: { email: options.email },
+    select: { id: true, email: true, displayName: true, role: true },
+  });
+
+  if (!user || user.role !== 'ADMIN') {
     throw new Error(
       `No eligible ACTIVE event player found for ${options.email}${options.eventId ? ` in event ${options.eventId}` : ''}.`
     );
   }
 
-  const assignmentStatus = resolveAssignmentStatus(player.teamId, player.team?.status ?? null);
+  const event = options.eventId
+    ? await prisma.event.findFirst({
+        where: { id: options.eventId, status: 'ACTIVE' },
+        select: { id: true, name: true },
+      })
+    : await prisma.event.findFirst({
+        where: { status: 'ACTIVE' },
+        orderBy: { startDate: 'desc' },
+        select: { id: true, name: true },
+      });
+
+  if (!event) {
+    throw new Error(
+      options.eventId
+        ? `Event ${options.eventId} is not ACTIVE or does not exist.`
+        : 'No ACTIVE event found.'
+    );
+  }
+
+  const teams = await prisma.team.findMany({
+    where: { eventId: event.id },
+    orderBy: { name: 'asc' },
+    select: { id: true, status: true },
+  });
+
+  const fallbackTeam = teams.find((team) => team.status === 'ACTIVE') ?? teams[0];
+  if (!fallbackTeam) {
+    throw new Error(`Cannot provision admin player for event ${event.id}: no teams found.`);
+  }
+
+  await prisma.player.upsert({
+    where: { eventId_userId: { eventId: event.id, userId: user.id } },
+    update: {
+      teamId: fallbackTeam.id,
+      status: resolvePlayerStatusFromTeamStatus(fallbackTeam.status),
+    },
+    create: {
+      userId: user.id,
+      eventId: event.id,
+      teamId: fallbackTeam.id,
+      status: resolvePlayerStatusFromTeamStatus(fallbackTeam.status),
+    },
+  });
+
+  const provisioned = await prisma.player.findFirst({
+    where: { userId: user.id, eventId: event.id, event: { status: 'ACTIVE' } },
+    select: {
+      id: true,
+      eventId: true,
+      teamId: true,
+      team: { select: { status: true } },
+      event: { select: { name: true } },
+      user: { select: { id: true, email: true, displayName: true, role: true } },
+    },
+  });
+
+  if (!provisioned) {
+    throw new Error(`Failed to provision admin player for ${options.email}.`);
+  }
+
+  return provisioned;
+}
+
+async function main(): Promise<void> {
+  const options = parseArgs(process.argv.slice(2));
+
+  let player = await findEligiblePlayer(options);
+  let autoProvisioned = false;
+
+  if (!player) {
+    player = await ensureAdminPlayerContext(options);
+    autoProvisioned = true;
+  }
+
+  let assignmentStatus = resolveAssignmentStatus(player.teamId, player.team?.status ?? null);
+  if (assignmentStatus === 'UNASSIGNED' && player.user.role === 'ADMIN') {
+    player = await ensureAdminPlayerContext(options);
+    autoProvisioned = true;
+    assignmentStatus = resolveAssignmentStatus(player.teamId, player.team?.status ?? null);
+  }
+
   if (assignmentStatus === 'UNASSIGNED' && !options.allowUnassigned) {
     throw new Error(
       'Player is unassigned. Use --allow-unassigned if you intentionally want to generate a token anyway.'
@@ -177,9 +245,11 @@ async function main(): Promise<void> {
     userId: player.user.id,
     email: player.user.email,
     displayName: player.user.displayName,
+    role: player.user.role.toLowerCase(),
     teamId: player.teamId,
     teamStatus: player.team?.status ?? null,
     assignmentStatus,
+    autoProvisionedAdminPlayer: autoProvisioned,
     token,
     magicLinkUrl: magicLinkUrl.toString(),
   };
@@ -190,9 +260,13 @@ async function main(): Promise<void> {
   }
 
   console.log(`Email: ${output.email}`);
+  console.log(`Role: ${output.role}`);
   console.log(`Event: ${output.eventName} (${output.eventId})`);
   console.log(`Player: ${output.playerId}`);
   console.log(`Assignment: ${output.assignmentStatus}`);
+  if (output.autoProvisionedAdminPlayer) {
+    console.log('Admin player context was auto-provisioned for this event.');
+  }
   console.log('');
   console.log(`Magic Link URL:\n${output.magicLinkUrl}`);
   console.log('');

@@ -1,1 +1,41 @@
-{}
+{
+	"servers": {
+		"mailtrap": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"mcp-mailtrap"
+			],
+			"env": {
+				"MAILTRAP_API_TOKEN": "${input:mailtrapApiToken}",
+				"DEFAULT_FROM_EMAIL": "${input:senderEmail}",
+				"MAILTRAP_ACCOUNT_ID": "${input:mailtrapAccountId}",
+				"MAILTRAP_TEST_INBOX_ID": "${input:mailtrapTestInboxId}"
+			},
+			"type": "stdio"
+		}
+	},
+	"inputs": [
+		{
+			"type": "promptString",
+			"id": "mailtrapApiToken",
+			"description": "Mailtrap API Token",
+			"password": true
+		},
+		{
+			"type": "promptString",
+			"id": "senderEmail",
+			"description": "Sender Email Address"
+		},
+		{
+			"type": "promptString",
+			"id": "mailtrapAccountId",
+			"description": "Mailtrap Account ID"
+		},
+		{
+			"type": "promptString",
+			"id": "mailtrapTestInboxId",
+			"description": "Mailtrap Test Inbox ID (optional)"
+		}
+	]
+}

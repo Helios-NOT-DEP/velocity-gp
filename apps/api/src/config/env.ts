@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import path from 'path';
 import { config } from 'dotenv';
 import { z } from 'zod';
 
@@ -51,10 +51,20 @@ const booleanFromEnv = z.preprocess(
     .transform((value) => value !== 'false')
 );
 
+const optionalUrl = z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional());
+
+const optionalMinString = (min: number) =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.string().min(min).optional());
+
+const optionalEmail = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z.string().email().optional()
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
-  PORT: z.coerce.number().int().positive().default(4000),
+  PORT: z.coerce.number().int().positive().default(3000),
   API_PREFIX: z.string().default('/api'),
   FRONTEND_ORIGIN: z.string().url().default('http://localhost:5173'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -64,17 +74,33 @@ const envSchema = z.object({
   POSTGRES_URL: z.string().optional(),
   POSTGRES_PRISMA_URL: z.string().optional(),
   SEED_DATABASE_URL: z.string().optional(),
+  VITE_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  VITE_PUBLIC_POSTHOG_HOST: optionalUrl,
+  SERVICE_NAME: z.string().default('velocity-gp-api'),
   AUTH_SECRET: z.string().optional(),
   MAGIC_LINK_TOKEN_EXPIRY_DATE: z.string().nullable().default(null),
   MAGIC_LINK_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(72),
-  SENDGRID_API_KEY: z.string().optional(),
-  SENDGRID_FROM_EMAIL: z.string().email().optional(),
+  MAILTRAP_WEBHOOK_SECRET: optionalMinString(16),
+  MAILTRAP_AUDIT_ACTOR_EMAIL: optionalEmail.default('system+mailtrap@velocitygp.internal'),
+  N8N_WEBHOOK_TOKEN: optionalMinString(16),
+  N8N_HOST: optionalUrl,
+  N8N_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
   PIT_RELEASE_BATCH_SIZE: z.coerce.number().int().positive().default(50),
-  PIT_RELEASE_WEBHOOK_URL: z.string().url().optional(),
+  PIT_RELEASE_WEBHOOK_URL: optionalUrl,
   PIT_RELEASE_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(3_000),
 });
+
+export const packageJson = z
+  .object({
+    apiPath: z.string().default(path.resolve(process.cwd(), 'api/package.json')),
+    webPath: z.string().default(path.resolve(process.cwd(), 'client/package.json')),
+  })
+  .default({
+    apiPath: resolve(currentDirectory, '../../package.json'),
+    webPath: resolve(currentDirectory, '../../../client/package.json'),
+  });
 
 export const env = envSchema.parse(process.env);

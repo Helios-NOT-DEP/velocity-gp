@@ -46,7 +46,7 @@ function base64UrlDecode(value: string): string {
 }
 
 function signPayload(encodedPayload: string): string {
-  return createHmac('sha256', getTokenSecret()).update(encodedPayload).digest('base64url');
+  return createHmac('sha512', getTokenSecret()).update(encodedPayload).digest('base64url');
 }
 
 function isTokenExpired(expiresAt: number): boolean {

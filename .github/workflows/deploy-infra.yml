@@ -55,6 +55,21 @@ jobs:
       CLIENT_PACKAGE_PATH: ${{ vars.CLIENT_PACKAGE_PATH || '' }}
       API_PACKAGE_PATH: ${{ vars.API_PACKAGE_PATH || '' }}
       DEBUG: ${{ vars.CLIENT_DEBUG || 'false' }}
+      SPACE_BUCKET: ${{ vars.SPACE_BUCKET || '' }}
+      API_BASE_URL: ${{ vars.API_BASE_URL || '' }}
+      FRONTEND_ORIGIN: ${{ vars.CORS_ORIGIN || '' }}
+      AUTH_SECRET: ${{ secrets.AUTH_SECRET || '' }}
+      MAGIC_LINK_TOKEN_TTL_MINUTES: ${{ vars.MAGIC_LINK_TOKEN_TTL_MINUTES || '15' }}
+      AUTH_SESSION_TTL_HOURS: ${{ vars.AUTH_SESSION_TTL_HOURS || '72' }}
+      N8N_HOST: ${{ vars.N8N_HOST || '' }}
+      N8N_WEBHOOK_TOKEN: ${{ secrets.N8N_WEBHOOK_TOKEN || '' }}
+      N8N_EMAIL_WEBHOOK_TIMEOUT_MS: ${{ vars.N8N_EMAIL_WEBHOOK_TIMEOUT_MS || '5000' }}
+      PIT_RELEASE_SCHEDULER_ENABLED: ${{ vars.PIT_RELEASE_SCHEDULER_ENABLED || 'true' }}
+      PIT_RELEASE_POLL_INTERVAL_MS: ${{ vars.PIT_RELEASE_POLL_INTERVAL_MS || '10000' }}
+      PIT_RELEASE_BATCH_SIZE: ${{ vars.PIT_RELEASE_BATCH_SIZE || '50' }}
+      PIT_RELEASE_WEBHOOK_URL: ${{ vars.PIT_RELEASE_WEBHOOK_URL || '' }}
+      PIT_RELEASE_WEBHOOK_TIMEOUT_MS: ${{ vars.PIT_RELEASE_WEBHOOK_TIMEOUT_MS || '3000' }}
+      SERVICE_NAME: ${{ vars.SERVICE_NAME || 'velocity-gp-api' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

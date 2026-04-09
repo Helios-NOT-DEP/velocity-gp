@@ -15,7 +15,7 @@ async function runSchedulerTick(): Promise<void> {
   try {
     await releaseExpiredTeamsFromPit();
   } catch (error) {
-    logger.error({ err: error }, 'pit release scheduler tick failed');
+    logger.error('pit release scheduler tick failed', { err: error });
   } finally {
     schedulerTickInFlight = false;
   }
@@ -38,12 +38,9 @@ export function startPitReleaseScheduler(): () => void {
   schedulerHandle.unref();
   void runSchedulerTick();
 
-  logger.info(
-    {
-      intervalMs: env.PIT_RELEASE_POLL_INTERVAL_MS,
-    },
-    'pit release scheduler started'
-  );
+  logger.info('pit release scheduler started', {
+    intervalMs: env.PIT_RELEASE_POLL_INTERVAL_MS,
+  });
 
   return stopPitReleaseScheduler;
 }
