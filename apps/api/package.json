@@ -22,6 +22,7 @@
     "auth:magic-link": "tsx scripts/generateLocalMagicLink.ts"
   },
   "dependencies": {
+    "@opentelemetry/winston-transport": "^0.24.0",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "@velocity-gp/api-contract": "0.1.0",
@@ -31,6 +32,8 @@
     "helmet": "^8.1.0",
     "pg": "^8.20.0",
     "pino": "^10.1.0",
+    "vite": "6.4.2",
+    "winston": "^3.19.0",
     "zod": "^4.1.11"
   },
   "devDependencies": {

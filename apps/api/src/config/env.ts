@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import path from 'path';
 import { config } from 'dotenv';
 import { z } from 'zod';
 
@@ -64,18 +64,32 @@ const envSchema = z.object({
   POSTGRES_URL: z.string().optional(),
   POSTGRES_PRISMA_URL: z.string().optional(),
   SEED_DATABASE_URL: z.string().optional(),
+  VITE_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  VITE_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+  SERVICE_NAME: z.string().default('velocity-gp-api'),
   AUTH_SECRET: z.string().optional(),
   MAGIC_LINK_TOKEN_EXPIRY_DATE: z.string().nullable().default(null),
   MAGIC_LINK_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(72),
-  SENDGRID_API_KEY: z.string().optional(),
-  SENDGRID_FROM_EMAIL: z.string().email().optional(),
   N8N_WEBHOOK_TOKEN: z.string().min(16).optional(),
+  N8N_EMAIL_WEBHOOK_URL: z.string().url().optional(),
+  N8N_EMAIL_WEBHOOK_TOKEN: z.string().min(16).optional(),
+  N8N_EMAIL_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
   PIT_RELEASE_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   PIT_RELEASE_WEBHOOK_URL: z.string().url().optional(),
   PIT_RELEASE_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(3_000),
 });
+
+export const packageJson = z
+  .object({
+    apiPath: z.string().default(path.resolve(process.cwd(), 'api/package.json')),
+    webPath: z.string().default(path.resolve(process.cwd(), 'client/package.json')),
+  })
+  .default({
+    apiPath: resolve(currentDirectory, '../../package.json'),
+    webPath: resolve(currentDirectory, '../../../client/package.json'),
+  });
 
 export const env = envSchema.parse(process.env);

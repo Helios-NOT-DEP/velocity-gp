@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app/createApp.js';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/db/client.js';
-import { setMagicLinkEmailSenderForTests } from '../src/services/authService.js';
+import { setEmailDispatcherForTests } from '../src/services/emailDispatchService.js';
 import { createMagicLinkToken } from '../src/services/authTokens.js';
 
 describe('velocity gp backend', () => {
@@ -204,7 +204,7 @@ describe('velocity gp backend', () => {
         },
       },
     });
-    setMagicLinkEmailSenderForTests(null);
+    setEmailDispatcherForTests(null);
   });
 
   it('returns health information', async () => {
@@ -271,8 +271,12 @@ describe('velocity gp backend', () => {
     const unassignedEmail = `unassigned-${token}@velocitygp.dev`;
     const capturedLinks: string[] = [];
 
-    setMagicLinkEmailSenderForTests(async (input) => {
-      capturedLinks.push(input.magicLinkUrl);
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
     });
 
     const [assignedResponse, unknownResponse, unassignedResponse] = await Promise.all([
@@ -439,8 +443,12 @@ describe('velocity gp backend', () => {
     const capturedLinks: string[] = [];
     const assignedEmail = `player-${token}@velocitygp.dev`;
 
-    setMagicLinkEmailSenderForTests(async (input) => {
-      capturedLinks.push(input.magicLinkUrl);
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
     });
 
     const requestResponse = await request(app)
