@@ -5,6 +5,7 @@ import { useGame } from '../context/GameContext';
 import { Sparkles, ArrowRight } from 'lucide-react';
 
 export default function Garage() {
+  // TODO(figma-sync): Replace keyword-based generation with description-driven onboarding to match the updated Team Onboarding design flow. | Figma source: src/app/pages/Garage.tsx description textarea + suggestion chips | Impact: user flow
   const [keyword1, setKeyword1] = useState('');
   const [keyword2, setKeyword2] = useState('');
   const [keyword3, setKeyword3] = useState('');
@@ -32,6 +33,7 @@ export default function Garage() {
   };
 
   const handleFinalize = () => {
+    // TODO(figma-sync): Route finalized onboarding to /team parity path (TeamPage) instead of direct /race-hub jump. | Figma source: src/app/pages/Garage.tsx handleContinue -> navigate('/team') | Impact: user flow
     createTeam(generatedTeamName, generatedCarImage, [keyword1, keyword2, keyword3]);
     navigate('/race-hub');
   };

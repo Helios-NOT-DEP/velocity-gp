@@ -45,6 +45,7 @@ export default function AdminQrCodes() {
   const [draftWeights, setDraftWeights] = useState<Record<string, number>>({});
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string | null>>({});
+  // TODO(figma-sync): Consolidate this split QR management experience with the monolithic Figma Admin QR panel behavior (create, enable/disable, delete, per-code controls from one shared state model). | Figma source: src/app/pages/Admin.tsx QR Codes tab | Impact: admin flow
 
   useEffect(() => {
     let isMounted = true;
@@ -140,12 +141,14 @@ export default function AdminQrCodes() {
   }
 
   function toggleStatus(id: string) {
+    // TODO(figma-sync): Persist enable/disable mutations through live admin APIs to match Figma's operational QR control behavior. | Figma source: src/app/pages/Admin.tsx toggleQRCode action | Impact: admin flow
     setQrCodes((existing) =>
       existing.map((code) => (code.id === id ? { ...code, active: !code.active } : code))
     );
   }
 
   function removeCode(id: string) {
+    // TODO(figma-sync): Persist QR deletion to backend instead of local-only removal so the admin screen remains consistent across sessions. | Figma source: src/app/pages/Admin.tsx deleteQRCode action | Impact: admin flow
     setQrCodes((existing) => existing.filter((code) => code.id !== id));
     setDraftWeights((existing) => {
       const next = { ...existing };
@@ -307,6 +310,7 @@ export default function AdminQrCodes() {
               </div>
 
               <div className="bg-white p-4 rounded-lg mb-4">
+                {/* TODO(figma-sync): Replace static QR icon placeholder with generated/real QR output parity used in Figma Admin cards. | Figma source: src/app/pages/Admin.tsx QRCodeSVG preview | Impact: admin flow */}
                 <div className="aspect-square w-full rounded-md border border-gray-200 grid place-items-center bg-[linear-gradient(135deg,#f8fafc,#e2e8f0)]">
                   <QrCode className="w-20 h-20 text-gray-800" />
                 </div>

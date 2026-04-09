@@ -4,6 +4,7 @@ import backgroundImage from '@/assets/login-background.png';
 import logoImage from '@/assets/velocity-gp-logo.png';
 
 export default function Login() {
+  // TODO(figma-sync): Reintroduce dual-field login capture (`Email or Phone` + `Full Name`) to match updated onboarding contract before Garage handoff. | Figma source: src/app/pages/Login.tsx form inputs | Impact: user flow
   const [workEmail, setWorkEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export default function Login() {
     setError(null);
 
     try {
+      // TODO(figma-sync): Align submit transition with Figma's immediate Garage navigation flow, while preserving magic-link security requirements. | Figma source: src/app/pages/Login.tsx handleSubmit (navigate('/garage')) | Impact: user flow
       const response = await requestMagicLink(workEmail.trim());
       setMessage(response.message);
     } catch {

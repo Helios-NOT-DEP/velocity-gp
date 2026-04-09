@@ -51,7 +51,10 @@ const booleanFromEnv = z.preprocess(
     .transform((value) => value !== 'false')
 );
 
-const optionalUrl = z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional());
+const optionalUrl = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z.string().url().optional().nullable()
+);
 
 const optionalMinString = (min: number) =>
   z.preprocess((v) => (v === '' ? undefined : v), z.string().min(min).optional());
@@ -61,12 +64,23 @@ const optionalEmail = z.preprocess(
   z.string().email().optional()
 );
 
+const frontendOrigins = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  return value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}, z.array(z.string().url()).min(1));
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3000),
   API_PREFIX: z.string().default('/api'),
-  FRONTEND_ORIGIN: z.string().url().default('http://localhost:5173'),
+  FRONTEND_ORIGIN: frontendOrigins.default(['http://localhost:5173']),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.string().optional(),
   DIRECT_DATABASE_URL: z.string().optional(),
@@ -103,4 +117,10 @@ export const packageJson = z
     webPath: resolve(currentDirectory, '../../../client/package.json'),
   });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.parse(process.env);
+
+export const env = {
+  ...parsedEnv,
+  FRONTEND_ORIGIN: parsedEnv.FRONTEND_ORIGIN[0],
+  FRONTEND_ORIGINS: parsedEnv.FRONTEND_ORIGIN,
+};

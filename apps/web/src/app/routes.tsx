@@ -22,6 +22,7 @@ export const appRoutes: RouteObject[] = [
     path: '/',
     Component: Login,
   },
+  // TODO(figma-sync): Reconcile auth callback/waiting routes with the simplified Figma route map so the designed entry flow and production auth flow do not diverge unexpectedly. | Figma source: src/app/routes.ts (Login -> Garage baseline) | Impact: user flow
   {
     path: '/login/callback',
     Component: LoginCallback,
@@ -38,6 +39,7 @@ export const appRoutes: RouteObject[] = [
     path: '/garage',
     Component: Garage,
   },
+  // TODO(figma-sync): Add /team route parity for post-Garage handoff; Figma flow routes Garage -> TeamPage before Race Hub. | Figma source: src/app/routes.ts (/team -> TeamPage) | Impact: user flow
   {
     path: '/',
     Component: RootLayout,
@@ -49,6 +51,7 @@ export const appRoutes: RouteObject[] = [
       { path: 'victory-lane', Component: VictoryLane },
     ],
   },
+  // TODO(figma-sync): Reconcile split nested admin sections with the single-screen /admin contract in Figma Make to preserve expected admin navigation behavior. | Figma source: src/app/routes.ts (/admin -> Admin) | Impact: admin flow
   {
     path: '/admin',
     element: (
