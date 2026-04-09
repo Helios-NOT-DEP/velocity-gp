@@ -159,6 +159,10 @@ services:
         value: "${N8N_WEBHOOK_TOKEN}"
         scope: RUN_AND_BUILD_TIME
         type: SECRET
+      - key: MAILTRAP_WEBHOOK_SECRET
+        value: "${MAILTRAP_WEBHOOK_SECRET}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET        
       - key: N8N_EMAIL_WEBHOOK_TIMEOUT_MS
         value: "${N8N_EMAIL_WEBHOOK_TIMEOUT_MS}"
         scope: RUN_AND_BUILD_TIME
