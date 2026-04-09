@@ -30,6 +30,7 @@ export default function AdminTeams() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({});
   const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
+  // TODO(figma-sync): Add team detail interactions (score edits, pit-stop controls, member ranking view) that exist in Figma Admin but are not present in this assignment-focused page. | Figma source: src/app/pages/Admin.tsx Teams tab + team detail view | Impact: admin flow
 
   const loadTeams = async (overrideEventId?: string) => {
     setIsLoading(true);
@@ -190,6 +191,7 @@ export default function AdminTeams() {
 
           {teams.map((team) => {
             const members = teamMembers.get(team.teamId) ?? [];
+            // TODO(figma-sync): Introduce selectable team drill-down state to mirror the Figma Admin team detail transition from list card to full team panel. | Figma source: src/app/pages/Admin.tsx selectedTeamId workflow | Impact: admin flow
             return (
               <article
                 key={team.teamId}

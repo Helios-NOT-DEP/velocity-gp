@@ -261,6 +261,7 @@ export default function RaceHub() {
   const submitPayload = useCallback(
     async (payload: string) => {
       const activeScanIdentity = scanIdentityRef.current ?? scanIdentity;
+      // TODO(figma-sync): Confirm whether identity resolution should remain a hard gate; Figma flow assumes immediate local scan interactions once team context exists. | Figma source: src/app/pages/RaceHub.tsx handleScan local simulation | Impact: user flow
       if (!activeScanIdentity) {
         setFeedback({
           level: 'warning',
@@ -313,6 +314,7 @@ export default function RaceHub() {
           });
         }
 
+        // TODO(figma-sync): Validate hazard/pit-stop transition parity now that redirects are API-driven instead of deterministic local scan outcomes. | Figma source: src/app/pages/RaceHub.tsx handleScan -> navigate('/pit-stop') | Impact: user flow
         if (uiAction.navigateTo) {
           stopScanner('idle');
           navigate(uiAction.navigateTo);
@@ -390,6 +392,7 @@ export default function RaceHub() {
   }, [detectPayloadFromFrame, submitPayload]);
 
   const startScanner = useCallback(async () => {
+    // TODO(figma-sync): Reconcile camera-permission state machine with the simpler Figma scan interaction model to keep designed scan/start states intuitive. | Figma source: src/app/pages/RaceHub.tsx scanner interaction states | Impact: user flow
     const activeScanIdentity = scanIdentityRef.current ?? scanIdentity;
     if (!activeScanIdentity) {
       setFeedback({

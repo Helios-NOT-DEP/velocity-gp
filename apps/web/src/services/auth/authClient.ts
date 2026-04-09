@@ -182,7 +182,12 @@ export async function getSession(): Promise<AuthSession> {
   }
 
   const normalizedSession = normalizeSessionFromResponse(response.data.session);
-  persistSession(normalizedSession, storedToken);
+  // Write session to storage silently (no event) — this is a passive refresh, not a
+  // session transition. Emitting the event here would cause an infinite loop because
+  // GameContext listens for it and calls getSession() again.
+  const storage = getBrowserStorage();
+  storage?.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
+  storage?.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, storedToken);
   return normalizedSession;
 }
 
