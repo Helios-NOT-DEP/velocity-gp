@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -13,6 +13,7 @@ describe('velocity gp backend', () => {
   const app = createApp();
   const apiPrefix = env.API_PREFIX;
   const n8nWebhookToken = env.N8N_WEBHOOK_TOKEN ?? 'velocity-gp-dev-webhook-token';
+  const mailtrapWebhookSecret = env.MAILTRAP_WEBHOOK_SECRET ?? 'velocity-gp-dev-mailtrap-secret';
   const token = randomUUID().slice(0, 8);
   const fixtureIds = {
     eventId: `event-app-${token}`,
@@ -26,6 +27,19 @@ describe('velocity gp backend', () => {
     qrCodeId: `qr-app-${token}`,
     qrPayload: `VG-APP-${token.toUpperCase()}`,
   };
+
+  function buildMailtrapSignatureHeaders(payload: unknown): Record<string, string> {
+    const timestamp = String(Math.floor(Date.now() / 1_000));
+    const serializedPayload = JSON.stringify(payload);
+    const signature = createHmac('sha256', mailtrapWebhookSecret)
+      .update(`${timestamp}.${serializedPayload}`)
+      .digest('hex');
+
+    return {
+      'x-mailtrap-signature': `sha256=${signature}`,
+      'x-mailtrap-timestamp': timestamp,
+    };
+  }
 
   beforeAll(async () => {
     const now = new Date();
@@ -367,6 +381,7 @@ describe('velocity gp backend', () => {
 
     const response = await request(app)
       .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set(buildMailtrapSignatureHeaders(payload))
       .set('authorization', `Bearer ${n8nWebhookToken}`)
       .send(payload);
 
@@ -440,6 +455,7 @@ describe('velocity gp backend', () => {
 
     const response = await request(app)
       .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set(buildMailtrapSignatureHeaders(duplicatePayload))
       .set('authorization', `Bearer ${n8nWebhookToken}`)
       .send(duplicatePayload);
 
@@ -456,6 +472,32 @@ describe('velocity gp backend', () => {
     });
 
     expect(events).toHaveLength(2);
+  });
+
+  it('rejects Mailtrap webhook requests when signature is tampered', async () => {
+    const payload = {
+      events: [
+        {
+          eventType: 'delivered',
+          recipientEmail: `player-${token}@velocitygp.dev`,
+          eventId: fixtureIds.eventId,
+        },
+      ],
+    };
+
+    const headers = buildMailtrapSignatureHeaders(payload);
+
+    const response = await request(app)
+      .post(`${apiPrefix}/webhooks/mailtrap/events`)
+      .set({
+        ...headers,
+        'x-mailtrap-signature': 'sha256=deadbeef',
+      })
+      .send(payload);
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
   });
 
   it('verifies valid magic links and returns deterministic routing + session payload', async () => {

@@ -35,7 +35,7 @@ Concretely:
 
 4. **SendGrid removed** — `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` env vars removed; all SendGrid call paths deleted.
 
-5. **Inbound Mailtrap webhook unchanged** — `POST /api/webhooks/mailtrap/events` continues to ingest bounce/delivery events into the `EmailEvent` table.
+5. **Inbound Mailtrap webhook hardened** — `POST /api/webhooks/mailtrap/events` now accepts HMAC-signed requests using `x-mailtrap-signature` + `x-mailtrap-timestamp` with `MAILTRAP_WEBHOOK_SECRET`, while temporarily retaining legacy bearer-token fallback (`N8N_WEBHOOK_TOKEN`) during migration.
 
 ## Consequences
 
@@ -61,6 +61,6 @@ Concretely:
 
 - `apps/api/src/services/emailDispatchService.ts` — new dispatch abstraction
 - `apps/api/src/services/authService.ts` — magic-link wiring
-- `apps/api/src/config/env.ts` — `N8N_HOST`, `N8N_WEBHOOK_TOKEN`, `N8N_WEBHOOK_TIMEOUT_MS`
-- `apps/api/src/routes/emailWebhook.ts` — inbound Mailtrap events (unchanged)
+- `apps/api/src/config/env.ts` — `N8N_HOST`, `N8N_WEBHOOK_TOKEN`, `N8N_WEBHOOK_TIMEOUT_MS`, `MAILTRAP_WEBHOOK_SECRET`
+- `apps/api/src/routes/emailWebhook.ts` — inbound Mailtrap events with signature auth
 - Mailtrap template IDs: 64344, 64343, 64342, 64345

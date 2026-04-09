@@ -56,7 +56,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    environment: "dev" # variable grouping for secrets and environment settings
+    environment: "copilot" # variable grouping for secrets and environment settings
     services:
       postgres:
         image: postgres:16
@@ -76,7 +76,8 @@ jobs:
       TZ: America/Chicago
       # Sensitive values (store in repository Secrets)
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
-      SEED_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
+      SEED_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
+      DIRECT_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
       DB_PASSWORD: "postgres"
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       ENV: "DEV"
@@ -84,35 +85,27 @@ jobs:
       DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       DO_APP_ID: ${{ vars.DO_APP_ID || ' ' }}
       PORT: ${{ secrets.PORT || '3000' }}
-      API_PREFIX: ${{ vars.API_PREFIX || '/api/v1' }}
+      API_PREFIX: ${{ vars.API_PREFIX || '/api' }}
       DOMAIN: ${{ vars.DOMAIN || 'velocity.app' }}
       FULL_DOMAIN: ${{ vars.FULL_DOMAIN || 'dev.velocity.app' }}
-      CLIENT_BASE_URL: ${{ vars.CLIENT_BASE_URL || 'https://dev.velocity.app' }}
-      DB_POOL_MAX: ${{ vars.DB_POOL_MAX || '20' }}
+      CLIENT_BASE_URL: ${{ vars.CLIENT_BASE_URL || 'http://localhost:5173' }}
       JWT_EXPIRES_IN: ${{ vars.JWT_EXPIRES_IN || '24h' }}
       JWT_COOKIE_NAME: ${{ vars.JWT_COOKIE_NAME || 'auth_token' }}
-      SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY || '' }}
-      CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://dev.velocity.app' }}
+      CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'http://localhost:5173' }}
       LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
       LOG_FORMAT: ${{ vars.LOG_FORMAT || 'json' }}
-      DIRECT_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
       MAGIC_LINK_TOKEN_EXPIRY_DATE: ${{ '2026-04-16T12:00:00-05:00' }}
       GITHUB_BRANCH: "${{ github.ref_name }}"
       GITHUB_REPOSITORY: "${{ github.repository }}"
       VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY || '' }}
-      VITE_PUBLIC_POSTHOG_HOST: ${{ vars.VITE_PUBLIC_POSTHOG_HOST || '' }}
-      SPACE_ACCESS_KEY_ID: ${{ vars.SPACE_ACCESS_KEY_ID || '' }}
-      SPACE_SECRET_ACCESS_KEY: ${{ secrets.SPACE_SECRET_ACCESS_KEY || '' }}
-      SPACE_ENDPOINT: ${{ vars.SPACE_ENDPOINT || '' }}
-      SPACE_ENDPOINT_DOMAIN: ${{ vars.SPACE_ENDPOINT_DOMAIN || '' }}
-      CLIENT_PACKAGE_PATH: ${{ vars.CLIENT_PACKAGE_PATH || '' }}
-      API_PACKAGE_PATH: ${{ vars.API_PACKAGE_PATH || '' }}
-      DEBUG: ${{ vars.CLIENT_DEBUG || 'false' }}
+      VITE_PUBLIC_POSTHOG_HOST: ${{ '' }}
+      DEBUG: ${{ 'true' }}
       SPACE_BUCKET: ${{ vars.SPACE_BUCKET || '' }}
       FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN || 'http://localhost:5173' }}
       AUTH_SECRET: ${{ secrets.AUTH_SECRET || '' }}
       MAGIC_LINK_TOKEN_TTL_MINUTES: ${{ vars.MAGIC_LINK_TOKEN_TTL_MINUTES || '15' }}
       AUTH_SESSION_TTL_HOURS: ${{ vars.AUTH_SESSION_TTL_HOURS || '72' }}
+      MAILTRAP_WEBHOOK_SECRET: ${{ secrets.MAILTRAP_WEBHOOK_SECRET || secrets.N8N_EMAIL_WEBHOOK_TOKEN || '' }}
       N8N_HOST: ${{ vars.N8N_EMAIL_WEBHOOK_URL || '' }}
       N8N_WEBHOOK_TOKEN: ${{ secrets.N8N_EMAIL_WEBHOOK_TOKEN || '' }}
       N8N_EMAIL_WEBHOOK_TIMEOUT_MS: ${{ vars.N8N_EMAIL_WEBHOOK_TIMEOUT_MS || '5000' }}
@@ -121,7 +114,7 @@ jobs:
       PIT_RELEASE_BATCH_SIZE: ${{ vars.PIT_RELEASE_BATCH_SIZE || '50' }}
       PIT_RELEASE_WEBHOOK_URL: ${{ vars.PIT_RELEASE_WEBHOOK_URL || '' }}
       PIT_RELEASE_WEBHOOK_TIMEOUT_MS: ${{ vars.PIT_RELEASE_WEBHOOK_TIMEOUT_MS || '3000' }}
-      SERVICE_NAME: ${{ vars.SERVICE_NAME || 'velocity-gp-api' }}
+      SERVICE_NAME: "velocity-gp-api"
 
     steps:
       - name: Checkout code
@@ -280,7 +273,7 @@ jobs:
 
   web-e2e:
     runs-on: ubuntu-latest
-    environment: "dev"
+    environment: "copilot"
 
     steps:
       - name: Checkout code

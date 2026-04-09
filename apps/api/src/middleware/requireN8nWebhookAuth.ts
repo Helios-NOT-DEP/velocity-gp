@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 
 import type { NextFunction, Request, Response } from 'express';
 
@@ -19,10 +20,15 @@ function parseBearerToken(authorizationHeaderValue: string | undefined): string 
   return token;
 }
 
-function hashesMatch(expected: string, provided: string): boolean {
-  const expectedDigest = createHmac('sha512', expected).update(expected).digest();
-  const providedDigest = createHmac('sha512', expected).update(provided).digest();
-  return timingSafeEqual(expectedDigest, providedDigest);
+function tokensMatch(expected: string, provided: string): boolean {
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  const providedBuffer = Buffer.from(provided, 'utf8');
+
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
 export function requireN8nWebhookAuth(
@@ -53,7 +59,7 @@ export function requireN8nWebhookAuth(
     throw new UnauthorizedError('Valid webhook bearer token is required.');
   }
 
-  if (!hashesMatch(configuredToken, bearerToken)) {
+  if (!tokensMatch(configuredToken, bearerToken)) {
     logger.warn('n8n webhook auth failed: invalid bearer token', requestMetadata);
     throw new UnauthorizedError('Valid webhook bearer token is required.');
   }

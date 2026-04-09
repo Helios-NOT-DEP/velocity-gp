@@ -38,14 +38,21 @@ export interface ApiClientConfig {
 export class ApiClient {
   private baseUrl: string;
 
-  constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || this.getDefaultBaseUrl();
+  constructor(config: ApiClientConfig | string = {}) {
+    if (typeof config === 'string') {
+      this.baseUrl = config;
+    } else {
+      this.baseUrl = config.baseUrl || this.getDefaultBaseUrl();
+    }
   }
 
   private getDefaultBaseUrl(): string {
     if (typeof globalThis !== 'undefined' && 'process' in globalThis) {
-      const host = (globalThis as any).process.env.API_HOST || 'localhost';
-      const port = (globalThis as any).process.env.API_PORT || '3000';
+      const processEnv = (
+        globalThis as unknown as { process: { env: Record<string, string | undefined> } }
+      ).process.env;
+      const host = processEnv.API_HOST || 'localhost';
+      const port = processEnv.API_PORT || '3000';
       return `http://${host}:${port}/api`;
     }
     return 'http://localhost:3000/api';
