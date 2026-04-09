@@ -44,11 +44,11 @@ export default function Login() {
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
-        <div className="mb-3 relative h-[100px]">
+        <div className="mb-5 relative h-[100px] md:h-[170px]">
           <img
             src={logoImage}
             alt="Velocity GP"
-            className="absolute left-1/2 -translate-x-1/2 top-0 w-[550px] max-w-none h-auto pointer-events-none select-none"
+            className="absolute left-1/2 -translate-x-1/2 w-[380px] h-[140px] -top-[20px] md:translate-x-0 md:-top-[-15px] md:-left-[16px] md:w-[480px] md:h-[170px] pointer-events-none select-none"
           />
         </div>
         <p className="text-gray-400 text-sm text-center mb-8">
