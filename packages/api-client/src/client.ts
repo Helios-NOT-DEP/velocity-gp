@@ -34,7 +34,7 @@ interface ApiEnvelope<T> {
 export class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = 'http://localhost:4000/api') {
+  constructor(baseUrl: string = 'http://localhost:3000/api') {
     this.baseUrl = baseUrl;
   }
 

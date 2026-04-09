@@ -23,10 +23,10 @@ export interface EmailDispatcher {
 
 class NoopEmailDispatcher implements EmailDispatcher {
   async dispatch(input: EmailDispatchInput): Promise<void> {
-    logger.info(
-      { toEmail: input.toEmail, templateKey: input.templateKey },
-      'email dispatch skipped: n8n email webhook is not configured'
-    );
+    logger.info('email dispatch skipped: n8n email webhook is not configured', {
+      toEmail: input.toEmail,
+      templateKey: input.templateKey,
+    });
   }
 }
 

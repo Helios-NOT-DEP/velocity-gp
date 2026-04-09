@@ -18,7 +18,7 @@ export interface PitReleasePublisher {
 
 class NoopPitReleasePublisher implements PitReleasePublisher {
   async publishTeamReleased(event: TeamPitReleasedEvent): Promise<void> {
-    logger.debug({ event }, 'pit release publish skipped (no publisher configured)');
+    logger.debug('pit release publish skipped (no publisher configured)', { event });
   }
 }
 

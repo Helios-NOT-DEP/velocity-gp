@@ -26,7 +26,7 @@ export function errorHandler(
     return;
   }
 
-  logger.error({ err: error, requestId }, 'unexpected backend error');
+  logger.error('unexpected backend error', { err: error, requestId });
 
   response.status(500).json(
     errorResponse(

@@ -7,20 +7,17 @@ const app = createApp();
 const stopPitReleaseScheduler = startPitReleaseScheduler();
 
 app.listen(env.PORT, env.HOST, () => {
-  logger.info(
-    {
-      host: env.HOST,
-      port: env.PORT,
-      apiPrefix: env.API_PREFIX,
-    },
-    'Velocity GP backend listening'
-  );
+  logger.debug('Velocity GP backend listening', {
+    host: env.HOST,
+    port: env.PORT,
+    apiPrefix: env.API_PREFIX,
+  });
 });
 
 type ShutdownSignal = 'SIGINT' | 'SIGTERM';
 
 function handleShutdownSignal(signal: ShutdownSignal): void {
-  logger.info({ signal }, 'received shutdown signal');
+  logger.debug('received shutdown signal', { signal });
   stopPitReleaseScheduler();
   process.exit(0);
 }

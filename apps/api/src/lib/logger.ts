@@ -1,5 +1,3 @@
-import pino from 'pino';
-
 import { env } from '../config/env.js';
 
 // export const logger = pino({
@@ -23,7 +21,6 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic
 import { OpenTelemetryTransportV3 } from '@opentelemetry/winston-transport';
 import * as winston from 'winston';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const packageJson = { version: '1.0.0' }; // require(env.packageJson.apiPath);
 
 // Initialize configuration

@@ -545,14 +545,11 @@ export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResp
           }
 
           attempt += 1;
-          logger.warn(
-            {
-              eventId: input.eventId,
-              playerId: input.request.playerId,
-              attempt,
-            },
-            'serialization conflict during scan processing, retrying'
-          );
+          logger.warn('serialization conflict during scan processing, retrying', {
+            eventId: input.eventId,
+            playerId: input.request.playerId,
+            attempt,
+          });
         }
       }
 

@@ -13,7 +13,8 @@ export type AdminActionType =
   | 'ROSTER_IMPORTED'
   | 'ROSTER_ASSIGNED'
   | 'ROSTER_REASSIGNED'
-  | 'ROSTER_UNASSIGNED';
+  | 'ROSTER_UNASSIGNED'
+  | 'EMAIL_RETURN_FLAGGED';
 
 export interface UpdateRaceControlRequest {
   readonly state: RaceControlState;
