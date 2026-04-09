@@ -342,7 +342,12 @@ export async function getSessionFromAuthorizationHeader(
   return withTraceSpan('auth.session.get', {}, async () => {
     const token = parseBearerToken(authorizationHeaderValue);
     if (!token) {
-      logger.debug('Missing bearer token in authorization header', { authorizationHeaderValue });
+      const authorizationScheme =
+        authorizationHeaderValue?.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? null;
+      logger.debug('Missing bearer token in authorization header', {
+        hasAuthorizationHeader: Boolean(authorizationHeaderValue),
+        authorizationScheme,
+      });
       throw new AppError(401, 'AUTH_MISSING_TOKEN', 'Authentication is required.');
     }
 

@@ -14,12 +14,24 @@ function parseBoolean(value: boolean | string | undefined, fallback = false) {
   return value === 'true';
 }
 
+function parseTraceSamplingRate(
+  value: string | number | undefined,
+  fallback = DEFAULT_TRACE_SAMPLING_RATE
+) {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const parsed = typeof value === 'string' ? parseFloat(value) : value;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : fallback;
+}
+
 export const observabilityConfig = {
   debug: parseBoolean(import.meta.env.VITE_OBSERVABILITY_DEBUG, import.meta.env.DEV),
   posthogApiKey: import.meta.env.VITE_POSTHOG_API_KEY || import.meta.env.VITE_POSTHOG_KEY || '',
   posthogHost: import.meta.env.VITE_POSTHOG_HOST || DEFAULT_POSTHOG_HOST,
-  serviceName: DEFAULT_SERVICE_NAME,
-  traceSamplingRate: DEFAULT_TRACE_SAMPLING_RATE,
+  serviceName: import.meta.env.VITE_OTEL_SERVICE_NAME || DEFAULT_SERVICE_NAME,
+  traceSamplingRate: parseTraceSamplingRate(import.meta.env.VITE_OTEL_TRACE_SAMPLING_RATE),
 };
 
 export function isAnalyticsEnabled() {
