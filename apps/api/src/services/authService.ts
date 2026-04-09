@@ -18,6 +18,7 @@ import {
   verifySessionToken,
 } from './authTokens.js';
 import { getEmailDispatcher } from './emailDispatchService.js';
+import { logger } from '../lib/logger.js';
 
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
@@ -220,7 +221,7 @@ export async function requestMagicLink(
   return withTraceSpan('auth.magic_link.request', { workEmail: request.workEmail }, async () => {
     const normalizedEmail = normalizeWorkEmail(request.workEmail);
     const eligiblePlayer = await loadEligiblePlayerByEmail(normalizedEmail);
-
+    logger.debug('Eligible player loaded', { eligiblePlayer });
     if (!eligiblePlayer || !eligiblePlayer.teamId || !eligiblePlayer.teamStatus) {
       incrementCounter('auth.magic_link.request.denied.total');
       return {
@@ -248,6 +249,8 @@ export async function requestMagicLink(
     });
 
     incrementCounter('auth.magic_link.request.accepted.total');
+    logger.debug('Magic link request accepted', { eligiblePlayer });
+
     return {
       accepted: true,
       message: GENERIC_MAGIC_LINK_MESSAGE,
@@ -275,6 +278,7 @@ export async function verifyMagicLink(
 
     if (!eligiblePlayer) {
       incrementCounter('auth.magic_link.verify.invalid.total');
+      logger.debug('Magic link verification failed: eligible player not found', { claims });
       throw new AppError(401, 'AUTH_INVALID_LINK', 'Magic link is invalid or expired.');
     }
 
@@ -327,6 +331,7 @@ export async function getSessionFromAuthorizationHeader(
   return withTraceSpan('auth.session.get', {}, async () => {
     const token = parseBearerToken(authorizationHeaderValue);
     if (!token) {
+      logger.debug('Missing bearer token in authorization header', { authorizationHeaderValue });
       throw new AppError(401, 'AUTH_MISSING_TOKEN', 'Authentication is required.');
     }
 

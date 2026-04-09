@@ -1,3 +1,5 @@
+import { logger } from '../lib/logger.js';
+
 export class AppError extends Error {
   readonly statusCode: number;
   readonly code: string;
@@ -13,6 +15,7 @@ export class AppError extends Error {
     this.statusCode = statusCode;
     this.code = code;
     this.details = details;
+    logger.error(message, { code, details });
   }
 }
 

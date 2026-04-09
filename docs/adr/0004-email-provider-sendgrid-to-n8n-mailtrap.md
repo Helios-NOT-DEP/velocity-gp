@@ -23,7 +23,7 @@ This meant:
 
 Concretely:
 
-1. **New `emailDispatchService`** — thin webhook sender that `POST`s a structured payload to the n8n `email` workflow trigger URL over HTTPS with a Bearer token, correlation ID, and `x-velocity-event: EMAIL_DISPATCH` header. Falls back to a no-op if n8n is unconfigured (preserves CI and dev behavior).
+1. **New `emailDispatchService`** — thin webhook sender that `POST`s a structured payload to the n8n `email` workflow trigger URL over HTTPS with a short-lived HS512 JWT in the Bearer header, correlation ID, and `x-velocity-event: EMAIL_DISPATCH` header. Falls back to a no-op if n8n is unconfigured (preserves CI and dev behavior).
 
 2. **n8n `email` workflow** — receives the payload (`templateKey`, `toEmail`, `variables`, `correlationId`), looks up the Mailtrap template by key, merges variables, and sends via the Mailtrap API. n8n owns all retry and fallback logic.
 
@@ -61,6 +61,6 @@ Concretely:
 
 - `apps/api/src/services/emailDispatchService.ts` — new dispatch abstraction
 - `apps/api/src/services/authService.ts` — magic-link wiring
-- `apps/api/src/config/env.ts` — `N8N_EMAIL_WEBHOOK_URL`, `N8N_EMAIL_WEBHOOK_TOKEN`, `N8N_EMAIL_WEBHOOK_TIMEOUT_MS`
+- `apps/api/src/config/env.ts` — `N8N_HOST`, `N8N_WEBHOOK_TOKEN`, `N8N_WEBHOOK_TIMEOUT_MS`
 - `apps/api/src/routes/emailWebhook.ts` — inbound Mailtrap events (unchanged)
 - Mailtrap template IDs: 64344, 64343, 64342, 64345

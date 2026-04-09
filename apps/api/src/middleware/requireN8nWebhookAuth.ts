@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
 import { env } from '../config/env.js';
+import { logger } from '../lib/logger.js';
 import { UnauthorizedError } from '../utils/appError.js';
 
 function parseBearerToken(authorizationHeaderValue: string | undefined): string | null {
@@ -29,15 +30,34 @@ export function requireN8nWebhookAuth(
   _response: Response,
   next: NextFunction
 ): void {
+  const authorizationHeader = request.header('authorization');
+  const bearerToken = parseBearerToken(authorizationHeader);
+  const requestMetadata = {
+    method: request.method,
+    path: request.originalUrl,
+    ip: request.ip,
+    hasAuthorizationHeader: Boolean(authorizationHeader),
+    hasBearerToken: Boolean(bearerToken),
+  };
+
+  logger.debug('n8n webhook auth attempt', requestMetadata);
+
   const configuredToken = env.N8N_WEBHOOK_TOKEN;
   if (!configuredToken) {
+    logger.warn('n8n webhook auth failed: token not configured', requestMetadata);
     throw new UnauthorizedError('Webhook token is not configured.');
   }
 
-  const bearerToken = parseBearerToken(request.header('authorization'));
-  if (!bearerToken || !hashesMatch(configuredToken, bearerToken)) {
+  if (!bearerToken) {
+    logger.warn('n8n webhook auth failed: missing bearer token', requestMetadata);
     throw new UnauthorizedError('Valid webhook bearer token is required.');
   }
 
+  if (!hashesMatch(configuredToken, bearerToken)) {
+    logger.warn('n8n webhook auth failed: invalid bearer token', requestMetadata);
+    throw new UnauthorizedError('Valid webhook bearer token is required.');
+  }
+
+  logger.debug('n8n webhook auth success', requestMetadata);
   next();
 }
