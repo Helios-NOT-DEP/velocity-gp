@@ -72,7 +72,7 @@ const envSchema = z.object({
   MAGIC_LINK_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(72),
   N8N_WEBHOOK_TOKEN: z.string().min(16).optional(),
-  N8N_EMAIL_WEBHOOK_URL: z.string().url().optional(),
+  N8N_HOST: z.string().url().optional(),
   N8N_EMAIL_WEBHOOK_TOKEN: z.string().min(16).optional(),
   N8N_EMAIL_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,

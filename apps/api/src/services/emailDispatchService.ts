@@ -36,7 +36,7 @@ class N8nEmailDispatcher implements EmailDispatcher {
   readonly #timeoutMs: number;
 
   constructor(url: string, token: string, timeoutMs: number) {
-    this.#url = url;
+    this.#url = url + '/sendmail';
     this.#token = token;
     this.#timeoutMs = timeoutMs;
   }
@@ -88,12 +88,12 @@ class N8nEmailDispatcher implements EmailDispatcher {
 let dispatcherOverride: EmailDispatcher | null = null;
 
 function createDefaultDispatcher(): EmailDispatcher {
-  if (!env.N8N_EMAIL_WEBHOOK_URL || !env.N8N_EMAIL_WEBHOOK_TOKEN) {
+  if (!env.N8N_HOST || !env.N8N_EMAIL_WEBHOOK_TOKEN) {
     return new NoopEmailDispatcher();
   }
 
   return new N8nEmailDispatcher(
-    env.N8N_EMAIL_WEBHOOK_URL,
+    env.N8N_HOST,
     env.N8N_EMAIL_WEBHOOK_TOKEN,
     env.N8N_EMAIL_WEBHOOK_TIMEOUT_MS
   );

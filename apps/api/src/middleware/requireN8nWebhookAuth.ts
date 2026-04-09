@@ -19,8 +19,8 @@ function parseBearerToken(authorizationHeaderValue: string | undefined): string 
 }
 
 function hashesMatch(expected: string, provided: string): boolean {
-  const expectedDigest = createHmac('sha256', expected).update(expected).digest();
-  const providedDigest = createHmac('sha256', expected).update(provided).digest();
+  const expectedDigest = createHmac('sha512', expected).update(expected).digest();
+  const providedDigest = createHmac('sha512', expected).update(provided).digest();
   return timingSafeEqual(expectedDigest, providedDigest);
 }
 
