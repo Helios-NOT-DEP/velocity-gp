@@ -10,6 +10,7 @@ async function loadEmailDispatchModule(options: {
   n8nHost?: string;
   n8nWebhookToken?: string;
   timeoutMs?: number;
+  nodeEnv?: 'development' | 'test' | 'production';
 }) {
   vi.resetModules();
 
@@ -29,6 +30,7 @@ async function loadEmailDispatchModule(options: {
 
   vi.doMock('../../src/config/env.js', () => ({
     env: {
+      NODE_ENV: options.nodeEnv,
       N8N_HOST: options.n8nHost,
       N8N_WEBHOOK_TOKEN: options.n8nWebhookToken,
       N8N_WEBHOOK_TIMEOUT_MS: options.timeoutMs ?? 1000,
@@ -178,5 +180,77 @@ describe('emailDispatchService logging', () => {
       ...logger.error.mock.calls,
     ]);
     expect(logsAsText).not.toContain(token);
+  });
+
+  it('throws concise non-dev errors for n8n failures', async () => {
+    const token = 'n8n-email-webhook-token-1234';
+    const { getEmailDispatcher } = await loadEmailDispatchModule({
+      nodeEnv: 'production',
+      n8nHost: 'https://n8n.example.com',
+      n8nWebhookToken: token,
+    });
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => 'workflow failure',
+    });
+
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      getEmailDispatcher().dispatch({
+        templateKey: 'admin_alert',
+        toEmail: 'ops@example.com',
+        variables: { message: 'hello' },
+        correlationId: 'corr-456',
+      })
+    ).rejects.toThrow('n8n email dispatch failed with status 500');
+
+    await expect(
+      getEmailDispatcher().dispatch({
+        templateKey: 'admin_alert',
+        toEmail: 'ops@example.com',
+        variables: { message: 'hello' },
+        correlationId: 'corr-456',
+      })
+    ).rejects.not.toThrow('ops@example.com');
+  });
+
+  it('redacts token-like values from non-dev transport error logs', async () => {
+    const token = 'n8n-email-webhook-token-1234';
+    const { getEmailDispatcher, logger } = await loadEmailDispatchModule({
+      nodeEnv: 'production',
+      n8nHost: 'https://n8n.example.com',
+      n8nWebhookToken: token,
+    });
+
+    const fetchSpy = vi
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          `transport failed for authorization Bearer header.payload.signature using secret ${token}`
+        )
+      );
+
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      getEmailDispatcher().dispatch({
+        templateKey: 'admin_alert',
+        toEmail: 'ops@example.com',
+        variables: { message: 'hello' },
+        correlationId: 'corr-789',
+      })
+    ).rejects.toThrow('transport failed');
+
+    const errorLogMetadata = logger.error.mock.calls[0]?.[1] as
+      | { errorMessage?: string }
+      | undefined;
+    const errorMessage = errorLogMetadata?.errorMessage ?? '';
+
+    expect(errorMessage).not.toContain(token);
+    expect(errorMessage).not.toContain('header.payload.signature');
+    expect(errorMessage).toContain('[REDACTED]');
   });
 });

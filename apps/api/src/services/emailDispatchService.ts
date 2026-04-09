@@ -31,6 +31,13 @@ function encodeBase64UrlJson(payload: Record<string, unknown>): string {
   return Buffer.from(JSON.stringify(payload)).toString('base64url');
 }
 
+function redactTokenLikeValues(message: string, token: string): string {
+  return message
+    .replaceAll(token, '[REDACTED]')
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
+    .replace(/\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED]');
+}
+
 function createHs512Jwt(secret: string, correlationId: string): string {
   const issuedAtEpochSeconds = Math.floor(Date.now() / 1000);
   const expiryEpochSeconds = issuedAtEpochSeconds + 60;
@@ -117,7 +124,7 @@ class N8nEmailDispatcher implements EmailDispatcher {
           responseStatus = response.status;
 
           if (!response.ok) {
-            logger.warn('email dispatch failure from n8n', {
+            const failureContext = {
               provider: 'n8n_mailtrap',
               templateKey: input.templateKey,
               toEmail: input.toEmail,
@@ -125,18 +132,18 @@ class N8nEmailDispatcher implements EmailDispatcher {
               endpoint: this.#loggableUrl,
               status: response.status,
               durationMs: Date.now() - startTimeMs,
+            };
+
+            logger.warn('email dispatch failure from n8n', {
+              ...failureContext,
             });
-            throw new Error(
-              `n8n email dispatch failed with status ${response.status} \n ${JSON.stringify({
-                provider: 'n8n_mailtrap',
-                templateKey: input.templateKey,
-                toEmail: input.toEmail,
-                correlationId,
-                endpoint: this.#loggableUrl,
-                status: response.status,
-                durationMs: Date.now() - startTimeMs,
-              })}`
-            );
+
+            const baseErrorMessage = `n8n email dispatch failed with status ${response.status}`;
+            if (env.NODE_ENV === 'development') {
+              throw new Error(`${baseErrorMessage} \n ${JSON.stringify(failureContext)}`);
+            }
+
+            throw new Error(baseErrorMessage);
           }
 
           logger.debug('email dispatch success from n8n', {
@@ -152,6 +159,12 @@ class N8nEmailDispatcher implements EmailDispatcher {
           incrementCounter('email.dispatch.success', { templateKey: input.templateKey });
         } catch (error) {
           if (responseStatus === null) {
+            const rawErrorMessage = error instanceof Error ? error.message : 'unknown error';
+            const errorMessage =
+              env.NODE_ENV === 'development'
+                ? rawErrorMessage
+                : redactTokenLikeValues(rawErrorMessage, this.#token);
+
             logger.error('email dispatch error before response from n8n', {
               provider: 'n8n_mailtrap',
               templateKey: input.templateKey,
@@ -159,7 +172,7 @@ class N8nEmailDispatcher implements EmailDispatcher {
               correlationId,
               endpoint: this.#loggableUrl,
               durationMs: Date.now() - startTimeMs,
-              errorMessage: error instanceof Error ? error.message : 'unknown error',
+              errorMessage,
             });
           }
 
