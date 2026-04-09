@@ -51,6 +51,11 @@ const booleanFromEnv = z.preprocess(
     .transform((value) => value !== 'false')
 );
 
+const optionalUrl = z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional());
+
+const optionalMinString = (min: number) =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.string().min(min).optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
@@ -65,19 +70,19 @@ const envSchema = z.object({
   POSTGRES_PRISMA_URL: z.string().optional(),
   SEED_DATABASE_URL: z.string().optional(),
   VITE_PUBLIC_POSTHOG_KEY: z.string().optional(),
-  VITE_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+  VITE_PUBLIC_POSTHOG_HOST: optionalUrl,
   SERVICE_NAME: z.string().default('velocity-gp-api'),
   AUTH_SECRET: z.string().optional(),
   MAGIC_LINK_TOKEN_EXPIRY_DATE: z.string().nullable().default(null),
   MAGIC_LINK_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(72),
-  N8N_WEBHOOK_TOKEN: z.string().min(16).optional(),
-  N8N_HOST: z.string().url().optional(),
+  N8N_WEBHOOK_TOKEN: optionalMinString(16),
+  N8N_HOST: optionalUrl,
   N8N_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
   PIT_RELEASE_BATCH_SIZE: z.coerce.number().int().positive().default(50),
-  PIT_RELEASE_WEBHOOK_URL: z.string().url().optional(),
+  PIT_RELEASE_WEBHOOK_URL: optionalUrl,
   PIT_RELEASE_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(3_000),
 });
 
