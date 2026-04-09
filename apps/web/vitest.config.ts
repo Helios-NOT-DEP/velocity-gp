@@ -3,7 +3,7 @@ import path from 'node:path';
 import baseConfig from '../../vitest.config';
 
 export default mergeConfig(
-  baseConfig,
+  baseConfig as any,
   defineConfig({
     resolve: {
       alias: {
@@ -19,6 +19,10 @@ export default mergeConfig(
       ],
       setupFiles: ['apps/web/tests/setup/setupTests.ts'],
       exclude: ['apps/web/tests/e2e/**', 'backend/**', 'dist/**', 'node_modules/**'],
+      coverage: {
+        include: ['apps/web/src/**/*.{ts,tsx}'],
+        reportsDirectory: './coverage/web',
+      },
     },
   })
 );
