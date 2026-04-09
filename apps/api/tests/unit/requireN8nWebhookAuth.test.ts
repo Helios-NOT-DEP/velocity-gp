@@ -10,17 +10,17 @@ async function loadMiddlewareModule(configuredToken?: string) {
     error: vi.fn(),
   };
 
-  vi.doMock('../src/config/env.js', () => ({
+  vi.doMock('../../src/config/env.js', () => ({
     env: {
       N8N_WEBHOOK_TOKEN: configuredToken,
     },
   }));
 
-  vi.doMock('../src/lib/logger.js', () => ({
+  vi.doMock('../../src/lib/logger.js', () => ({
     logger,
   }));
 
-  const module = await import('../src/middleware/requireN8nWebhookAuth.js');
+  const module = await import('../../src/middleware/requireN8nWebhookAuth.js');
   return {
     ...module,
     logger,

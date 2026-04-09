@@ -27,7 +27,7 @@ async function loadEmailDispatchModule(options: {
     }
   );
 
-  vi.doMock('../src/config/env.js', () => ({
+  vi.doMock('../../src/config/env.js', () => ({
     env: {
       N8N_HOST: options.n8nHost,
       N8N_WEBHOOK_TOKEN: options.n8nWebhookToken,
@@ -35,16 +35,16 @@ async function loadEmailDispatchModule(options: {
     },
   }));
 
-  vi.doMock('../src/lib/logger.js', () => ({
+  vi.doMock('../../src/lib/logger.js', () => ({
     logger,
   }));
 
-  vi.doMock('../src/lib/observability.js', () => ({
+  vi.doMock('../../src/lib/observability.js', () => ({
     incrementCounter,
     withTraceSpan,
   }));
 
-  const module = await import('../src/services/emailDispatchService.js');
+  const module = await import('../../src/services/emailDispatchService.js');
   return {
     ...module,
     logger,

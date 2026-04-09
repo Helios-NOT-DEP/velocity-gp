@@ -54,7 +54,7 @@ describe('ApiClient', () => {
       status: 400,
     } as unknown as Response);
 
-    const client = new ApiClient('http://localhost:4000/api');
+    const client = new ApiClient('http://localhost:3000/api');
 
     await expect(client.post('/players', { email: 'not-an-email' })).resolves.toEqual({
       data: undefined,

@@ -11,8 +11,14 @@ export default mergeConfig(
       },
     },
     test: {
-      include: ['apps/web/tests/**/*.test.ts', 'apps/web/tests/**/*.test.tsx'],
-      exclude: ['backend/**', 'dist/**', 'node_modules/**'],
+      include: [
+        'apps/web/tests/unit/**/*.test.ts',
+        'apps/web/tests/unit/**/*.test.tsx',
+        'apps/web/tests/component/**/*.test.ts',
+        'apps/web/tests/component/**/*.test.tsx',
+      ],
+      setupFiles: ['apps/web/tests/setup/setupTests.ts'],
+      exclude: ['apps/web/tests/e2e/**', 'backend/**', 'dist/**', 'node_modules/**'],
     },
   })
 );

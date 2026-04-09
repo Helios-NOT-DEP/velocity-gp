@@ -16,7 +16,8 @@ The backend is organized by responsibility instead of piling everything into a s
 - `../../packages/api-contract/src/schemas/` — shared Zod validators at the HTTP boundary
 - `src/services/` — placeholder business logic, isolated from Express
 - `src/utils/` — shared utilities and error types
-- `tests/` — backend integration tests
+- `tests/unit/` — backend unit tests
+- `tests/integration/` — backend integration tests
 
 ## Local development
 
@@ -28,7 +29,9 @@ Optional commands:
 
 - `npm run dev` — starts the backend on `http://localhost:4000`
 - `npm run build` — compiles the backend into `dist/`
-- `npm run test` — runs backend integration tests
+- `npm run test` — runs backend unit + integration tests
+- `npm run test:unit` — runs backend unit tests only
+- `npm run test:integration` — runs backend integration tests only
 - `npm run auth:magic-link -- --email <user-email>` — prints a local magic-link callback URL/token for an ACTIVE event player
 
 ## Available placeholder endpoints

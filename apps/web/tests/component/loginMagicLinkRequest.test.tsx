@@ -4,16 +4,15 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { appRoutes } from '../src/app/routes';
-import { GameProvider } from '../src/app/context/GameContext';
+import { appRoutes } from '@/app/routes';
+import { GameProvider } from '@/app/context/GameContext';
 
 const { requestMagicLinkMock } = vi.hoisted(() => ({
   requestMagicLinkMock: vi.fn(),
 }));
 
 vi.mock('@/services/auth', async () => {
-  const actual =
-    await vi.importActual<typeof import('../src/services/auth')>('../src/services/auth');
+  const actual = await vi.importActual<typeof import('@/services/auth')>('@/services/auth');
 
   return {
     ...actual,

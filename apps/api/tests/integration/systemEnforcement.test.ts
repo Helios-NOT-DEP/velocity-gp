@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
-import { prisma } from '../src/db/client.js';
-import { initiateRescue } from '../src/services/rescueService.js';
-import { submitScan } from '../src/services/scanService.js';
+import { prisma } from '../../src/db/client.js';
+import { initiateRescue } from '../../src/services/rescueService.js';
+import { submitScan } from '../../src/services/scanService.js';
 import {
   setPitReleasePublisherForTests,
   type TeamPitReleasedEvent,
-} from '../src/services/pitReleasePublisher.js';
-import { releaseExpiredTeamsFromPit } from '../src/services/pitReleaseService.js';
+} from '../../src/services/pitReleasePublisher.js';
+import { releaseExpiredTeamsFromPit } from '../../src/services/pitReleaseService.js';
 
 interface ScanFixtureOptions {
   readonly globalHazardRatio?: number;

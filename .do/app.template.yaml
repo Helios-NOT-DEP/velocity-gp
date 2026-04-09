@@ -151,22 +151,18 @@ services:
         value: "${AUTH_SESSION_TTL_HOURS}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
-      - key: N8N_EMAIL_WEBHOOK_URL
-        value: "${N8N_EMAIL_WEBHOOK_URL}"
-        scope: RUN_AND_BUILD_TIME
-        type: GENERAL
-      - key: N8N_EMAIL_WEBHOOK_TOKEN
-        value: "${N8N_EMAIL_WEBHOOK_TOKEN}"
-        scope: RUN_AND_BUILD_TIME
-        type: SECRET
-      - key: N8N_EMAIL_WEBHOOK_TIMEOUT_MS
-        value: "${N8N_EMAIL_WEBHOOK_TIMEOUT_MS}"
+      - key: N8N_HOST
+        value: "${N8N_HOST}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
       - key: N8N_WEBHOOK_TOKEN
         value: "${N8N_WEBHOOK_TOKEN}"
         scope: RUN_AND_BUILD_TIME
         type: SECRET
+      - key: N8N_EMAIL_WEBHOOK_TIMEOUT_MS
+        value: "${N8N_EMAIL_WEBHOOK_TIMEOUT_MS}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: PIT_RELEASE_SCHEDULER_ENABLED
         value: "${PIT_RELEASE_SCHEDULER_ENABLED}"
         scope: RUN_AND_BUILD_TIME
@@ -216,8 +212,6 @@ static_sites:
         value: "${_self.PUBLIC_URL}/api"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
-      - key: VITE_API_BASE_URL
-        value: "${API_BASE_URL}"
       - key: VITE_PUBLIC_POSTHOG_KEY
         value: "${POSTHOG_KEY}"
         scope: RUN_AND_BUILD_TIME

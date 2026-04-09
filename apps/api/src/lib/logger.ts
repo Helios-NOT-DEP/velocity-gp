@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+
 import { env } from '../config/env.js';
 
 // export const logger = pino({
@@ -67,16 +69,32 @@ if (posthogKey) {
 /* v8 ignore stop */
 
 // -- Winston Format Setup --
-const { splat, combine, timestamp, errors, prettyPrint } = winston.format;
+const { splat, combine, timestamp, errors, metadata } = winston.format;
 
-const myFormat = winston.format.printf(({ timestamp, label, module, level, message }) => {
-  return `${timestamp} [${module || label}] ${level}: ${message}`;
+const myFormat = winston.format.printf((info) => {
+  const { timestamp, label, module, level, message, service, stack } = info;
+  const source = module || label || service || serviceName;
+  const renderedMessage = stack || message;
+  const extraMetadata =
+    info.metadata && Object.keys(info.metadata).length > 0
+      ? ` ${JSON.stringify(info.metadata)}`
+      : '';
+
+  return `${timestamp} [${source}] ${level}: ${renderedMessage}${extraMetadata}`;
 });
 
 // -- Create Winston Logger --
 export const logger = winston.createLogger({
   level: logLevel,
-  format: combine(timestamp(), splat(), myFormat, prettyPrint(), errors({ stack: true })),
+  format: combine(
+    timestamp(),
+    errors({ stack: true }),
+    splat(),
+    metadata({
+      fillExcept: ['timestamp', 'label', 'module', 'level', 'message', 'service', 'stack'],
+    }),
+    myFormat
+  ),
   defaultMeta: {
     service: serviceName,
     environment: nodeEnv,
@@ -96,24 +114,35 @@ if (otelTransport) {
 
 // -- File Transports (Production/Dev) --
 if (nodeEnv === 'production' || nodeEnv === 'development') {
-  // Error logs
-  logger.add(
-    new winston.transports.File({
-      filename: 'logs/error.log',
-      level: 'error',
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
-    })
-  );
+  const logsDirectory = 'logs';
 
-  // Combined logs
-  logger.add(
-    new winston.transports.File({
-      filename: 'logs/combined.log',
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
-    })
-  );
+  try {
+    mkdirSync(logsDirectory, { recursive: true });
+
+    // Error logs
+    logger.add(
+      new winston.transports.File({
+        filename: `${logsDirectory}/error.log`,
+        level: 'error',
+        maxsize: 10485760, // 10MB
+        maxFiles: 5,
+      })
+    );
+
+    // Combined logs
+    logger.add(
+      new winston.transports.File({
+        filename: `${logsDirectory}/combined.log`,
+        maxsize: 10485760, // 10MB
+        maxFiles: 5,
+      })
+    );
+  } catch (error) {
+    logger.warn('File logging disabled due to logger directory initialization failure.', {
+      logsDirectory,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }
 
 // -- Lifecycle Helpers --

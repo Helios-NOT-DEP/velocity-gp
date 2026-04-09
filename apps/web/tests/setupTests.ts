@@ -1,2 +1,0 @@
-﻿// setupTests placeholder
-export default {};

@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createApp } from '../src/app/createApp.js';
-import { env } from '../src/config/env.js';
-import { prisma } from '../src/db/client.js';
-import { setEmailDispatcherForTests } from '../src/services/emailDispatchService.js';
-import { createMagicLinkToken } from '../src/services/authTokens.js';
+import { createApp } from '../../src/app/createApp.js';
+import { env } from '../../src/config/env.js';
+import { prisma } from '../../src/db/client.js';
+import { setEmailDispatcherForTests } from '../../src/services/emailDispatchService.js';
+import { createMagicLinkToken } from '../../src/services/authTokens.js';
 
 describe('velocity gp backend', () => {
   const app = createApp();

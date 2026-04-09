@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyticsEventCatalog } from '../src/services/observability';
+import { analyticsEventCatalog } from '@/services/observability';
 
 describe('analyticsEventCatalog', () => {
   it('keeps product analytics and telemetry responsibilities separate', () => {

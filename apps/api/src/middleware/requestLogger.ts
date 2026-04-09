@@ -16,7 +16,6 @@ export function requestLogger(request: Request, response: Response, next: NextFu
       userAgent: request.get('user-agent'),
       query: request.query,
       params: request.params,
-      body: request.body,
       statusCode: response.statusCode,
       durationInMs,
     });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveSeedDatabaseUrl } from '../src/db/resolveSeedDatabaseUrl.js';
+import { resolveSeedDatabaseUrl } from '../../src/db/resolveSeedDatabaseUrl.js';
 
 describe('resolveSeedDatabaseUrl', () => {
   it('prefers SEED_DATABASE_URL when provided', () => {
