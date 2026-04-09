@@ -115,6 +115,7 @@ jobs:
       PIT_RELEASE_WEBHOOK_URL: ${{ vars.PIT_RELEASE_WEBHOOK_URL || '' }}
       PIT_RELEASE_WEBHOOK_TIMEOUT_MS: ${{ vars.PIT_RELEASE_WEBHOOK_TIMEOUT_MS || '3000' }}
       SERVICE_NAME: "velocity-gp-api"
+      SOURCEMAP: ${{ vars.SOURCEMAP || 'false' }}
 
     steps:
       - name: Checkout code

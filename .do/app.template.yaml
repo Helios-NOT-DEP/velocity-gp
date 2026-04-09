@@ -236,3 +236,7 @@ static_sites:
         value: "${DEBUG}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
+      - key: SOURCEMAP
+        value: "${SOURCEMAP}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
