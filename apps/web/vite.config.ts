@@ -24,7 +24,7 @@ export default defineConfig({
 
   // Enable production source maps only when explicitly requested.
   build: {
-    sourcemap: buildSourceMapEnabled,
+    sourcemap: true,
   },
 
   // Disable source maps in dev
@@ -38,6 +38,6 @@ export default defineConfig({
 
   // Ignore source maps for node_modules
   server: {
-    sourcemapIgnoreList: () => true, // Ignore all
+    sourcemapIgnoreList: (sourcePath) => sourcePath.includes('node_modules'),
   },
 });
