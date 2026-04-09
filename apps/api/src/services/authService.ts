@@ -238,15 +238,26 @@ export async function requestMagicLink(
     });
 
     const magicLinkUrl = resolveFrontendMagicLinkUrl(magicLinkToken);
-    await getEmailDispatcher().dispatch({
-      templateKey: 'magic_link_login',
-      toEmail: eligiblePlayer.email,
-      variables: {
-        magicLinkUrl,
-        eventName: eligiblePlayer.eventName,
-        expiresInMinutes: env.MAGIC_LINK_TOKEN_TTL_MINUTES,
-      },
-    });
+    try {
+      await getEmailDispatcher().dispatch({
+        templateKey: 'magic_link_login',
+        toEmail: eligiblePlayer.email,
+        variables: {
+          magicLinkUrl,
+          eventName: eligiblePlayer.eventName,
+          expiresInMinutes: env.MAGIC_LINK_TOKEN_TTL_MINUTES,
+        },
+      });
+    } catch (error) {
+      incrementCounter('auth.magic_link.request.dispatch.failure.total');
+      logger.error('Magic link dispatch failed', {
+        userId: eligiblePlayer.userId,
+        playerId: eligiblePlayer.playerId,
+        eventId: eligiblePlayer.eventId,
+        templateKey: 'magic_link_login',
+        errorMessage: error instanceof Error ? error.message : 'unknown error',
+      });
+    }
 
     incrementCounter('auth.magic_link.request.accepted.total');
     logger.debug('Magic link request accepted', { eligiblePlayer });

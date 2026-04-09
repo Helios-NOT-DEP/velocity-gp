@@ -298,6 +298,25 @@ describe('velocity gp backend', () => {
     expect(capturedLinks.length).toBe(1);
   });
 
+  it('returns accepted magic-link response when email dispatch fails', async () => {
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        throw new Error('simulated dispatch failure');
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: assignedEmail });
+
+    expect(response.status).toBe(202);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.accepted).toBe(true);
+    expect(typeof response.body.data.message).toBe('string');
+  });
+
   it('rejects Mailtrap webhook requests without a valid bearer token', async () => {
     const response = await request(app)
       .post(`${apiPrefix}/webhooks/mailtrap/events`)
