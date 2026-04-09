@@ -6,13 +6,28 @@ import { AppError } from '../utils/appError.js';
 
 export function errorHandler(
   error: Error,
-  _request: Request,
+  request: Request,
   response: Response,
   _next: NextFunction
 ): void {
   const requestId = response.locals.requestId as string | undefined;
 
   if (error instanceof AppError) {
+    const appErrorLogContext = {
+      requestId,
+      method: request.method,
+      path: request.originalUrl,
+      statusCode: error.statusCode,
+      code: error.code,
+      details: error.details,
+    };
+
+    if (error.statusCode >= 500) {
+      logger.error('handled app error', appErrorLogContext);
+    } else {
+      logger.warn('handled app error', appErrorLogContext);
+    }
+
     response.status(error.statusCode).json(
       errorResponse(
         {
