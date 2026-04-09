@@ -1,4 +1,5 @@
 import type { Prisma } from '../../prisma/generated/client.js';
+import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
 import { withTraceSpan } from '../lib/observability.js';
 
@@ -42,17 +43,26 @@ function isBounceReturnSignal(eventType: string): boolean {
   return normalizeEventType(eventType) === 'bounce';
 }
 
-async function resolveAuditActorUserId(tx: Prisma.TransactionClient): Promise<string | null> {
-  const actor = await tx.user.findFirst({
+const MAILTRAP_AUDIT_ACTOR_DISPLAY_NAME = 'System (Mailtrap Webhook)';
+
+async function resolveAuditActorUserId(tx: Prisma.TransactionClient): Promise<string> {
+  const actor = await tx.user.upsert({
     where: {
-      role: 'ADMIN',
+      email: normalizeEmail(env.MAILTRAP_AUDIT_ACTOR_EMAIL),
+    },
+    update: {},
+    create: {
+      email: normalizeEmail(env.MAILTRAP_AUDIT_ACTOR_EMAIL),
+      displayName: MAILTRAP_AUDIT_ACTOR_DISPLAY_NAME,
+      role: 'HELIOS',
+      isHelios: true,
     },
     select: {
       id: true,
     },
   });
 
-  return actor?.id ?? null;
+  return actor.id;
 }
 
 export async function ingestMailtrapEvents(
@@ -217,26 +227,25 @@ export async function ingestMailtrapEvents(
         }
 
         let createdAudits = 0;
-        if (actorUserId) {
-          for (const player of relatedPlayers) {
-            await tx.adminActionAudit.create({
-              data: {
-                eventId: player.eventId,
-                actorUserId,
-                actionType: 'EMAIL_RETURN_FLAGGED',
-                targetType: 'PLAYER',
-                targetId: player.id,
-                details: {
-                  reason: 'mailtrap_bounce',
-                  recipientEmail: normalizedRecipientEmail,
-                  provider: 'MAILTRAP',
-                  providerEventId,
-                  messageId: event.messageId ?? null,
-                },
+        for (const player of relatedPlayers) {
+          await tx.adminActionAudit.create({
+            data: {
+              eventId: player.eventId,
+              actorUserId,
+              actionType: 'EMAIL_RETURN_FLAGGED',
+              targetType: 'PLAYER',
+              targetId: player.id,
+              details: {
+                reason: 'mailtrap_bounce',
+                initiatedBy: 'SYSTEM_MAILTRAP_WEBHOOK',
+                recipientEmail: normalizedRecipientEmail,
+                provider: 'MAILTRAP',
+                providerEventId,
+                messageId: event.messageId ?? null,
               },
-            });
-            createdAudits += 1;
-          }
+            },
+          });
+          createdAudits += 1;
         }
 
         return {

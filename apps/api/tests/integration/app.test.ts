@@ -14,6 +14,7 @@ describe('velocity gp backend', () => {
   const apiPrefix = env.API_PREFIX;
   const n8nWebhookToken = env.N8N_WEBHOOK_TOKEN ?? 'velocity-gp-dev-webhook-token';
   const mailtrapWebhookSecret = env.MAILTRAP_WEBHOOK_SECRET ?? 'velocity-gp-dev-mailtrap-secret';
+  const mailtrapAuditActorEmail = env.MAILTRAP_AUDIT_ACTOR_EMAIL;
   const token = randomUUID().slice(0, 8);
   const fixtureIds = {
     eventId: `event-app-${token}`,
@@ -421,6 +422,14 @@ describe('velocity gp backend', () => {
           actionType: 'EMAIL_RETURN_FLAGGED',
           targetId: fixtureIds.playerId,
         },
+        select: {
+          actorUserId: true,
+          actorUser: {
+            select: {
+              email: true,
+            },
+          },
+        },
       }),
     ]);
 
@@ -428,6 +437,8 @@ describe('velocity gp backend', () => {
     expect(player?.hasReturnEmailIssue).toBe(true);
     expect(events).toHaveLength(2);
     expect(emailReturnAudit).not.toBeNull();
+    expect(emailReturnAudit?.actorUser.email).toBe(mailtrapAuditActorEmail);
+    expect(emailReturnAudit?.actorUserId).not.toBe(fixtureIds.adminUserId);
   });
 
   it('handles duplicate Mailtrap events idempotently', async () => {
