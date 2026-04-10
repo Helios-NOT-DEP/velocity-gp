@@ -24,6 +24,6 @@ jobs:
         uses: akhilmhdh/contributors-readme-action@v2.3.11
         with:
           readme_path: README.md
-          commit_message: docs(readme): update contributors list
+          commit_message: 'docs(readme): update contributors list'
         env:
           GITHUB_TOKEN: ${{ github.token }}
