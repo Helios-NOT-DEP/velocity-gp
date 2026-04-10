@@ -11,6 +11,7 @@ import { requestContext } from '../middleware/requestContext.js';
 import { requestLogger } from '../middleware/requestLogger.js';
 import { apiRouter } from '../routes/index.js';
 import { healthRouter } from '../routes/health.js';
+import { logger } from '../lib/logger.js';
 
 interface RequestWithRawBody extends Request {
   rawBody?: Buffer;
@@ -39,8 +40,9 @@ export function createApp() {
   );
 
   app.use(healthRouter);
-  app.use(env.API_PREFIX, apiRouter);
 
+  app.use(env.API_PREFIX, apiRouter);
+  logger.info('Setup API routes with prefix', { prefix: env.API_PREFIX });
   app.use(notFoundHandler);
   app.use(errorHandler);
 

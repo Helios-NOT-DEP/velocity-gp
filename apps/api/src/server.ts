@@ -7,7 +7,7 @@ const app = createApp();
 const stopPitReleaseScheduler = startPitReleaseScheduler();
 
 app.listen(env.PORT, env.HOST, () => {
-  logger.debug('Velocity GP backend listening', {
+  logger.info('Velocity GP backend listening', {
     host: env.HOST,
     port: env.PORT,
     apiPrefix: env.API_PREFIX,
@@ -17,7 +17,7 @@ app.listen(env.PORT, env.HOST, () => {
 type ShutdownSignal = 'SIGINT' | 'SIGTERM';
 
 function handleShutdownSignal(signal: ShutdownSignal): void {
-  logger.debug('received shutdown signal', { signal });
+  logger.info('received shutdown signal', { signal });
   stopPitReleaseScheduler();
   process.exit(0);
 }

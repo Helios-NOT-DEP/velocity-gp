@@ -8,7 +8,7 @@ export function requestLogger(request: Request, response: Response, next: NextFu
   response.on('finish', () => {
     const durationInMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
-    logger.info('request completed', {
+    logger.info('API Request completed', {
       requestId: response.locals.requestId,
       method: request.method,
       path: request.path,

@@ -52,7 +52,7 @@ services:
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
       - key: API_PREFIX
-        value: "/api"
+        value: ""
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
       - key: CLIENT_BASE_URL
@@ -192,7 +192,7 @@ services:
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
     # liveness_health_check:
-    #   http_path: /api/health
+    #   http_path: /health
     #   period_seconds: 10
     #   success_threshold: 1
     #   failure_threshold: 3
