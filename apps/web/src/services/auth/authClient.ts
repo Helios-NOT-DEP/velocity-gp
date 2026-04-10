@@ -68,6 +68,20 @@ function readAuthTokenFromStorage(): string | null {
   return getBrowserStorage()?.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY) ?? null;
 }
 
+function shouldClearStoredSession(response: {
+  status: number;
+  error?: { code?: string };
+}): boolean {
+  if (
+    response.error?.code === 'AUTH_INVALID_SESSION' ||
+    response.error?.code === 'AUTH_MISSING_TOKEN'
+  ) {
+    return true;
+  }
+
+  return response.status === 401;
+}
+
 function clearStoredSession(): void {
   const storage = getBrowserStorage();
   storage?.removeItem(AUTH_SESSION_STORAGE_KEY);
@@ -195,26 +209,21 @@ export async function getSession(): Promise<AuthSession> {
   const storedToken = readAuthTokenFromStorage();
   const storedSession = readSessionFromStorage();
 
-  if (!storedToken && storedSession.isAuthenticated) {
-    return storedSession;
-  }
-
-  if (!storedToken) {
-    // Without a bearer token we stay in storage-only mode (offline/anonymous-safe path).
-    return storedSession;
-  }
-
   let response: Awaited<ReturnType<typeof apiClient.get<SessionResponse>>>;
   try {
     response = await apiClient.get<SessionResponse>(authEndpoints.getSession, undefined);
   } catch {
-    clearStoredSession();
-    return anonymousSession;
+    // Transport/runtime failures are non-authoritative; keep last known local session.
+    return storedSession;
   }
 
   if (!response.ok || !response.data) {
-    clearStoredSession();
-    return anonymousSession;
+    if (shouldClearStoredSession(response)) {
+      clearStoredSession();
+      return anonymousSession;
+    }
+
+    return storedSession;
   }
 
   const normalizedSession = normalizeSessionFromResponse(response.data.session);
