@@ -35,11 +35,7 @@ export const appRoutes: RouteObject[] = [
   },
   {
     path: '/waiting-assignment',
-    element: (
-      <ProtectedRouteGuard>
-        <WaitingAssignment />
-      </ProtectedRouteGuard>
-    ),
+    Component: WaitingAssignment,
   },
   // Garage remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
