@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { requestMagicLink } from '@/services/auth';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { getSession, requestMagicLink } from '@/services/auth';
 import backgroundImage from '@/assets/login-background.png';
 import logoImage from '@/assets/velocity-gp-logo.png';
 
@@ -9,6 +10,41 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function redirectIfAuthenticated() {
+      const session = await getSession();
+      if (!isMounted || !session.isAuthenticated || !session.userId) {
+        return;
+      }
+
+      if (session.role === 'admin') {
+        navigate('/admin/game-control', { replace: true });
+        return;
+      }
+
+      if (session.assignmentStatus === 'UNASSIGNED') {
+        navigate('/waiting-assignment', { replace: true });
+        return;
+      }
+
+      if (session.assignmentStatus === 'ASSIGNED_PENDING') {
+        navigate('/garage', { replace: true });
+        return;
+      }
+
+      navigate('/race-hub', { replace: true });
+    }
+
+    void redirectIfAuthenticated();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

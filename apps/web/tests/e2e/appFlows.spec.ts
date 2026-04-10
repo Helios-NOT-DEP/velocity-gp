@@ -141,4 +141,17 @@ test.describe('Velocity GP web flows', () => {
 
     await expect(page.getByRole('heading', { name: 'Create Your Team' })).toBeVisible();
   });
+
+  test('redirects authenticated users away from login page', async ({ page }) => {
+    await seedAuthSession(page, {
+      userId: 'player-1',
+      role: 'player',
+      isAuthenticated: true,
+      email: 'player@example.com',
+    });
+
+    await page.goto('/');
+
+    await expect(page).toHaveURL(/\/race-hub$/);
+  });
 });
