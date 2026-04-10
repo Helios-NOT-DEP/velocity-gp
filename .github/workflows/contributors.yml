@@ -1,0 +1,26 @@
+name: Contributors
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 12 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-contributors:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update contributors in README
+        uses: akhilmhdh/contributors-readme-action@v2.3.11
+        with:
+          readme_path: README.md
+          commit_message: docs(readme): update contributors list
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

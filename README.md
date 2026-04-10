@@ -121,6 +121,15 @@ API routes are mounted under `/api` and currently include:
 - Observability: [observability.md](./docs/architecture/observability.md)
 - Contributing: [CONTRIBUTING.md](./docs/contributing/CONTRIBUTING.md)
 
+## Contributors
+
+Thank you to everyone who has contributed to Velocity GP.
+
+<!-- readme: contributors -start -->
+<!-- readme: contributors -end -->
+
+See the full list: [Contributors Graph](https://github.com/Helios-NOT-DEP/velocity-gp/graphs/contributors).
+
 ## Notes
 
 - The API uses shared contracts/schemas from `packages/api-contract`.
