@@ -112,7 +112,6 @@ jobs:
       PIT_RELEASE_SCHEDULER_ENABLED: ${{ vars.PIT_RELEASE_SCHEDULER_ENABLED || 'false' }}
       PIT_RELEASE_POLL_INTERVAL_MS: ${{ vars.PIT_RELEASE_POLL_INTERVAL_MS || '10000' }}
       PIT_RELEASE_BATCH_SIZE: ${{ vars.PIT_RELEASE_BATCH_SIZE || '50' }}
-      PIT_RELEASE_WEBHOOK_URL: ${{ vars.PIT_RELEASE_WEBHOOK_URL || '' }}
       PIT_RELEASE_WEBHOOK_TIMEOUT_MS: ${{ vars.PIT_RELEASE_WEBHOOK_TIMEOUT_MS || '3000' }}
       SERVICE_NAME: "velocity-gp-api"
       SOURCEMAP: ${{ vars.SOURCEMAP || 'false' }}
@@ -275,10 +274,103 @@ jobs:
   web-e2e:
     runs-on: ubuntu-latest
     environment: "copilot"
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: velocitygp_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      TZ: America/Chicago
+      # Sensitive values (store in repository Secrets)
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
+      SEED_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
+      DIRECT_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/velocitygp_test"
+      DB_PASSWORD: "postgres"
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      ENV: "DEV"
+      NODE_ENV: "development" # ${{ vars.NODE_ENV }}
+      DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      DO_APP_ID: ${{ vars.DO_APP_ID || ' ' }}
+      PORT: ${{ secrets.PORT || '3000' }}
+      API_PREFIX: ${{ vars.API_PREFIX || '/api' }}
+      DOMAIN: ${{ vars.DOMAIN || 'velocity.app' }}
+      FULL_DOMAIN: ${{ vars.FULL_DOMAIN || 'dev.velocity.app' }}
+      CLIENT_BASE_URL: ${{ vars.CLIENT_BASE_URL || 'http://localhost:5173' }}
+      JWT_EXPIRES_IN: ${{ vars.JWT_EXPIRES_IN || '24h' }}
+      JWT_COOKIE_NAME: ${{ vars.JWT_COOKIE_NAME || 'auth_token' }}
+      CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'http://localhost:5173' }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
+      LOG_FORMAT: ${{ vars.LOG_FORMAT || 'json' }}
+      MAGIC_LINK_TOKEN_EXPIRY_DATE: ${{ '2026-04-16T12:00:00-05:00' }}
+      GITHUB_BRANCH: "${{ github.ref_name }}"
+      GITHUB_REPOSITORY: "${{ github.repository }}"
+      VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY || '' }}
+      VITE_PUBLIC_POSTHOG_HOST: ${{ '' }}
+      DEBUG: ${{ 'true' }}
+      SPACE_BUCKET: ${{ vars.SPACE_BUCKET || '' }}
+      FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN || 'http://localhost:5173' }}
+      AUTH_SECRET: ${{ secrets.AUTH_SECRET || '' }}
+      MAGIC_LINK_TOKEN_TTL_MINUTES: ${{ vars.MAGIC_LINK_TOKEN_TTL_MINUTES || '15' }}
+      AUTH_SESSION_TTL_HOURS: ${{ vars.AUTH_SESSION_TTL_HOURS || '72' }}
+      MAILTRAP_WEBHOOK_SECRET: ${{ secrets.MAILTRAP_WEBHOOK_SECRET || secrets.N8N_EMAIL_WEBHOOK_TOKEN || '' }}
+      N8N_HOST: ${{ vars.N8N_EMAIL_WEBHOOK_URL || '' }}
+      N8N_WEBHOOK_TOKEN: ${{ secrets.N8N_EMAIL_WEBHOOK_TOKEN || '' }}
+      N8N_EMAIL_WEBHOOK_TIMEOUT_MS: ${{ vars.N8N_EMAIL_WEBHOOK_TIMEOUT_MS || '5000' }}
+      PIT_RELEASE_SCHEDULER_ENABLED: ${{ vars.PIT_RELEASE_SCHEDULER_ENABLED || 'false' }}
+      PIT_RELEASE_POLL_INTERVAL_MS: ${{ vars.PIT_RELEASE_POLL_INTERVAL_MS || '10000' }}
+      PIT_RELEASE_BATCH_SIZE: ${{ vars.PIT_RELEASE_BATCH_SIZE || '50' }}
+      PIT_RELEASE_WEBHOOK_TIMEOUT_MS: ${{ vars.PIT_RELEASE_WEBHOOK_TIMEOUT_MS || '3000' }}
+      SERVICE_NAME: "velocity-gp-api"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Show current time
+        run: date
+      - name: Set /etc/localtime
+        run: |
+          sudo ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
+          sudo dpkg-reconfigure -f noninteractive tzdata
+      - name: Show new time
+        run: date
+
+      - name: Check if app.template.yaml changed
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: .do/app.template.yaml
+
+      - name: Replace placeholders in app.yaml
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: danielr1996/envsubst-action@1.0.0
+        with:
+          input: ./.do/app.template.yaml
+          output: ./.do/app.yaml
+
+      - name: Display app.yaml
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: cat ./.do/app.yaml
+
+      - name: Authenticate doctl (DigitalOcean CLI)
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Validate App Spec
+        if: steps.changed-files.outputs.any_changed == 'true' && github.event_name != 'pull_request'
+        run: doctl app spec validate ./.do/app.yaml --verbose
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -286,11 +378,38 @@ jobs:
           node-version: "22"
           cache: "npm"
 
+      - name: Verify Node.js version
+        run: node -v
+
       - name: Install dependencies
         run: npm install
 
-      - name: Build web stack
-        run: npm run build:web
+      - name: list dependencies
+        run: npm ls
+
+      - name: Get Path & List files
+        run: pwd && ls -la
+
+      - name: ESLint Version
+        run: npx eslint --version
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed PostgreSQL with test data
+        run: npm run db:seed
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Check code formatting
+        run: npm run format:check
+
+      - name: Build TypeScript
+        run: npm run build
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium

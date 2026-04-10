@@ -9,6 +9,7 @@ import {
   type AuthSession,
 } from '@/services/auth';
 
+// TODO(figma-sync): Add TeamMember-backed roster fields on Team for TeamPage/Admin parity (member list, contact metadata, per-member scoring). | Figma source: src/app/context/GameContext.tsx (Team.members, TeamMember) | Impact: user/admin flow
 export interface Team {
   id: string;
   name: string;
@@ -20,6 +21,7 @@ export interface Team {
   keywords?: string[];
 }
 
+// TODO(figma-sync): Expand scan model with member/team/qr identifiers required by Figma Admin player/team detail and scan-history views. | Figma source: src/app/context/GameContext.tsx (Scan.memberId/teamId/qrCodeId) | Impact: user/admin flow
 export interface Scan {
   id: string;
   points: number;
@@ -41,6 +43,7 @@ export interface GameState {
   teams: Team[];
   currentTeam: Team | null;
   scans: Scan[];
+  // TODO(figma-sync): Introduce qrCodes and gameActive state branches expected by Figma Admin control and QR inventory screens. | Figma source: src/app/context/GameContext.tsx (GameState.qrCodes/gameActive) | Impact: admin flow
 }
 
 interface GameContextType {
@@ -51,6 +54,7 @@ interface GameContextType {
   addScan: (points: number) => void;
   triggerPitStop: (teamId: string, duration: number) => void;
   clearPitStop: (teamId: string) => void;
+  // TODO(figma-sync): Add admin command surface (score adjustments, QR CRUD/toggles, game active toggle, member updates) once Figma Admin parity work begins. | Figma source: src/app/context/GameContext.tsx admin actions | Impact: admin flow
   hydrateScanIdentity: (identity: ScanIdentity) => void;
   applyScanOutcome: (response: SubmitScanResponse) => void;
 }

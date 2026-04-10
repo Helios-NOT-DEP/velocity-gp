@@ -71,6 +71,7 @@ export default function AdminPlayers() {
   const [importResultMessage, setImportResultMessage] = useState<string | null>(null);
   const [isPreviewingImport, setIsPreviewingImport] = useState(false);
   const [isApplyingImport, setIsApplyingImport] = useState(false);
+  // TODO(figma-sync): Add player detail drill-down parity (contact editing and per-player scan history) from the Figma Admin players workflow. | Figma source: src/app/pages/Admin.tsx Players tab + selectedPlayerId detail view | Impact: admin flow
 
   const loadRoster = async (overrideEventId?: string) => {
     setIsLoading(true);
@@ -389,6 +390,7 @@ export default function AdminPlayers() {
               </thead>
               <tbody>
                 {rosterRows.map((row) => {
+                  // TODO(figma-sync): Extend roster rows with score/rank metadata expected by Figma player cards and detail stats before implementing designed player ranking UI. | Figma source: src/app/pages/Admin.tsx Players list (score-ranked cards) | Impact: admin flow
                   const selectedTeamId =
                     assignmentDrafts[row.playerId] ?? row.teamId ?? UNASSIGNED_OPTION;
                   const hasChanges =

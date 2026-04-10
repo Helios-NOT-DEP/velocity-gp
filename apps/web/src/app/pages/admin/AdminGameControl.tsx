@@ -6,6 +6,7 @@ import { adminDemoQrCodes } from '../../admin/adminViewData';
 export default function AdminGameControl() {
   const { gameState } = useGame();
   const activePenalties = gameState.teams.filter((team) => team.inPitStop).length;
+  // TODO(figma-sync): Wire game active/pause controls to live admin state so this panel matches the interactive control card behavior in Figma Admin. | Figma source: src/app/pages/Admin.tsx Game Status card | Impact: admin flow
 
   return (
     <section className="space-y-6">
@@ -43,6 +44,7 @@ export default function AdminGameControl() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400">QR Codes:</span>
+              {/* TODO(figma-sync): Replace demo QR count with shared live QR inventory state once admin parity introduces qrCodes in GameState. | Figma source: src/app/pages/Admin.tsx Quick Stats (gameState.qrCodes.length) | Impact: admin flow */}
               <span className="font-mono text-xl text-[#39FF14]">{adminDemoQrCodes.length}</span>
             </div>
           </div>
