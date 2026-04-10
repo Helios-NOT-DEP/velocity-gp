@@ -28,6 +28,8 @@ interface AuthUser {
   createdAt: Date;
 }
 
+const LOGOUT_ENDPOINT = '/auth/logout';
+
 export type MagicLinkRequestResult = RequestMagicLinkResponse;
 export type MagicLinkVerifyResult = VerifyMagicLinkResponse;
 
@@ -179,14 +181,31 @@ export async function verifyMagicLink(token: string): Promise<MagicLinkVerifyRes
 
 export async function getSession(): Promise<AuthSession> {
   const storedToken = readAuthTokenFromStorage();
-  if (!storedToken) {
-    return readSessionFromStorage();
+  const storedSession = readSessionFromStorage();
+
+  if (!storedToken && storedSession.isAuthenticated) {
+    return storedSession;
   }
 
-  const response = await apiClient.get<SessionResponse>(authEndpoints.getSession, undefined);
+  let response: Awaited<ReturnType<typeof apiClient.get<SessionResponse>>>;
+  try {
+    response = await apiClient.get<SessionResponse>(authEndpoints.getSession, undefined);
+  } catch {
+    if (storedToken) {
+      clearStoredSession();
+      return anonymousSession;
+    }
+
+    return storedSession;
+  }
+
   if (!response.ok || !response.data) {
-    clearStoredSession();
-    return anonymousSession;
+    if (storedToken) {
+      clearStoredSession();
+      return anonymousSession;
+    }
+
+    return storedSession;
   }
 
   const normalizedSession = normalizeSessionFromResponse(response.data.session);
@@ -195,7 +214,9 @@ export async function getSession(): Promise<AuthSession> {
   // GameContext listens for it and calls getSession() again.
   const storage = getBrowserStorage();
   storage?.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
-  storage?.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, storedToken);
+  if (storedToken) {
+    storage?.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, storedToken);
+  }
   return normalizedSession;
 }
 
@@ -217,7 +238,11 @@ export async function sendVerificationEmail(email: string): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
-  clearStoredSession();
+  try {
+    await apiClient.post<{ loggedOut: boolean }>(LOGOUT_ENDPOINT);
+  } finally {
+    clearStoredSession();
+  }
 }
 
 export { AUTH_SESSION_STORAGE_KEY, AUTH_SESSION_TOKEN_STORAGE_KEY, AUTH_SESSION_UPDATED_EVENT };

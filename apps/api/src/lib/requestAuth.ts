@@ -6,20 +6,49 @@ interface AuthResponseLocals {
   auth?: RequestAuthContext;
 }
 
+const AUTH_SESSION_COOKIE_NAME = 'velocitygp_session';
+
+function parseCookieValue(cookieHeaderValue: string | undefined, name: string): string | null {
+  if (!cookieHeaderValue) {
+    return null;
+  }
+
+  const cookiePairs = cookieHeaderValue.split(';');
+  for (const cookiePair of cookiePairs) {
+    const [cookieName, ...cookieValueParts] = cookiePair.split('=');
+    if (!cookieName || cookieValueParts.length === 0) {
+      continue;
+    }
+
+    if (cookieName.trim() !== name) {
+      continue;
+    }
+
+    try {
+      return decodeURIComponent(cookieValueParts.join('=').trim());
+    } catch {
+      return cookieValueParts.join('=').trim();
+    }
+  }
+
+  return null;
+}
+
 export function resolveRequestAuthContext(request: Request): RequestAuthContext | null {
   const authorizationHeader = request.header('authorization');
-  if (authorizationHeader) {
-    const [scheme, token] = authorizationHeader.split(' ');
-    if (scheme?.toLowerCase() === 'bearer' && token) {
-      try {
-        const claims = verifySessionToken(token);
-        return {
-          userId: claims.userId,
-          role: claims.role,
-        };
-      } catch {
-        // Fall back to legacy headers for compatibility in tests/local tooling.
-      }
+  const [scheme, bearerToken] = (authorizationHeader ?? '').split(' ');
+  const authCookieToken = parseCookieValue(request.header('cookie'), AUTH_SESSION_COOKIE_NAME);
+  const token = scheme?.toLowerCase() === 'bearer' && bearerToken ? bearerToken : authCookieToken;
+
+  if (token) {
+    try {
+      const claims = verifySessionToken(token);
+      return {
+        userId: claims.userId,
+        role: claims.role,
+      };
+    } catch {
+      // Fall back to legacy headers for compatibility in tests/local tooling.
     }
   }
 

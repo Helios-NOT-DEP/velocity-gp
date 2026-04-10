@@ -96,6 +96,13 @@ test.describe('Velocity GP web flows', () => {
     await expect(page.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeVisible();
   });
 
+  test('redirects anonymous users away from protected non-admin routes', async ({ page }) => {
+    await page.goto('/garage');
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeVisible();
+  });
+
   test('shows forbidden state for authenticated non-admin users', async ({ page }) => {
     await seedAuthSession(page, {
       userId: 'player-1',
@@ -120,5 +127,18 @@ test.describe('Velocity GP web flows', () => {
     await page.goto('/admin/game-control');
 
     await expect(page.getByRole('heading', { name: 'Game Control' })).toBeVisible();
+  });
+
+  test('allows authenticated users to access protected non-admin routes', async ({ page }) => {
+    await seedAuthSession(page, {
+      userId: 'player-1',
+      role: 'player',
+      isAuthenticated: true,
+      email: 'player@example.com',
+    });
+
+    await page.goto('/garage');
+
+    await expect(page.getByRole('heading', { name: 'Create Your Team' })).toBeVisible();
   });
 });

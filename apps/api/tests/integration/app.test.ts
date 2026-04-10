@@ -550,7 +550,24 @@ describe('velocity gp backend', () => {
     expect(verifyResponse.body.data.redirectPath).toBe('/race-hub');
     expect(typeof verifyResponse.body.data.sessionToken).toBe('string');
 
+    const setCookieHeader = verifyResponse.headers['set-cookie'];
+    expect(setCookieHeader).toBeDefined();
+    expect(Array.isArray(setCookieHeader)).toBe(true);
+    expect(setCookieHeader?.[0]).toContain('velocitygp_session=');
+    expect(setCookieHeader?.[0]).toContain('Max-Age=432000');
+    expect(setCookieHeader?.[0]).toContain('HttpOnly');
+
     const sessionToken = String(verifyResponse.body.data.sessionToken);
+    const sessionCookie = setCookieHeader?.[0]?.split(';')[0];
+    expect(sessionCookie).toBeTruthy();
+
+    const cookieSessionResponse = await request(app)
+      .get(`${apiPrefix}/auth/session`)
+      .set('cookie', String(sessionCookie));
+
+    expect(cookieSessionResponse.status).toBe(200);
+    expect(cookieSessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
+
     const [sessionResponse, routingResponse] = await Promise.all([
       request(app).get(`${apiPrefix}/auth/session`).set('authorization', `Bearer ${sessionToken}`),
       request(app)
@@ -562,6 +579,53 @@ describe('velocity gp backend', () => {
     expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
     expect(routingResponse.status).toBe(200);
     expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
+  });
+
+  it('clears auth cookie on logout and removes cookie-authenticated access', async () => {
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+    const capturedLinks: string[] = [];
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
+    });
+
+    const requestResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: assignedEmail });
+
+    expect(requestResponse.status).toBe(202);
+    expect(capturedLinks.length).toBe(1);
+
+    const tokenFromLink = new URL(capturedLinks[0]).searchParams.get('token');
+    expect(tokenFromLink).toBeTruthy();
+    if (!tokenFromLink) {
+      throw new Error('Expected token in captured magic link URL.');
+    }
+
+    const agent = request.agent(app);
+    const verifyResponse = await agent.post(`${apiPrefix}/auth/magic-link/verify`).send({
+      token: tokenFromLink,
+    });
+
+    expect(verifyResponse.status).toBe(200);
+
+    const authenticatedSessionResponse = await agent.get(`${apiPrefix}/auth/session`);
+    expect(authenticatedSessionResponse.status).toBe(200);
+
+    const logoutResponse = await agent.post(`${apiPrefix}/auth/logout`);
+    expect(logoutResponse.status).toBe(200);
+    expect(logoutResponse.body.success).toBe(true);
+    expect(logoutResponse.body.data.loggedOut).toBe(true);
+    expect(logoutResponse.headers['set-cookie']?.[0]).toContain('velocitygp_session=;');
+
+    const postLogoutSessionResponse = await agent.get(`${apiPrefix}/auth/session`);
+    expect(postLogoutSessionResponse.status).toBe(401);
+    expect(postLogoutSessionResponse.body.success).toBe(false);
+    expect(postLogoutSessionResponse.body.error.code).toBe('AUTH_MISSING_TOKEN');
   });
 
   it('rejects unassigned players during verify with AUTH_ASSIGNMENT_REQUIRED', async () => {

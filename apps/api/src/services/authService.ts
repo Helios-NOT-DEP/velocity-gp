@@ -29,6 +29,9 @@ import { logger } from '../lib/logger.js';
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
 
+export const AUTH_SESSION_COOKIE_NAME = 'velocitygp_session';
+export const AUTH_SESSION_COOKIE_MAX_AGE_MS = env.AUTH_SESSION_COOKIE_TTL_DAYS * 24 * 60 * 60_000;
+
 interface EligiblePlayer {
   readonly userId: string;
   readonly playerId: string;
@@ -368,19 +371,72 @@ function parseBearerToken(authorizationHeaderValue: string | undefined): string 
 }
 
 /**
+ * Parses a cookie value from the Cookie request header.
+ */
+function parseCookieValue(cookieHeaderValue: string | undefined, name: string): string | null {
+  if (!cookieHeaderValue) {
+    return null;
+  }
+
+  const cookiePairs = cookieHeaderValue.split(';');
+  for (const cookiePair of cookiePairs) {
+    const [cookieName, ...cookieValueParts] = cookiePair.split('=');
+    if (!cookieName || cookieValueParts.length === 0) {
+      continue;
+    }
+
+    if (cookieName.trim() !== name) {
+      continue;
+    }
+
+    try {
+      return decodeURIComponent(cookieValueParts.join('=').trim());
+    } catch {
+      return cookieValueParts.join('=').trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolves session token from Authorization header first, then auth cookie.
+ */
+function resolveSessionToken(
+  authorizationHeaderValue: string | undefined,
+  cookieHeaderValue: string | undefined
+): string | null {
+  return (
+    parseBearerToken(authorizationHeaderValue) ??
+    parseCookieValue(cookieHeaderValue, AUTH_SESSION_COOKIE_NAME)
+  );
+}
+
+/**
  * Resolves and validates session context from the Authorization header.
  */
 export async function getSessionFromAuthorizationHeader(
   authorizationHeaderValue: string | undefined
 ): Promise<SessionResponse> {
+  return getSessionFromAuthInputs(authorizationHeaderValue, undefined);
+}
+
+/**
+ * Resolves and validates session context from Authorization and Cookie headers.
+ */
+export async function getSessionFromAuthInputs(
+  authorizationHeaderValue: string | undefined,
+  cookieHeaderValue: string | undefined
+): Promise<SessionResponse> {
   return withTraceSpan('auth.session.get', {}, async () => {
-    const token = parseBearerToken(authorizationHeaderValue);
+    const token = resolveSessionToken(authorizationHeaderValue, cookieHeaderValue);
     if (!token) {
       const authorizationScheme =
         authorizationHeaderValue?.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? null;
       logger.debug('Missing bearer token in authorization header', {
         hasAuthorizationHeader: Boolean(authorizationHeaderValue),
         authorizationScheme,
+        hasCookieHeader: Boolean(cookieHeaderValue),
       });
       throw new AppError(401, 'AUTH_MISSING_TOKEN', 'Authentication is required.');
     }
@@ -422,5 +478,19 @@ export async function getRoutingDecisionFromAuthorizationHeader(
   authorizationHeaderValue: string | undefined
 ): Promise<RoutingDecisionResponse> {
   const sessionResponse = await getSessionFromAuthorizationHeader(authorizationHeaderValue);
+  return buildRoutingDecision(sessionResponse.session);
+}
+
+/**
+ * Returns assignment-aware routing details for the authenticated session.
+ */
+export async function getRoutingDecisionFromAuthInputs(
+  authorizationHeaderValue: string | undefined,
+  cookieHeaderValue: string | undefined
+): Promise<RoutingDecisionResponse> {
+  const sessionResponse = await getSessionFromAuthInputs(
+    authorizationHeaderValue,
+    cookieHeaderValue
+  );
   return buildRoutingDecision(sessionResponse.session);
 }

@@ -39,6 +39,27 @@ describe('admin route guards', () => {
     });
   });
 
+  it('redirects unauthenticated users from /garage to /', async () => {
+    renderWithRoute('/garage');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeTruthy();
+    });
+  });
+
+  it('allows authenticated users to access /garage', async () => {
+    renderWithRoute('/garage', {
+      userId: 'player-1',
+      role: 'player',
+      isAuthenticated: true,
+      email: 'player@example.com',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Create Your Team' })).toBeTruthy();
+    });
+  });
+
   it('redirects legacy /signup path to the login experience', async () => {
     renderWithRoute('/signup');
 

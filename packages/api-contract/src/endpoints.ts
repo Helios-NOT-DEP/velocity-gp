@@ -75,6 +75,7 @@ export const authEndpoints = {
   verifyMagicLink: '/auth/magic-link/verify',
   getSession: '/auth/session',
   getRoutingDecision: '/auth/routing-decision',
+  logout: '/auth/logout',
 };
 
 // Legacy aliases retained while callers migrate.
