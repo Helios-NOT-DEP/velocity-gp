@@ -89,7 +89,7 @@ class N8nEmailDispatcher implements EmailDispatcher {
       { templateKey: input.templateKey, provider: 'n8n_mailtrap' },
       async () => {
         const startTimeMs = Date.now();
-        logger.debug('email dispatch attempt to n8n', {
+        logger.info('email dispatch attempt to n8n', {
           provider: 'n8n_mailtrap',
           templateKey: input.templateKey,
           toEmail: input.toEmail,
@@ -146,7 +146,7 @@ class N8nEmailDispatcher implements EmailDispatcher {
             throw new Error(baseErrorMessage);
           }
 
-          logger.debug('email dispatch success from n8n', {
+          logger.info('email dispatch success from n8n', {
             provider: 'n8n_mailtrap',
             templateKey: input.templateKey,
             toEmail: input.toEmail,
