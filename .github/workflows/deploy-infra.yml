@@ -58,7 +58,7 @@ jobs:
       SPACE_BUCKET: ${{ vars.SPACE_BUCKET || '' }}
       API_BASE_URL: ${{ vars.API_BASE_URL || '' }}
       FRONTEND_ORIGIN: ${{ vars.CORS_ORIGIN || '' }}
-      FRONTEND_MAGIC_LINK_ORIGIN: ${{ vars.FRONTEND_MAGIC_LINK_ORIGIN || 'https://dev.velocitygp.app' }}
+      FRONTEND_MAGIC_LINK_ORIGIN: ${{ vars.CLIENT_BASE_URL || 'https://dev.velocitygp.app' }}
       AUTH_SECRET: ${{ secrets.AUTH_SECRET || '' }}
       MAGIC_LINK_TOKEN_TTL_MINUTES: ${{ vars.MAGIC_LINK_TOKEN_TTL_MINUTES || '15' }}
       AUTH_SESSION_TTL_HOURS: ${{ vars.AUTH_SESSION_TTL_HOURS || '72' }}
