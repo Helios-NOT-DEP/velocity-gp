@@ -16,6 +16,9 @@ jobs:
   update-contributors:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Update contributors in README
         uses: akhilmhdh/contributors-readme-action@v2.3.11
@@ -23,4 +26,4 @@ jobs:
           readme_path: README.md
           commit_message: docs(readme): update contributors list
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
