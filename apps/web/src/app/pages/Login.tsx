@@ -24,8 +24,12 @@ export default function Login() {
       // TODO(figma-sync): Align submit transition with Figma's immediate Garage navigation flow, while preserving magic-link security requirements. | Figma source: src/app/pages/Login.tsx handleSubmit (navigate('/garage')) | Impact: user flow
       const response = await requestMagicLink(workEmail.trim());
       setMessage(response.message);
-    } catch {
-      setError('Unable to request a sign-in link right now. Please try again.');
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.message === 'AUTH_USER_NOT_FOUND') {
+        setError('No user found for this work email.');
+      } else {
+        setError('Unable to request a sign-in link right now. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }

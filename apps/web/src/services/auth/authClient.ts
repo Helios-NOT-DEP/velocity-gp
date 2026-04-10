@@ -143,7 +143,15 @@ export async function requestMagicLink(workEmail: string): Promise<MagicLinkRequ
     workEmail,
   });
 
-  if (!response.ok || !response.data) {
+  if (!response.ok) {
+    if (response.error?.code === 'AUTH_USER_NOT_FOUND') {
+      throw new Error('AUTH_USER_NOT_FOUND');
+    }
+
+    throw new Error('Unable to request a magic link right now.');
+  }
+
+  if (!response.data) {
     throw new Error('Unable to request a magic link right now.');
   }
 

@@ -75,12 +75,43 @@ const frontendOrigins = z.preprocess((value) => {
     .filter((origin) => origin.length > 0);
 }, z.array(z.string().url()).min(1));
 
+function isLoopbackHostname(hostname: string): boolean {
+  const normalizedHostname = hostname.toLowerCase();
+
+  return (
+    normalizedHostname === 'localhost' ||
+    normalizedHostname.endsWith('.localhost') ||
+    normalizedHostname === '0.0.0.0' ||
+    normalizedHostname === '::1' ||
+    normalizedHostname === '[::1]' ||
+    normalizedHostname === '127.0.0.1' ||
+    normalizedHostname.startsWith('127.')
+  );
+}
+
+function assertSafeMagicLinkOriginInProduction(origin: string): void {
+  const parsedOrigin = new URL(origin);
+
+  if (parsedOrigin.protocol !== 'https:') {
+    throw new Error(
+      'Invalid FRONTEND_MAGIC_LINK_ORIGIN in production: callback origin must use HTTPS.'
+    );
+  }
+
+  if (isLoopbackHostname(parsedOrigin.hostname)) {
+    throw new Error(
+      'Invalid FRONTEND_MAGIC_LINK_ORIGIN in production: callback origin cannot target localhost or loopback hosts.'
+    );
+  }
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3000),
   API_PREFIX: z.string().default('/api'),
   FRONTEND_ORIGIN: frontendOrigins.default(['http://localhost:5173']),
+  FRONTEND_MAGIC_LINK_ORIGIN: optionalUrl,
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.string().optional(),
   DIRECT_DATABASE_URL: z.string().optional(),
@@ -118,9 +149,17 @@ export const packageJson = z
   });
 
 const parsedEnv = envSchema.parse(process.env);
+const frontendOriginsFromEnv = parsedEnv.FRONTEND_ORIGIN;
+const frontendOrigin = frontendOriginsFromEnv[0];
+const frontendMagicLinkOrigin = parsedEnv.FRONTEND_MAGIC_LINK_ORIGIN ?? frontendOrigin;
+
+if (parsedEnv.NODE_ENV === 'production') {
+  assertSafeMagicLinkOriginInProduction(frontendMagicLinkOrigin);
+}
 
 export const env = {
   ...parsedEnv,
-  FRONTEND_ORIGIN: parsedEnv.FRONTEND_ORIGIN[0],
-  FRONTEND_ORIGINS: parsedEnv.FRONTEND_ORIGIN,
+  FRONTEND_ORIGIN: frontendOrigin,
+  FRONTEND_ORIGINS: frontendOriginsFromEnv,
+  FRONTEND_MAGIC_LINK_ORIGIN: frontendMagicLinkOrigin,
 };

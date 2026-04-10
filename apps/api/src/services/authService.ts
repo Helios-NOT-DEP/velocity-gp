@@ -23,8 +23,8 @@ import { logger } from '../lib/logger.js';
 /**
  * Authentication service for magic-link and session flows.
  *
- * This module keeps enrollment responses intentionally generic to avoid leaking
- * eligibility details, and derives routing decisions from team assignment state.
+ * This module derives routing decisions from team assignment state and enforces
+ * explicit auth eligibility checks during magic-link requests.
  */
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
@@ -52,7 +52,7 @@ function normalizeWorkEmail(email: string): string {
  * Builds the frontend callback URL that carries the signed magic-link token.
  */
 function resolveFrontendMagicLinkUrl(token: string): string {
-  const callbackUrl = new URL('/login/callback', env.FRONTEND_ORIGIN);
+  const callbackUrl = new URL('/login/callback', env.FRONTEND_MAGIC_LINK_ORIGIN);
   callbackUrl.searchParams.set('token', token);
   return callbackUrl.toString();
 }
@@ -240,8 +240,8 @@ async function loadEligiblePlayerByClaims(claims: {
 /**
  * Requests a magic link for an eligible player.
  *
- * The response is always non-revealing, regardless of whether the email is
- * eligible for access.
+ * Ineligible lookups return AUTH_USER_NOT_FOUND so the login UI can present
+ * deterministic feedback to the caller.
  */
 export async function requestMagicLink(
   request: RequestMagicLinkRequest
@@ -252,10 +252,7 @@ export async function requestMagicLink(
     logger.debug('Eligible player loaded', { eligiblePlayer });
     if (!eligiblePlayer || !eligiblePlayer.teamId || !eligiblePlayer.teamStatus) {
       incrementCounter('auth.magic_link.request.denied.total');
-      return {
-        accepted: true,
-        message: GENERIC_MAGIC_LINK_MESSAGE,
-      };
+      throw new AppError(404, 'AUTH_USER_NOT_FOUND', 'No user found for this work email.');
     }
 
     const magicLinkToken = createMagicLinkToken({

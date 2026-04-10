@@ -8,7 +8,7 @@
 
 ## Context
 
-Velocity GP's player authentication and post-login routing depend on a stable way to identify attendees across roster imports, admin assignment workflows, and event-day sign-in. The backlog also requires deterministic behavior for assigned, pending, and unassigned players, while avoiding user enumeration in magic-link flows.
+Velocity GP's player authentication and post-login routing depend on a stable way to identify attendees across roster imports, admin assignment workflows, and event-day sign-in. The backlog also requires deterministic behavior for assigned, pending, and unassigned players, with explicit feedback when a magic-link request email is not eligible.
 
 The rulebook in #44 is already written as the canonical baseline for #12 and #14 and describes implemented behavior from #43 and #45. This ADR backfills that stable rulebook into a concise architectural decision record.
 

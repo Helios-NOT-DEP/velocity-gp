@@ -233,12 +233,12 @@ async function main(): Promise<void> {
     email: player.user.email,
   });
 
-  const magicLinkUrl = new URL('/login/callback', env.FRONTEND_ORIGIN);
+  const magicLinkUrl = new URL('/login/callback', env.FRONTEND_MAGIC_LINK_ORIGIN);
   magicLinkUrl.searchParams.set('token', token);
 
   const output = {
     generatedAt: new Date().toISOString(),
-    frontendOrigin: env.FRONTEND_ORIGIN,
+    frontendOrigin: env.FRONTEND_MAGIC_LINK_ORIGIN,
     eventId: player.eventId,
     eventName: player.event.name,
     playerId: player.id,

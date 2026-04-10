@@ -280,7 +280,7 @@ describe('velocity gp backend', () => {
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('returns non-enumerating magic-link responses for assigned, unknown, and unassigned emails', async () => {
+  it('returns not-found for ineligible magic-link requests and accepted for eligible users', async () => {
     const assignedEmail = `player-${token}@velocitygp.dev`;
     const unknownEmail = `unknown-${token}@velocitygp.dev`;
     const unassignedEmail = `unassigned-${token}@velocitygp.dev`;
@@ -303,14 +303,16 @@ describe('velocity gp backend', () => {
     ]);
 
     expect(assignedResponse.status).toBe(202);
-    expect(unknownResponse.status).toBe(202);
-    expect(unassignedResponse.status).toBe(202);
+    expect(unknownResponse.status).toBe(404);
+    expect(unassignedResponse.status).toBe(404);
+    expect(assignedResponse.body.success).toBe(true);
+    expect(unknownResponse.body.success).toBe(false);
+    expect(unassignedResponse.body.success).toBe(false);
     expect(assignedResponse.body.data.accepted).toBe(true);
-    expect(unknownResponse.body.data.accepted).toBe(true);
-    expect(unassignedResponse.body.data.accepted).toBe(true);
-    expect(assignedResponse.body.data.message).toBe(unknownResponse.body.data.message);
-    expect(unassignedResponse.body.data.message).toBe(unknownResponse.body.data.message);
+    expect(unknownResponse.body.error.code).toBe('AUTH_USER_NOT_FOUND');
+    expect(unassignedResponse.body.error.code).toBe('AUTH_USER_NOT_FOUND');
     expect(capturedLinks.length).toBe(1);
+    expect(new URL(capturedLinks[0]).origin).toBe(new URL(env.FRONTEND_MAGIC_LINK_ORIGIN).origin);
   });
 
   it('returns accepted magic-link response when email dispatch fails', async () => {

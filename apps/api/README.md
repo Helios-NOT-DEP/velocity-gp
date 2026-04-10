@@ -23,11 +23,12 @@ The backend is organized by responsibility instead of piling everything into a s
 
 1. Run `npm install` at the repository root.
 2. Copy `.env.example` to `.env` inside this folder.
+   - For remote/dev email flows, set `FRONTEND_MAGIC_LINK_ORIGIN=https://dev.velocitygp.app`.
 3. Start the backend server.
 
 Optional commands:
 
-- `npm run dev` — starts the backend on `http://localhost:4000`
+- `npm run dev` — starts the backend on `http://localhost:3000`
 - `npm run build` — compiles the backend into `dist/`
 - `npm run test` — runs backend unit + integration tests
 - `npm run test:unit` — runs backend unit tests only

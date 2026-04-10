@@ -57,4 +57,23 @@ describe('login magic link request', () => {
       expect(screen.getByText('Check your inbox for your secure sign-in link.')).toBeTruthy();
     });
   });
+
+  it('shows a specific message when no user matches the work email', async () => {
+    requestMagicLinkMock.mockRejectedValue(new Error('AUTH_USER_NOT_FOUND'));
+
+    renderLoginRoute();
+
+    fireEvent.change(screen.getByPlaceholderText('your@email.com'), {
+      target: { value: 'unknown@velocitygp.app' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Email Me a Sign-In Link' }));
+
+    await waitFor(() => {
+      expect(requestMagicLinkMock).toHaveBeenCalledWith('unknown@velocitygp.app');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('No user found for this work email.')).toBeTruthy();
+    });
+  });
 });

@@ -18,13 +18,21 @@ export interface ApiResponse<T> {
   data: T;
   status: number;
   ok: boolean;
+  error?: {
+    code?: string;
+    message?: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+interface ParsedApiBody<T> {
+  data: T;
+  error?: ApiResponse<T>['error'];
 }
 
 interface ApiEnvelope<T> {
   data?: T;
-  error?: {
-    message?: string;
-  };
+  error?: ApiResponse<T>['error'];
   success?: boolean;
 }
 
@@ -80,12 +88,13 @@ export class ApiClient {
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
-    const data = await this.parseResponseBody<T>(response);
+    const parsedBody = await this.parseResponseBody<T>(response);
 
     return {
-      data,
+      data: parsedBody.data,
       status: response.status,
       ok: response.ok,
+      error: parsedBody.error,
     };
   }
 
@@ -128,20 +137,27 @@ export class ApiClient {
     return new URL(normalizedEndpoint, normalizedBaseUrl);
   }
 
-  private async parseResponseBody<T>(response: globalThis.Response): Promise<T> {
+  private async parseResponseBody<T>(response: globalThis.Response): Promise<ParsedApiBody<T>> {
     const contentType = response.headers?.get?.('content-type') || 'application/json';
 
     if (!contentType.includes('application/json')) {
-      return undefined as T;
+      return { data: undefined as T };
     }
 
     const payload = (await response.json()) as T | ApiEnvelope<T>;
 
     if (this.isApiEnvelope<T>(payload)) {
-      return payload.data as T;
+      if (payload.success === false) {
+        return {
+          data: undefined as T,
+          error: payload.error,
+        };
+      }
+
+      return { data: payload.data as T };
     }
 
-    return payload as T;
+    return { data: payload as T };
   }
 
   private isApiEnvelope<T>(payload: T | ApiEnvelope<T>): payload is ApiEnvelope<T> {

@@ -202,6 +202,8 @@ cp .env.example .env.local
 `#TODO(#12)`: Add Auth.js + SendGrid runtime variables to this table once magic-link authentication is implemented.
 
 The backend package has its own `apps/api/.env.example` file for server-side configuration.
+Set `FRONTEND_MAGIC_LINK_ORIGIN` to the web domain that should be embedded in emailed login links
+(for example `https://dev.velocitygp.app` in remote dev).
 
 **Never commit `.env.local`** — it's in `.gitignore`.
 

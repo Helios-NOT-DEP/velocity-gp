@@ -79,8 +79,9 @@ Roster workflows must produce auditable actions:
 ### Magic-link request
 
 - Request contract accepts `workEmail` only.
-- Response must be non-enumerating:
-  - eligible and ineligible emails receive the same accepted-style response shape and generic message.
+- Response behavior:
+  - eligible emails return an accepted-style payload and trigger magic-link dispatch.
+  - ineligible emails (unknown or assignment-ineligible) return `404 AUTH_USER_NOT_FOUND`.
 
 ### Verify/session gating
 

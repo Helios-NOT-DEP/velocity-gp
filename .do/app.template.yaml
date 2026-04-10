@@ -139,6 +139,10 @@ services:
         value: "${FRONTEND_ORIGIN}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
+      - key: FRONTEND_MAGIC_LINK_ORIGIN
+        value: "${FRONTEND_MAGIC_LINK_ORIGIN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: AUTH_SECRET
         value: "${AUTH_SECRET}"
         scope: RUN_AND_BUILD_TIME

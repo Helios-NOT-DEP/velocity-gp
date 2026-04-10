@@ -42,6 +42,29 @@ test.describe('Velocity GP web flows', () => {
     await expect(page.getByText('Check your inbox for your secure sign-in link.')).toBeVisible();
   });
 
+  test('shows user-not-found feedback when no player matches email', async ({ page }) => {
+    await page.route('**/api/auth/magic-link/request', async (route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: {
+            code: 'AUTH_USER_NOT_FOUND',
+            message: 'No user found for this work email.',
+          },
+        }),
+      });
+    });
+
+    await page.goto('/');
+
+    await page.getByPlaceholder('your@email.com').fill('unknown@velocitygp.app');
+    await page.getByRole('button', { name: 'Email Me a Sign-In Link' }).click();
+
+    await expect(page.getByText('No user found for this work email.')).toBeVisible();
+  });
+
   test('shows login failure feedback when magic-link request fails', async ({ page }) => {
     await page.route('**/api/auth/magic-link/request', async (route) => {
       await route.fulfill({
