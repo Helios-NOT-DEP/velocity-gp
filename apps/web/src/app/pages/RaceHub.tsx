@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
-import { Camera, CameraOff, Loader2, Plus, RefreshCcw, Scan, TriangleAlert } from 'lucide-react';
+import { Camera, CameraOff, Loader2, Plus, RefreshCcw, Scan } from 'lucide-react';
 
 import type { SubmitScanResponse } from '@velocity-gp/api-contract';
 import { apiClient, scanEndpoints } from '@/services/api';
@@ -478,7 +478,11 @@ export default function RaceHub() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 ${feedbackClasses(feedback.level)}`}>
+          <div
+            className={`rounded-xl border p-3 ${feedbackClasses(feedback.level)}`}
+            role="status"
+            aria-live="polite"
+          >
             <p className="text-sm font-semibold">{feedback.title}</p>
             <p className="text-xs mt-1">{feedback.message}</p>
             {feedback.showGuidance && (
@@ -545,13 +549,6 @@ export default function RaceHub() {
             </button>
           </div>
 
-          {!scanIdentity && !isHydratingIdentity && (
-            <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-3 text-xs text-yellow-200 flex items-start gap-2">
-              <TriangleAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              No seeded player profile is mapped for this session email, so scanner submission is
-              blocked.
-            </div>
-          )}
         </div>
       </div>
 
