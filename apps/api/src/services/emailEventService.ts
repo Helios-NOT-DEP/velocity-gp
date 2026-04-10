@@ -3,6 +3,13 @@ import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
 import { withTraceSpan } from '../lib/observability.js';
 
+/**
+ * Ingestion service for provider email webhooks (currently Mailtrap).
+ *
+ * Events are deduplicated by provider event ID when available. Return-signal
+ * events (for example bounces) also flag affected users/players and emit admin
+ * audit records.
+ */
 interface MailtrapEventInput {
   readonly eventType: string;
   readonly timestamp?: string;
@@ -31,6 +38,9 @@ interface IngestMailtrapEventsResult {
   readonly auditCount: number;
 }
 
+/**
+ * Normalizes email for stable lookup and dedupe.
+ */
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -65,6 +75,12 @@ async function resolveAuditActorUserId(tx: Prisma.TransactionClient): Promise<st
   return actor.id;
 }
 
+/**
+ * Persists Mailtrap webhook events and applies return-email issue flags.
+ *
+ * Invalid timestamps are skipped. Duplicate provider events are counted but do
+ * not fail ingestion.
+ */
 export async function ingestMailtrapEvents(
   input: IngestMailtrapEventsInput
 ): Promise<IngestMailtrapEventsResult> {

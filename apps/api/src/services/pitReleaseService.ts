@@ -11,6 +11,12 @@ import {
   getPitReleasePublisher,
 } from './pitReleasePublisher.js';
 
+/**
+ * Services for moving teams out of pit lockout and broadcasting release events.
+ *
+ * This module centralizes transition side effects (team/player status updates,
+ * transition records, metrics, and publisher integration).
+ */
 export interface ReleaseTeamFromPitInput {
   readonly eventId: string;
   readonly teamId: string;
@@ -33,6 +39,11 @@ export interface PitReleaseSweepOptions {
   readonly publisher?: PitReleasePublisher;
 }
 
+/**
+ * Releases a single team from pit within an existing transaction.
+ *
+ * Returns `null` when the team does not exist for the event or is already out of pit.
+ */
 export async function releaseTeamFromPitInTransaction(
   tx: Prisma.TransactionClient,
   input: ReleaseTeamFromPitInput
@@ -99,6 +110,9 @@ export async function releaseTeamFromPitInTransaction(
   };
 }
 
+/**
+ * Publishes a `TEAM_PIT_RELEASED` event and records success/failure metrics.
+ */
 export async function publishTeamReleaseEvent(
   event: TeamPitReleasedEvent,
   publisher: PitReleasePublisher = getPitReleasePublisher()
@@ -114,6 +128,10 @@ export async function publishTeamReleaseEvent(
   }
 }
 
+/**
+ * Releases a single team from pit using an isolated transaction and publishes
+ * the release event when a transition occurred.
+ */
 export async function releaseTeamFromPit(
   input: ReleaseTeamFromPitInput,
   publisher: PitReleasePublisher = getPitReleasePublisher()
@@ -131,6 +149,12 @@ export async function releaseTeamFromPit(
   return releaseEvent;
 }
 
+/**
+ * Sweeps for pit-expired teams and releases them in bounded batches.
+ *
+ * Each successful release attempts publication but does not fail the sweep when
+ * publish errors occur.
+ */
 export async function releaseExpiredTeamsFromPit(
   options: PitReleaseSweepOptions = {}
 ): Promise<PitReleaseSweepResult> {

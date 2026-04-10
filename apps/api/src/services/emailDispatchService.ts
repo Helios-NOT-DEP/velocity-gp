@@ -5,6 +5,12 @@ import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 
+/**
+ * Outbound email dispatch layer.
+ *
+ * Uses an n8n webhook when configured and falls back to a noop dispatcher in
+ * local/test environments that do not have webhook credentials.
+ */
 export type EmailTemplateKey =
   | 'magic_link_login'
   | 'welcome_onboarding'
@@ -22,6 +28,9 @@ export interface EmailDispatcher {
   dispatch(input: EmailDispatchInput): Promise<void>;
 }
 
+/**
+ * Removes query fragments and secrets from webhook URLs before logging.
+ */
 function sanitizeWebhookUrlForLogs(url: string): string {
   const parsed = new URL(url);
   return `${parsed.origin}${parsed.pathname}`;
@@ -38,6 +47,9 @@ function redactTokenLikeValues(message: string, token: string): string {
     .replace(/\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED]');
 }
 
+/**
+ * Builds a short-lived HS512 JWT for authenticated webhook dispatch.
+ */
 function createHs512Jwt(secret: string, correlationId: string): string {
   const issuedAtEpochSeconds = Math.floor(Date.now() / 1000);
   const expiryEpochSeconds = issuedAtEpochSeconds + 60;
@@ -59,6 +71,9 @@ function createHs512Jwt(secret: string, correlationId: string): string {
   return `${unsignedToken}.${signature}`;
 }
 
+/**
+ * No-op dispatcher used when outbound email integration is disabled.
+ */
 class NoopEmailDispatcher implements EmailDispatcher {
   async dispatch(input: EmailDispatchInput): Promise<void> {
     logger.info('email dispatch skipped: n8n email webhook is not configured', {
@@ -68,6 +83,9 @@ class NoopEmailDispatcher implements EmailDispatcher {
   }
 }
 
+/**
+ * n8n-backed dispatcher used for production email workflows.
+ */
 class N8nEmailDispatcher implements EmailDispatcher {
   readonly #url: string;
   readonly #token: string;
@@ -198,10 +216,17 @@ function createDefaultDispatcher(): EmailDispatcher {
 
 const defaultDispatcher = createDefaultDispatcher();
 
+/**
+ * Returns the active email dispatcher implementation.
+ */
 export function getEmailDispatcher(): EmailDispatcher {
   return dispatcherOverride ?? defaultDispatcher;
 }
 
+/**
+ * Test-only override for controlling email dispatch behavior in unit/integration
+ * tests.
+ */
 export function setEmailDispatcherForTests(dispatcher: EmailDispatcher | null): void {
   dispatcherOverride = dispatcher;
 }

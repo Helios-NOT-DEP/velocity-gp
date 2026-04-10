@@ -20,6 +20,12 @@ import {
 import { getEmailDispatcher } from './emailDispatchService.js';
 import { logger } from '../lib/logger.js';
 
+/**
+ * Authentication service for magic-link and session flows.
+ *
+ * This module keeps enrollment responses intentionally generic to avoid leaking
+ * eligibility details, and derives routing decisions from team assignment state.
+ */
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
 
@@ -35,10 +41,16 @@ interface EligiblePlayer {
   readonly eventName: string;
 }
 
+/**
+ * Normalizes incoming work-email values for stable lookups.
+ */
 function normalizeWorkEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/**
+ * Builds the frontend callback URL that carries the signed magic-link token.
+ */
 function resolveFrontendMagicLinkUrl(token: string): string {
   const callbackUrl = new URL('/login/callback', env.FRONTEND_ORIGIN);
   callbackUrl.searchParams.set('token', token);
@@ -69,6 +81,9 @@ function resolveAssignmentStatus(teamId: string | null, teamStatus: EligiblePlay
   return 'ASSIGNED_ACTIVE' as const;
 }
 
+/**
+ * Maps database enrollment details to the API auth session contract.
+ */
 function buildSessionFromEligiblePlayer(input: EligiblePlayer): PlayerAuthSession {
   return {
     userId: input.userId,
@@ -84,6 +99,9 @@ function buildSessionFromEligiblePlayer(input: EligiblePlayer): PlayerAuthSessio
   };
 }
 
+/**
+ * Resolves the post-auth navigation destination.
+ */
 function resolveRedirectPath(session: PlayerAuthSession): VerifyMagicLinkResponse['redirectPath'] {
   if (session.assignmentStatus === 'UNASSIGNED') {
     return '/waiting-assignment';
@@ -161,6 +179,10 @@ async function loadEligiblePlayerByEmail(workEmail: string): Promise<EligiblePla
   };
 }
 
+/**
+ * Resolves an eligible player from token claims while enforcing active-event
+ * participation.
+ */
 async function loadEligiblePlayerByClaims(claims: {
   readonly userId: string;
   readonly playerId: string;
@@ -215,6 +237,12 @@ async function loadEligiblePlayerByClaims(claims: {
   };
 }
 
+/**
+ * Requests a magic link for an eligible player.
+ *
+ * The response is always non-revealing, regardless of whether the email is
+ * eligible for access.
+ */
 export async function requestMagicLink(
   request: RequestMagicLinkRequest
 ): Promise<RequestMagicLinkResponse> {
@@ -269,6 +297,9 @@ export async function requestMagicLink(
   });
 }
 
+/**
+ * Validates a magic-link token and returns an authenticated session payload.
+ */
 export async function verifyMagicLink(
   request: VerifyMagicLinkRequest
 ): Promise<VerifyMagicLinkResponse> {
@@ -323,6 +354,9 @@ export async function verifyMagicLink(
   });
 }
 
+/**
+ * Extracts bearer token value from an Authorization header.
+ */
 function parseBearerToken(authorizationHeaderValue: string | undefined): string | null {
   if (!authorizationHeaderValue) {
     return null;
@@ -336,6 +370,9 @@ function parseBearerToken(authorizationHeaderValue: string | undefined): string 
   return token;
 }
 
+/**
+ * Resolves and validates session context from the Authorization header.
+ */
 export async function getSessionFromAuthorizationHeader(
   authorizationHeaderValue: string | undefined
 ): Promise<SessionResponse> {
@@ -381,6 +418,9 @@ export async function getSessionFromAuthorizationHeader(
   });
 }
 
+/**
+ * Returns assignment-aware routing details for the authenticated session.
+ */
 export async function getRoutingDecisionFromAuthorizationHeader(
   authorizationHeaderValue: string | undefined
 ): Promise<RoutingDecisionResponse> {

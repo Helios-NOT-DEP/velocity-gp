@@ -5,6 +5,12 @@ import type { AuthSessionRole, TeamStatus } from '@velocity-gp/api-contract';
 
 import { env } from '../config/env.js';
 
+/**
+ * Stateless HMAC-signed token helpers for magic links and auth sessions.
+ *
+ * Tokens are compact (`base64url(payload).signature`) and intentionally avoid
+ * external dependencies while the auth layer evolves.
+ */
 export interface MagicLinkTokenClaims {
   readonly kind: 'magic_link';
   readonly tokenId: string;
@@ -33,6 +39,9 @@ export interface SessionTokenClaims {
 
 type AuthTokenClaims = MagicLinkTokenClaims | SessionTokenClaims;
 
+/**
+ * Resolves signing secret with a local-development fallback.
+ */
 function getTokenSecret(): string {
   return env.AUTH_SECRET ?? 'velocity-gp-dev-auth-secret';
 }
@@ -53,12 +62,18 @@ function isTokenExpired(expiresAt: number): boolean {
   return Date.now() >= expiresAt;
 }
 
+/**
+ * Creates a signed token from claims.
+ */
 function createToken<T extends AuthTokenClaims>(claims: T): string {
   const encodedPayload = base64UrlEncode(JSON.stringify(claims));
   const signature = signPayload(encodedPayload);
   return `${encodedPayload}.${signature}`;
 }
 
+/**
+ * Verifies token shape, signature, and expiry.
+ */
 function parseToken(token: string): AuthTokenClaims {
   const [encodedPayload, signature] = token.split('.');
   if (!encodedPayload || !signature) {
@@ -92,6 +107,9 @@ function parseToken(token: string): AuthTokenClaims {
   return payload;
 }
 
+/**
+ * Creates a short-lived magic-link token.
+ */
 export function createMagicLinkToken(input: {
   readonly userId: string;
   readonly playerId: string;
@@ -120,6 +138,9 @@ export function createMagicLinkToken(input: {
   });
 }
 
+/**
+ * Creates an authenticated session token.
+ */
 export function createSessionToken(input: {
   readonly userId: string;
   readonly playerId: string;
@@ -151,6 +172,9 @@ export function createSessionToken(input: {
   });
 }
 
+/**
+ * Verifies and narrows a token to magic-link claims.
+ */
 export function verifyMagicLinkToken(token: string): MagicLinkTokenClaims {
   const payload = parseToken(token);
   if (payload.kind !== 'magic_link') {
@@ -160,6 +184,9 @@ export function verifyMagicLinkToken(token: string): MagicLinkTokenClaims {
   return payload;
 }
 
+/**
+ * Verifies and narrows a token to session claims.
+ */
 export function verifySessionToken(token: string): SessionTokenClaims {
   const payload = parseToken(token);
   if (payload.kind !== 'session') {

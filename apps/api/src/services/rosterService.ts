@@ -18,6 +18,10 @@ import { prisma } from '../db/client.js';
 import { withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
 
+/**
+ * Admin roster service for listing, assignment updates, and CSV-style import
+ * preview/apply flows.
+ */
 interface AdminActionContext {
   readonly actorUserId?: string;
 }
@@ -60,6 +64,9 @@ interface ResolvedImportRow {
 
 const PHONE_E164_REGEX = /^\+[1-9]\d{7,14}$/;
 
+/**
+ * Canonical work-email normalization used across roster matching.
+ */
 function normalizeWorkEmail(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -90,6 +97,9 @@ function normalizeTeamKey(teamName: string): string {
   return teamName.trim().toLowerCase();
 }
 
+/**
+ * Derives assignment status from team relationship and team state.
+ */
 function resolveAssignmentStatus(team: { status: 'PENDING' | 'ACTIVE' | 'IN_PIT' } | null) {
   if (!team) {
     return 'UNASSIGNED' as const;
@@ -102,6 +112,9 @@ function resolveAssignmentStatus(team: { status: 'PENDING' | 'ACTIVE' | 'IN_PIT'
   return 'ASSIGNED_ACTIVE' as const;
 }
 
+/**
+ * Maps internal player+user+team joins to API roster rows.
+ */
 function mapRosterRow(player: RosterPlayerRecord): AdminRosterRow {
   return {
     playerId: player.id,
@@ -119,6 +132,9 @@ function mapRosterRow(player: RosterPlayerRecord): AdminRosterRow {
   };
 }
 
+/**
+ * Resolves admin actor for audit logging, with ADMIN fallback.
+ */
 async function resolveActorUserId(
   tx: Prisma.TransactionClient,
   actorUserId: string | undefined
@@ -164,6 +180,9 @@ function resolvePlayerStatusFromTeamStatus(teamStatus: 'PENDING' | 'ACTIVE' | 'I
   return 'RACING' as const;
 }
 
+/**
+ * Builds roster filtering predicates for search/team/status query params.
+ */
 function buildRosterWhereClause(
   eventId: string,
   query: ListAdminRosterQuery
@@ -229,6 +248,9 @@ function buildRosterWhereClause(
   return where;
 }
 
+/**
+ * Lists roster rows for admin surfaces with cursor pagination.
+ */
 export async function listAdminRoster(
   eventId: string,
   query: ListAdminRosterQuery
@@ -290,6 +312,9 @@ export async function listAdminRoster(
   });
 }
 
+/**
+ * Lists teams for roster assignment UX including unassigned player count.
+ */
 export async function listAdminRosterTeams(eventId: string): Promise<ListAdminRosterTeamsResponse> {
   return withTraceSpan('admin.roster.teams.list', { eventId }, async () => {
     const [teams, unassignedCount] = await Promise.all([
@@ -331,6 +356,9 @@ export async function listAdminRosterTeams(eventId: string): Promise<ListAdminRo
   });
 }
 
+/**
+ * Reassigns (or unassigns) a player's team membership and records an audit row.
+ */
 export async function updateRosterAssignment(
   eventId: string,
   playerId: string,
@@ -482,6 +510,9 @@ export async function updateRosterAssignment(
   });
 }
 
+/**
+ * Aggregates row-level import actions for preview/apply summaries.
+ */
 function summarizePreviewRows(rows: readonly ResolvedImportRow[]) {
   return rows.reduce(
     (summary, row) => {
@@ -527,6 +558,10 @@ function toPreviewResponse(rows: readonly ResolvedImportRow[]): RosterImportPrev
   };
 }
 
+/**
+ * Resolves import rows into validated, action-ready records by comparing payload
+ * values against existing users, players, and teams.
+ */
 async function resolvePreviewRows(
   eventId: string,
   request: RosterImportPreviewRequest
@@ -696,6 +731,9 @@ async function resolvePreviewRows(
   });
 }
 
+/**
+ * Returns normalized preview output and action summary for roster imports.
+ */
 export async function previewRosterImport(
   eventId: string,
   request: RosterImportPreviewRequest
@@ -706,6 +744,9 @@ export async function previewRosterImport(
   });
 }
 
+/**
+ * Applies roster imports transactionally and records aggregate import audit data.
+ */
 export async function applyRosterImport(
   eventId: string,
   request: RosterImportApplyRequest,

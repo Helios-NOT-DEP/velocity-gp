@@ -1,6 +1,12 @@
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
+/**
+ * Publisher abstractions for team pit-release events.
+ *
+ * The default implementation is environment-driven: webhook when configured,
+ * noop otherwise.
+ */
 export type PitReleaseReason = 'TIMER_EXPIRED' | 'RESCUE_CLEARED' | 'ADMIN_MANUAL';
 
 export interface TeamPitReleasedEvent {
@@ -16,12 +22,18 @@ export interface PitReleasePublisher {
   publishTeamReleased(event: TeamPitReleasedEvent): Promise<void>;
 }
 
+/**
+ * No-op publisher used in local/dev setups without a webhook.
+ */
 class NoopPitReleasePublisher implements PitReleasePublisher {
   async publishTeamReleased(event: TeamPitReleasedEvent): Promise<void> {
     logger.debug('pit release publish skipped (no publisher configured)', { event });
   }
 }
 
+/**
+ * Webhook-backed publisher for external pit-release consumers.
+ */
 class WebhookPitReleasePublisher implements PitReleasePublisher {
   readonly #url: string;
   readonly #timeoutMs: number;
@@ -72,10 +84,16 @@ function createDefaultPublisher(): PitReleasePublisher {
 
 const defaultPublisher = createDefaultPublisher();
 
+/**
+ * Returns the active pit-release publisher implementation.
+ */
 export function getPitReleasePublisher(): PitReleasePublisher {
   return publisherOverride ?? defaultPublisher;
 }
 
+/**
+ * Test-only hook to override publisher behavior.
+ */
 export function setPitReleasePublisherForTests(publisher: PitReleasePublisher | null): void {
   publisherOverride = publisher;
 }

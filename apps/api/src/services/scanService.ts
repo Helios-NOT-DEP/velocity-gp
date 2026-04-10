@@ -13,11 +13,24 @@ import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError } from '../utils/appError.js';
 
+/**
+ * QR scan processing service.
+ *
+ * This service is transaction-heavy and responsible for:
+ * - validating event/player/team/QR state
+ * - creating scan records for all outcomes
+ * - awarding points or applying pit-stop hazards
+ * - retrying serialization conflicts for high-concurrency scans
+ */
 interface SubmitScanInput {
   readonly eventId: string;
   readonly request: SubmitScanRequest;
 }
 
+/**
+ * Maximum retry attempts for serialization conflicts (`P2034` / adapter-level
+ * write conflicts).
+ */
 const SERIALIZATION_RETRY_LIMIT = 3;
 
 function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
@@ -35,6 +48,9 @@ interface AdapterSerializationErrorShape {
   readonly message?: string;
 }
 
+/**
+ * Detects Prisma adapter-level write-conflict signatures.
+ */
 function isAdapterSerializationFailure(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) {
     return false;
@@ -58,12 +74,18 @@ function isAdapterSerializationFailure(error: unknown): boolean {
   return adapterError.message?.includes('TransactionWriteConflict') ?? false;
 }
 
+/**
+ * Detects serialization failures that are safe to retry.
+ */
 function isSerializationFailure(error: unknown): boolean {
   return (
     (isKnownPrismaError(error) && error.code === 'P2034') || isAdapterSerializationFailure(error)
   );
 }
 
+/**
+ * Resolves effective hazard ratio with per-QR override precedence.
+ */
 function resolveHazardRatio(hazardRatioOverride: number | null, globalHazardRatio: number): number {
   const configuredRatio = hazardRatioOverride ?? globalHazardRatio;
   return configuredRatio > 0 ? configuredRatio : 1;
@@ -75,6 +97,12 @@ interface ResolveHazardDecisionInput {
   readonly hazardWeightOverride: number | null;
 }
 
+/**
+ * Resolves whether a scan triggers pit hazard.
+ *
+ * If `hazardWeightOverride` is set, it acts as percent chance (0..100).
+ * Otherwise, hazard triggers by modulo using global scan count.
+ */
 function resolveHazardDecision(input: ResolveHazardDecisionInput): boolean {
   if (input.hazardWeightOverride !== null) {
     if (input.hazardWeightOverride <= 0) {
@@ -91,6 +119,9 @@ function resolveHazardDecision(input: ResolveHazardDecisionInput): boolean {
   return input.globalScanCountAfter % input.hazardRatioUsed === 0;
 }
 
+/**
+ * Executes complete scan processing inside a transaction.
+ */
 async function processScanInTransaction(
   tx: Prisma.TransactionClient,
   input: SubmitScanInput,
@@ -478,6 +509,9 @@ interface CreateBlockedScanResponseInput {
   readonly globalScanCountAfter: number;
 }
 
+/**
+ * Creates a canonical blocked-scan record/response pair.
+ */
 async function createBlockedScanResponse(
   tx: Prisma.TransactionClient,
   input: CreateBlockedScanResponseInput
@@ -515,6 +549,11 @@ async function createBlockedScanResponse(
   };
 }
 
+/**
+ * Primary scan ingestion API.
+ *
+ * Uses serializable transactions and bounded retries for write conflicts.
+ */
 export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResponse> {
   const qrPayload = input.request.qrPayload.trim();
   if (!qrPayload) {
@@ -561,6 +600,9 @@ export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResp
   );
 }
 
+/**
+ * Backward-compatible adapter for legacy scan contract.
+ */
 export async function submitLegacyScan(request: ScanHazardRequest): Promise<SubmitScanResponse> {
   return submitScan({
     eventId: request.eventId,
