@@ -19,6 +19,7 @@ import {
 } from './authTokens.js';
 import { getEmailDispatcher } from './emailDispatchService.js';
 import { logger } from '../lib/logger.js';
+import { AUTH_SESSION_COOKIE_NAME, resolveSessionToken } from './authSessionToken.js';
 
 /**
  * Authentication service for magic-link and session flows.
@@ -29,8 +30,8 @@ import { logger } from '../lib/logger.js';
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
 
-export const AUTH_SESSION_COOKIE_NAME = 'velocitygp_session';
 export const AUTH_SESSION_COOKIE_MAX_AGE_MS = env.AUTH_SESSION_COOKIE_TTL_DAYS * 24 * 60 * 60_000;
+export { AUTH_SESSION_COOKIE_NAME };
 
 interface EligiblePlayer {
   readonly userId: string;
@@ -355,64 +356,6 @@ export async function verifyMagicLink(
       redirectPath: resolveRedirectPath(session),
     };
   });
-}
-
-/**
- * Extracts bearer token value from an Authorization header.
- */
-function parseBearerToken(authorizationHeaderValue: string | undefined): string | null {
-  if (!authorizationHeaderValue) {
-    return null;
-  }
-
-  const [scheme, token] = authorizationHeaderValue.split(' ');
-  if (!scheme || !token || scheme.toLowerCase() !== 'bearer') {
-    return null;
-  }
-
-  return token;
-}
-
-/**
- * Parses a cookie value from the Cookie request header.
- */
-function parseCookieValue(cookieHeaderValue: string | undefined, name: string): string | null {
-  if (!cookieHeaderValue) {
-    return null;
-  }
-
-  const cookiePairs = cookieHeaderValue.split(';');
-  for (const cookiePair of cookiePairs) {
-    const [cookieName, ...cookieValueParts] = cookiePair.split('=');
-    if (!cookieName || cookieValueParts.length === 0) {
-      continue;
-    }
-
-    if (cookieName.trim() !== name) {
-      continue;
-    }
-
-    try {
-      return decodeURIComponent(cookieValueParts.join('=').trim());
-    } catch {
-      return cookieValueParts.join('=').trim();
-    }
-  }
-
-  return null;
-}
-
-/**
- * Resolves session token from Authorization header first, then auth cookie.
- */
-function resolveSessionToken(
-  authorizationHeaderValue: string | undefined,
-  cookieHeaderValue: string | undefined
-): string | null {
-  return (
-    parseBearerToken(authorizationHeaderValue) ??
-    parseCookieValue(cookieHeaderValue, AUTH_SESSION_COOKIE_NAME)
-  );
 }
 
 /**

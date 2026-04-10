@@ -1,44 +1,14 @@
 import type { Request, Response } from 'express';
 import type { AuthRole, RequestAuthContext } from '../types/auth.js';
 import { verifySessionToken } from '../services/authTokens.js';
+import { resolveSessionToken } from '../services/authSessionToken.js';
 
 interface AuthResponseLocals {
   auth?: RequestAuthContext;
 }
 
-const AUTH_SESSION_COOKIE_NAME = 'velocitygp_session';
-
-function parseCookieValue(cookieHeaderValue: string | undefined, name: string): string | null {
-  if (!cookieHeaderValue) {
-    return null;
-  }
-
-  const cookiePairs = cookieHeaderValue.split(';');
-  for (const cookiePair of cookiePairs) {
-    const [cookieName, ...cookieValueParts] = cookiePair.split('=');
-    if (!cookieName || cookieValueParts.length === 0) {
-      continue;
-    }
-
-    if (cookieName.trim() !== name) {
-      continue;
-    }
-
-    try {
-      return decodeURIComponent(cookieValueParts.join('=').trim());
-    } catch {
-      return cookieValueParts.join('=').trim();
-    }
-  }
-
-  return null;
-}
-
 export function resolveRequestAuthContext(request: Request): RequestAuthContext | null {
-  const authorizationHeader = request.header('authorization');
-  const [scheme, bearerToken] = (authorizationHeader ?? '').trim().split(/\s+/);
-  const authCookieToken = parseCookieValue(request.header('cookie'), AUTH_SESSION_COOKIE_NAME);
-  const token = scheme?.toLowerCase() === 'bearer' && bearerToken ? bearerToken : authCookieToken;
+  const token = resolveSessionToken(request.header('authorization'), request.header('cookie'));
 
   if (token) {
     try {
