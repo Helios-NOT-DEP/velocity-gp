@@ -9,6 +9,7 @@ export function initializeObservability() {
     return;
   }
 
+  // Analytics + global error handlers are initialized once for the app lifecycle.
   initializeAnalytics();
   attachGlobalErrorHandlers();
   observabilityInitialized = true;
@@ -20,6 +21,7 @@ function attachGlobalErrorHandlers() {
   }
 
   window.addEventListener('error', (event) => {
+    // Browser-level runtime failures are forwarded into telemetry spans.
     captureTelemetryError(event.error ?? new Error(event.message), {
       'error.type': 'window.error',
       'error.filename': event.filename,
@@ -27,6 +29,7 @@ function attachGlobalErrorHandlers() {
   });
 
   window.addEventListener('unhandledrejection', (event) => {
+    // Promise rejections without explicit handlers are treated as production errors.
     captureTelemetryError(event.reason, {
       'error.type': 'window.unhandledrejection',
     });

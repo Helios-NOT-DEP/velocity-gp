@@ -12,6 +12,7 @@ function desktopNavClassName(isActive: boolean) {
 }
 
 export default function AdminLayout() {
+  // Mobile nav is defined separately from desktop labels to keep short text/icon pairs.
   const mobileNav = [
     { path: '/admin/game-control', label: 'Control', icon: Settings },
     { path: '/admin/qr-codes', label: 'QR', icon: QrCode },
@@ -46,6 +47,7 @@ export default function AdminLayout() {
         </div>
       </header>
 
+      {/* Desktop sticky section tabs mirror admin route children and remain visible while scrolling. */}
       <div className="hidden md:block border-b border-gray-800 bg-black/50 sticky top-[88px] z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-2 overflow-x-auto" aria-label="Admin sections">
@@ -71,6 +73,7 @@ export default function AdminLayout() {
         <Outlet />
       </main>
 
+      {/* Mobile admin routes use a fixed bottom nav to match the player shell navigation model. */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 z-50"
         aria-label="Admin sections mobile"

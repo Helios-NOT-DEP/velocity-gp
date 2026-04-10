@@ -55,6 +55,7 @@ export default function AdminQrCodes() {
       setLoadError(null);
 
       try {
+        // Resolve active event first, then fetch its QR inventory as hazard records.
         const eventResponse = await apiClient.get<EventSummary>(eventEndpoints.getCurrentEvent);
         if (!eventResponse.ok) {
           throw new Error(`Failed to load current event: ${eventResponse.status}`);

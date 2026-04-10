@@ -8,6 +8,7 @@ import { submitScan } from '../services/scanService.js';
 
 export const scanRouter = Router();
 
+// Canonical scan ingestion endpoint; legacy scan path remains in hazard router.
 scanRouter.post(
   '/events/:eventId/scans',
   validate(eventScanParamsSchema, 'params'),

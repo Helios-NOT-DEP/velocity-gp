@@ -116,14 +116,14 @@ describe('emailDispatchService logging', () => {
     expect(jwtHeader.typ).toBe('JWT');
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(logger.debug).toHaveBeenCalledWith(
+    expect(logger.info).toHaveBeenCalledWith(
       'email dispatch attempt to n8n',
       expect.objectContaining({
         provider: 'n8n_mailtrap',
         templateKey: 'magic_link_login',
       })
     );
-    expect(logger.debug).toHaveBeenCalledWith(
+    expect(logger.info).toHaveBeenCalledWith(
       'email dispatch success from n8n',
       expect.objectContaining({
         status: 202,

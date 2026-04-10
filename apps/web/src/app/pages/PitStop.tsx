@@ -8,6 +8,7 @@ export default function PitStop() {
   const navigate = useNavigate();
 
   if (!gameState.currentTeam?.inPitStop) {
+    // Pit-stop screen is only valid during lockout; otherwise route back to active scanner flow.
     navigate('/race-hub');
     return null;
   }
@@ -19,6 +20,7 @@ export default function PitStop() {
   };
 
   const handleHeliosRescue = () => {
+    // Demo action mirrors future Helios rescue QR flow by clearing pit status immediately.
     if (gameState.currentTeam) {
       clearPitStop(gameState.currentTeam.id);
       navigate('/race-hub');

@@ -1,3 +1,4 @@
+// Flat export surface for app consumers that import UI primitives directly.
 export * from './components/accordion.js';
 export * from './components/alert-dialog.js';
 export * from './components/alert.js';

@@ -22,6 +22,7 @@ export async function withTelemetrySpan<T>(
   return tracer.startActiveSpan(spanName, async (span) => {
     span?.setAttributes(toAttributes(options.attributes));
     let hasErrorStatus = false;
+    // Wrapped span tracks explicit ERROR status set by caller without losing original API.
     const wrappedSpan = span
       ? Object.assign(Object.create(span), {
           setStatus(status: Parameters<Span['setStatus']>[0]) {
@@ -57,6 +58,7 @@ export function captureTelemetryError(
   error: unknown,
   attributes?: Record<string, string | number | boolean | undefined>
 ) {
+  // Lightweight helper for ad-hoc UI failures outside explicit tracing scopes.
   tracer.startActiveSpan('ui.error', (span) => {
     span?.setAttributes(toAttributes(attributes));
     span?.recordException(error as Error);

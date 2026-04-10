@@ -13,6 +13,7 @@ export function errorHandler(
   const requestId = response.locals.requestId as string | undefined;
 
   if (error instanceof AppError) {
+    // AppError represents expected domain/API failures with stable client-facing codes.
     const appErrorLogContext = {
       requestId,
       method: request.method,

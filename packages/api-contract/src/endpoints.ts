@@ -14,7 +14,9 @@ export const raceStateEndpoints = {
 };
 
 export const scanEndpoints = {
+  // Preferred scan ingestion endpoint.
   submitScan: (eventId: string) => `/events/${eventId}/scans`,
+  // Compatibility endpoint retained for older scanner callers.
   legacySubmitScan: '/hazards/scan',
   updateHazardStatus: (eventId: string, playerId: string) =>
     `/events/${eventId}/players/${playerId}/hazard-status`,
@@ -73,6 +75,7 @@ export const adminEndpoints = {
 export const authEndpoints = {
   requestMagicLink: '/auth/magic-link/request',
   verifyMagicLink: '/auth/magic-link/verify',
+  // Session/routing endpoints derive state from Authorization bearer tokens.
   getSession: '/auth/session',
   getRoutingDecision: '/auth/routing-decision',
   logout: '/auth/logout',

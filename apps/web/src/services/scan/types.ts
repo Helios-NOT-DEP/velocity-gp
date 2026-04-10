@@ -22,6 +22,7 @@ export interface ScanFeedback {
 
 export interface ScanUiAction {
   readonly feedback: ScanFeedback;
+  // Navigation side effects are explicit so scanner page can centralize route transitions.
   readonly navigateTo: '/pit-stop' | null;
   readonly shouldResumeScanner: boolean;
 }

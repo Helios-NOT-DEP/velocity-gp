@@ -42,6 +42,7 @@ export function resolveRequestAuthContext(request: Request): RequestAuthContext 
 
   if (token) {
     try {
+      // Primary auth path: parse and verify signed session token.
       const claims = verifySessionToken(token);
       return {
         userId: claims.userId,

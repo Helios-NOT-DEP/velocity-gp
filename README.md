@@ -121,6 +121,49 @@ API routes are mounted under `/api` and currently include:
 - Observability: [observability.md](./docs/architecture/observability.md)
 - Contributing: [CONTRIBUTING.md](./docs/contributing/CONTRIBUTING.md)
 
+## Contributors
+
+Thank you to everyone who has contributed to Velocity GP.
+
+<!-- readme: contributors -start -->
+<table>
+	<tbody>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/neerpatel">
+                    <img src="https://avatars.githubusercontent.com/u/1582261?v=4" width="100;" alt="neerpatel"/>
+                    <br />
+                    <sub><b>Neer Patel</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/rm-potato">
+                    <img src="https://avatars.githubusercontent.com/u/32198503?v=4" width="100;" alt="rm-potato"/>
+                    <br />
+                    <sub><b>Ryan Milton</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/MiloWical">
+                    <img src="https://avatars.githubusercontent.com/u/20027643?v=4" width="100;" alt="MiloWical"/>
+                    <br />
+                    <sub><b>MiloWical</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/dannydjg16">
+                    <img src="https://avatars.githubusercontent.com/u/21086409?v=4" width="100;" alt="dannydjg16"/>
+                    <br />
+                    <sub><b>Daniel Grant</b></sub>
+                </a>
+            </td>
+		</tr>
+	<tbody>
+</table>
+<!-- readme: contributors -end -->
+
+See the full list: [Contributors Graph](https://github.com/Helios-NOT-DEP/velocity-gp/graphs/contributors).
+
 ## Notes
 
 - The API uses shared contracts/schemas from `packages/api-contract`.

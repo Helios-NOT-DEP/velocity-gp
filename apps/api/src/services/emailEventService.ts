@@ -106,6 +106,7 @@ export async function ingestMailtrapEvents(
         const providerEventId = event.providerEventId ?? null;
 
         if (providerEventId) {
+          // Deduplicate by provider event id to make webhook retries idempotent.
           const existing = await tx.emailEvent.findUnique({
             where: {
               provider_providerEventId: {

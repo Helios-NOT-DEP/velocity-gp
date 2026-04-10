@@ -15,6 +15,7 @@ import {
 
 export const authRouter = Router();
 
+// Magic-link endpoints own login/session lifecycle for all client surfaces.
 authRouter.post(
   '/auth/magic-link/request',
   validate(requestMagicLinkSchema),

@@ -19,6 +19,7 @@ import AdminPlayers from './pages/admin/AdminPlayers';
 import AdminStatistics from './pages/admin/AdminStatistics';
 
 export const appRoutes: RouteObject[] = [
+  // Public auth entrypoint.
   {
     path: '/',
     Component: Login,
@@ -40,6 +41,7 @@ export const appRoutes: RouteObject[] = [
       </ProtectedRouteGuard>
     ),
   },
+  // Garage remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
     path: '/garage',
     element: (
@@ -57,6 +59,7 @@ export const appRoutes: RouteObject[] = [
       </ProtectedRouteGuard>
     ),
     children: [
+      // In-race player navigation rendered with persistent bottom navigation.
       { path: 'race-hub', Component: RaceHub },
       { path: 'pit-stop', Component: PitStop },
       { path: 'helios', Component: HeliosProfile },
@@ -67,6 +70,7 @@ export const appRoutes: RouteObject[] = [
   // TODO(figma-sync): Reconcile split nested admin sections with the single-screen /admin contract in Figma Make to preserve expected admin navigation behavior. | Figma source: src/app/routes.ts (/admin -> Admin) | Impact: admin flow
   {
     path: '/admin',
+    // Guard once at layout level so all nested admin tabs share the same auth gate.
     element: (
       <AdminRouteGuard>
         <AdminLayout />

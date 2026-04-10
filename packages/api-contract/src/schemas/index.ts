@@ -1,3 +1,4 @@
+// Zod schema exports used by backend validation middleware and tests.
 export * from './authSchemas.js';
 export * from './adminSchemas.js';
 export * from './eventSchemas.js';

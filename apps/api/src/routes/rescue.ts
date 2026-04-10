@@ -9,6 +9,7 @@ import { completeRescue, getRescueStatus, initiateRescue } from '../services/res
 
 export const rescueRouter = Router();
 
+// Rescue workflow endpoints for Helios intervention lifecycle.
 rescueRouter.post(
   '/rescue/initiate',
   validate(initiateRescueSchema),

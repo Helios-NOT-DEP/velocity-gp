@@ -31,6 +31,7 @@ export const observabilityConfig = {
   posthogApiKey: import.meta.env.VITE_POSTHOG_API_KEY || import.meta.env.VITE_POSTHOG_KEY || '',
   posthogHost: import.meta.env.VITE_POSTHOG_HOST || DEFAULT_POSTHOG_HOST,
   serviceName: import.meta.env.VITE_OTEL_SERVICE_NAME || DEFAULT_SERVICE_NAME,
+  // Sampling rate is currently consumed by tracer bootstrap integration.
   traceSamplingRate: parseTraceSamplingRate(import.meta.env.VITE_OTEL_TRACE_SAMPLING_RATE),
 };
 

@@ -128,6 +128,7 @@ async function processScanInTransaction(
   qrPayload: string,
   now: Date
 ): Promise<SubmitScanResponse> {
+  // Load all state that influences scan outcome before mutating any records.
   const [eventConfig, playerWithTeam, globalScanCountBefore] = await Promise.all([
     tx.eventConfig.findUnique({
       where: {
@@ -253,6 +254,7 @@ async function processScanInTransaction(
     (!team.pitStopExpiresAt || team.pitStopExpiresAt.getTime() > now.getTime());
 
   if (eventConfig.raceControlState === 'PAUSED') {
+    // Race-control pause short-circuits all scans but still records blocked attempts.
     return createBlockedScanResponse(tx, {
       eventId: input.eventId,
       playerId: playerWithTeam.id,
@@ -311,6 +313,7 @@ async function processScanInTransaction(
   });
 
   if (claimResult.count === 0) {
+    // Duplicate is determined by unique claim write, avoiding race-prone read-before-write checks.
     const message = 'Player has already claimed this QR code.';
     const scanRecord = await tx.scanRecord.create({
       data: {
@@ -362,6 +365,7 @@ async function processScanInTransaction(
     hazardWeightOverride: qrCode.hazardWeightOverride,
   });
   if (hazardTriggered) {
+    // Hazard path transitions the team into pit-stop and records team/player state mutation.
     const pitStopExpiresAt = new Date(now.getTime() + eventConfig.pitStopDurationSeconds * 1_000);
 
     const [updatedTeam, scanRecord] = await Promise.all([
@@ -583,6 +587,7 @@ export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResp
             throw error;
           }
 
+          // Retry only known serialization/write-conflict failures under serializable isolation.
           attempt += 1;
           logger.warn('serialization conflict during scan processing, retrying', {
             eventId: input.eventId,

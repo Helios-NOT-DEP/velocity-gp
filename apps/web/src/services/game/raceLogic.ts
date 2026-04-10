@@ -21,6 +21,7 @@ export class RaceEventLog {
   private events: RaceEvent[] = [];
 
   addEvent(event: RaceEvent): void {
+    // In-memory log is intentionally append-only and resettable between race sessions.
     this.events.push(event);
   }
 

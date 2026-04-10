@@ -142,12 +142,14 @@ export class ApiClient {
     const contentType = response.headers?.get?.('content-type') || 'application/json';
 
     if (!contentType.includes('application/json')) {
+      // Non-JSON endpoints are treated as data-less responses by this client abstraction.
       return { data: undefined as T };
     }
 
     const payload = (await response.json()) as T | ApiEnvelope<T>;
 
     if (this.isApiEnvelope<T>(payload)) {
+      // Preferred contract: `{ success, data|error }` envelope from api-contract/http helpers.
       if (payload.success === false) {
         return {
           data: undefined as T,
@@ -171,6 +173,7 @@ function readAuthorizationHeaderFromStorage(): string | null {
     return null;
   }
 
+  // Shared key aligns with web auth client token persistence.
   const token = globalThis.localStorage.getItem('velocitygp.auth.token');
   if (!token) {
     return null;

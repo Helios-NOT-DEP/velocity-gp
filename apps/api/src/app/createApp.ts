@@ -34,15 +34,19 @@ export function createApp() {
     express.json({
       limit: '1mb',
       verify: (request, _response, buffer) => {
+        // Raw body is preserved for webhook signature verification middleware.
         (request as RequestWithRawBody).rawBody = Buffer.from(buffer);
       },
     })
   );
 
+  // Health route stays outside API prefix to keep probes stable across prefix changes.
   app.use(healthRouter);
 
+  // Product API routes are namespaced via env-configured prefix.
   app.use(env.API_PREFIX, apiRouter);
   logger.info('Setup API routes with prefix', { prefix: env.API_PREFIX });
+  // Terminal middleware order: 404 translation first, centralized error mapping last.
   app.use(notFoundHandler);
   app.use(errorHandler);
 

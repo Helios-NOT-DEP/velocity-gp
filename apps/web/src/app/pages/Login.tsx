@@ -58,6 +58,8 @@ export default function Login() {
 
     try {
       // TODO(figma-sync): Align submit transition with Figma's immediate Garage navigation flow, while preserving magic-link security requirements. | Figma source: src/app/pages/Login.tsx handleSubmit (navigate('/garage')) | Impact: user flow
+      // Current behavior intentionally stays on this screen and shows server response
+      // because auth requires external email-link verification.
       const response = await requestMagicLink(workEmail.trim());
       setMessage(response.message);
     } catch (requestError) {

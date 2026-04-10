@@ -208,6 +208,7 @@ let dispatcherOverride: EmailDispatcher | null = null;
 
 function createDefaultDispatcher(): EmailDispatcher {
   if (!env.N8N_HOST || !env.N8N_WEBHOOK_TOKEN) {
+    // Local/dev environments can run without outbound provider credentials.
     return new NoopEmailDispatcher();
   }
 

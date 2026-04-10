@@ -6,6 +6,7 @@ export interface AdminSection {
   issueLinks: string[];
 }
 
+// Admin navigation contract used by both layout tabs and section placeholders.
 export const adminSections: AdminSection[] = [
   {
     id: 'game-control',

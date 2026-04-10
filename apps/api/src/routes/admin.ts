@@ -37,6 +37,7 @@ import {
 
 export const adminRouter = Router();
 
+// Apply admin authorization once for all /admin-prefixed endpoints in this router.
 adminRouter.use('/admin', requireAdmin);
 
 adminRouter.get(

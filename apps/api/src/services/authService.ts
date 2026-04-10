@@ -73,6 +73,7 @@ function mapRole(role: EligiblePlayer['role']): PlayerAuthSession['role'] {
 }
 
 function resolveAssignmentStatus(teamId: string | null, teamStatus: EligiblePlayer['teamStatus']) {
+  // Missing team context is treated as unassigned even if a player record exists.
   if (!teamId || !teamStatus) {
     return 'UNASSIGNED' as const;
   }
@@ -254,6 +255,7 @@ export async function requestMagicLink(
     const eligiblePlayer = await loadEligiblePlayerByEmail(normalizedEmail);
     logger.debug('Eligible player loaded', { eligiblePlayer });
     if (!eligiblePlayer || !eligiblePlayer.teamId || !eligiblePlayer.teamStatus) {
+      // Current product behavior only permits magic-link login for rostered + assigned players.
       incrementCounter('auth.magic_link.request.denied.total');
       throw new AppError(404, 'AUTH_USER_NOT_FOUND', 'No user found for this work email.');
     }
@@ -326,6 +328,7 @@ export async function verifyMagicLink(
 
     const session = buildSessionFromEligiblePlayer(eligiblePlayer);
     if (session.assignmentStatus === 'UNASSIGNED') {
+      // Verification succeeds cryptographically, but access is blocked until assignment exists.
       incrementCounter('auth.magic_link.verify.unassigned.total');
       throw new AppError(
         403,
@@ -445,6 +448,7 @@ export async function getSessionFromAuthInputs(
     try {
       claims = verifySessionToken(token);
     } catch {
+      // Token parse/expiry errors intentionally map to a generic invalid-session response.
       throw new AppError(401, 'AUTH_INVALID_SESSION', 'Session is invalid or expired.');
     }
 

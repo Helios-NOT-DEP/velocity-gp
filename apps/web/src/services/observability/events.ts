@@ -1,3 +1,5 @@
+// Product analytics events allowed from the web client. OTel-only events are
+// intentionally excluded from `AnalyticsEventName` below to prevent misuse.
 export const analyticsEventCatalog = {
   page_viewed: {
     owner: 'posthog',

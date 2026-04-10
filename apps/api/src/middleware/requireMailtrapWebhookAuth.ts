@@ -44,6 +44,7 @@ export function requireMailtrapWebhookAuth(
   const hasSignatureHeaders = Boolean(signatureHeader || timestampHeader);
 
   if (!hasSignatureHeaders) {
+    // Backward-compatible fallback while webhook callers migrate to Mailtrap signatures.
     requireN8nWebhookAuth(request, response, next);
     return;
   }

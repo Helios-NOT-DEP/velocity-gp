@@ -1,3 +1,4 @@
+// Shared domain contracts consumed by API routes/services and web clients.
 export * from './auth.js';
 export * from './adminControls.js';
 export * from './participants.js';

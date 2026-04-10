@@ -40,6 +40,7 @@ export default function Leaderboard() {
   const leaderScore = sortedTeams[0]?.score || 0;
 
   useEffect(() => {
+    // Rotating commentary keeps leaderboard visually "live" while realtime feed is pending.
     const commentaries = [
       'Intense competition at the top! Teams fighting for every point...',
       'Strategic moves happening across the board!',

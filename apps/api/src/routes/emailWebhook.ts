@@ -8,6 +8,7 @@ import { ingestMailtrapEvents } from '../services/emailEventService.js';
 
 export const emailWebhookRouter = Router();
 
+// Provider webhook ingress is authenticated before payload validation.
 emailWebhookRouter.post(
   '/webhooks/mailtrap/events',
   requireMailtrapWebhookAuth,

@@ -12,6 +12,7 @@ import { createTeam, getTeam, getTeamMembers, joinTeam } from '../services/teamS
 
 export const teamRouter = Router();
 
+// Team management endpoints for creation, joining, and roster retrieval.
 teamRouter.post(
   '/teams',
   validate(createTeamSchema),
