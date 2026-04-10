@@ -11,6 +11,7 @@ import WaitingAssignment from './pages/WaitingAssignment';
 import RootLayout from './layouts/RootLayout';
 import AdminLayout from './layouts/AdminLayout';
 import AdminRouteGuard from './components/auth/AdminRouteGuard';
+import ProtectedRouteGuard from './components/auth/ProtectedRouteGuard';
 import AdminGameControl from './pages/admin/AdminGameControl';
 import AdminQrCodes from './pages/admin/AdminQrCodes';
 import AdminTeams from './pages/admin/AdminTeams';
@@ -39,12 +40,20 @@ export const appRoutes: RouteObject[] = [
   // Garage remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
     path: '/garage',
-    Component: Garage,
+    element: (
+      <ProtectedRouteGuard>
+        <Garage />
+      </ProtectedRouteGuard>
+    ),
   },
   // TODO(figma-sync): Add /team route parity for post-Garage handoff; Figma flow routes Garage -> TeamPage before Race Hub. | Figma source: src/app/routes.ts (/team -> TeamPage) | Impact: user flow
   {
     path: '/',
-    Component: RootLayout,
+    element: (
+      <ProtectedRouteGuard>
+        <RootLayout />
+      </ProtectedRouteGuard>
+    ),
     children: [
       // In-race player navigation rendered with persistent bottom navigation.
       { path: 'race-hub', Component: RaceHub },

@@ -1,7 +1,7 @@
 {
   "name": "@velocity-gp/root",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.3",
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -29,7 +29,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "bump": "npm version patch --no-git-tag-version"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

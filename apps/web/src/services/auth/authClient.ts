@@ -37,6 +37,8 @@ interface AuthUser {
   createdAt: Date;
 }
 
+const LOGOUT_ENDPOINT = '/auth/logout';
+
 export type MagicLinkRequestResult = RequestMagicLinkResponse;
 export type MagicLinkVerifyResult = VerifyMagicLinkResponse;
 
@@ -66,12 +68,32 @@ function readAuthTokenFromStorage(): string | null {
   return getBrowserStorage()?.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY) ?? null;
 }
 
+function shouldClearStoredSession(response: {
+  status: number;
+  error?: { code?: string };
+}): boolean {
+  if (
+    response.error?.code === 'AUTH_INVALID_SESSION' ||
+    response.error?.code === 'AUTH_MISSING_TOKEN' ||
+    response.error?.code === 'AUTH_ASSIGNMENT_REQUIRED'
+  ) {
+    return true;
+  }
+
+  return response.status === 401;
+}
+
 function clearStoredSession(): void {
   const storage = getBrowserStorage();
+  const hadStoredSession = storage?.getItem(AUTH_SESSION_STORAGE_KEY) !== null;
+  const hadStoredToken = storage?.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY) !== null;
+
   storage?.removeItem(AUTH_SESSION_STORAGE_KEY);
   storage?.removeItem(AUTH_SESSION_TOKEN_STORAGE_KEY);
-  // Clearing auth is a state transition; notify listeners immediately.
-  emitSessionUpdatedEvent();
+  if (hadStoredSession || hadStoredToken) {
+    // Clearing non-empty auth state is a transition; notify listeners immediately.
+    emitSessionUpdatedEvent();
+  }
 }
 
 function persistSession(session: AuthSession, sessionToken: string): void {
@@ -191,15 +213,23 @@ export async function verifyMagicLink(token: string): Promise<MagicLinkVerifyRes
 
 export async function getSession(): Promise<AuthSession> {
   const storedToken = readAuthTokenFromStorage();
-  if (!storedToken) {
-    // Without a bearer token we stay in storage-only mode (offline/anonymous-safe path).
-    return readSessionFromStorage();
+  const storedSession = readSessionFromStorage();
+
+  let response: Awaited<ReturnType<typeof apiClient.get<SessionResponse>>>;
+  try {
+    response = await apiClient.get<SessionResponse>(authEndpoints.getSession, undefined);
+  } catch {
+    // Transport/runtime failures are non-authoritative; keep last known local session.
+    return storedSession;
   }
 
-  const response = await apiClient.get<SessionResponse>(authEndpoints.getSession, undefined);
   if (!response.ok || !response.data) {
-    clearStoredSession();
-    return anonymousSession;
+    if (shouldClearStoredSession(response)) {
+      clearStoredSession();
+      return anonymousSession;
+    }
+
+    return storedSession;
   }
 
   const normalizedSession = normalizeSessionFromResponse(response.data.session);
@@ -208,7 +238,9 @@ export async function getSession(): Promise<AuthSession> {
   // GameContext listens for it and calls getSession() again.
   const storage = getBrowserStorage();
   storage?.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
-  storage?.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, storedToken);
+  if (storedToken) {
+    storage?.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, storedToken);
+  }
   return normalizedSession;
 }
 
@@ -230,7 +262,11 @@ export async function sendVerificationEmail(email: string): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
-  clearStoredSession();
+  try {
+    await apiClient.post<{ loggedOut: boolean }>(LOGOUT_ENDPOINT);
+  } finally {
+    clearStoredSession();
+  }
 }
 
 export { AUTH_SESSION_STORAGE_KEY, AUTH_SESSION_TOKEN_STORAGE_KEY, AUTH_SESSION_UPDATED_EVENT };

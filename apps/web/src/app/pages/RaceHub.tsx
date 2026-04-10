@@ -1,16 +1,19 @@
-/* global navigator, HTMLVideoElement, HTMLCanvasElement, MediaStream, ImageBitmapSource */
+/* global navigator */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import jsQR from 'jsqr';
-import { Camera, CameraOff, Loader2, Plus, RefreshCcw, Scan, TriangleAlert } from 'lucide-react';
+import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
+import { Camera, CameraOff, Loader2, Plus, RefreshCcw, Scan } from 'lucide-react';
 
 import type { SubmitScanResponse } from '@velocity-gp/api-contract';
 import { apiClient, scanEndpoints } from '@/services/api';
 import { getSession } from '@/services/auth';
 import { trackAnalyticsEvent } from '@/services/observability';
 import {
+  classifyQrPayload,
   createPayloadDedupeState,
+  getTrustedQrRedirectOrigin,
   mapScanResponseToUiAction,
+  redirectToTrustedQrUrl,
   resolveScanIdentityForEmail,
   shouldSuppressDuplicatePayload,
   type PayloadDedupeState,
@@ -19,26 +22,6 @@ import {
   type ScannerState,
 } from '@/services/scan';
 import { useGame } from '../context/GameContext';
-
-interface BarcodeDetectorResult {
-  rawValue?: string;
-}
-
-interface BarcodeDetectorInstance {
-  detect(source: ImageBitmapSource): Promise<BarcodeDetectorResult[]>;
-}
-
-interface BarcodeDetectorConstructor {
-  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
-  getSupportedFormats?: () => Promise<string[]>;
-}
-
-// Limit expensive jsQR fallback work to reduce CPU load on devices without BarcodeDetector support.
-const JS_QR_THROTTLE_INTERVAL_MS = 150;
-
-function getBarcodeDetectorConstructor(): BarcodeDetectorConstructor | undefined {
-  return (globalThis as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
-}
 
 function defaultFeedback(): ScanFeedback {
   return {
@@ -79,23 +62,28 @@ function formatTimestamp(timestamp: Date): string {
   });
 }
 
+function getFirstDetectedPayload(detectedCodes: IDetectedBarcode[]): string | null {
+  const rawValue = detectedCodes[0]?.rawValue?.trim();
+  return rawValue && rawValue.length > 0 ? rawValue : null;
+}
+
+function getScannerErrorName(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    return String((error as { name?: string }).name);
+  }
+
+  return 'unknown';
+}
+
 export default function RaceHub() {
   // RaceHub owns scanner lifecycle, scan submission, and feedback mapping for gameplay.
   const { gameState, hydrateScanIdentity, applyScanOutcome } = useGame();
   const navigate = useNavigate();
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const scanIdentityRef = useRef<ScanIdentity | null>(null);
-  const detectorRef = useRef<BarcodeDetectorInstance | null>(null);
-  const detectorUnavailableRef = useRef(false);
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
   const scannerEpochRef = useRef<number>(0);
-  // Tracks last fallback decode attempt time so jsQR does not run every animation frame.
-  const lastJsQRDecodeTimeRef = useRef<number>(0);
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
@@ -103,6 +91,7 @@ export default function RaceHub() {
   const [isHydratingIdentity, setIsHydratingIdentity] = useState(true);
   const [showGuidance, setShowGuidance] = useState(false);
 
+  const trustedRedirectOrigin = useMemo(() => getTrustedQrRedirectOrigin(), []);
   const scannerActive =
     scannerState === 'requesting_permission' ||
     scannerState === 'ready' ||
@@ -110,24 +99,8 @@ export default function RaceHub() {
     scannerState === 'submitting';
 
   const stopScanner = useCallback((nextState: ScannerState = 'idle') => {
-    if (animationFrameRef.current !== null) {
-      window.cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
     isSubmittingRef.current = false;
-    // Reset fallback throttle when scanner session ends so restart starts with a fresh decode window.
     scannerEpochRef.current += 1;
-    lastJsQRDecodeTimeRef.current = 0;
     setScannerState(nextState);
   }, []);
 
@@ -195,75 +168,13 @@ export default function RaceHub() {
 
     return () => {
       isMounted = false;
-    };
-  }, [gameState.currentUser?.email]);
-
-  useEffect(() => {
-    return () => {
       stopScanner('idle');
     };
-  }, [stopScanner]);
-
-  const detectPayloadFromFrame = useCallback(async (): Promise<string | null> => {
-    const video = videoRef.current;
-    if (!video || video.videoWidth <= 0 || video.videoHeight <= 0) {
-      return null;
-    }
-
-    const Detector = getBarcodeDetectorConstructor();
-    if (Detector && !detectorUnavailableRef.current) {
-      try {
-        if (!detectorRef.current) {
-          detectorRef.current = new Detector({ formats: ['qr_code'] });
-        }
-
-        const results = await detectorRef.current.detect(video);
-        const rawValue = results[0]?.rawValue?.trim();
-        if (rawValue) {
-          return rawValue;
-        }
-      } catch {
-        trackAnalyticsEvent('scanner_decode_failure', {
-          decoder: 'barcode-detector',
-        });
-        detectorRef.current = null;
-        detectorUnavailableRef.current = true;
-      }
-    }
-
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      return null;
-    }
-
-    // jsQR fallback is CPU-heavy; avoid doing full-frame pixel reads every animation frame.
-    const now = Date.now();
-    if (now - lastJsQRDecodeTimeRef.current < JS_QR_THROTTLE_INTERVAL_MS) {
-      return null;
-    }
-    lastJsQRDecodeTimeRef.current = now;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) {
-      return null;
-    }
-
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth',
-    });
-
-    return qrCode?.data?.trim() || null;
-  }, []);
+  }, [gameState.currentUser?.email, stopScanner]);
 
   const submitPayload = useCallback(
     async (payload: string) => {
       const activeScanIdentity = scanIdentityRef.current ?? scanIdentity;
-      // TODO(figma-sync): Confirm whether identity resolution should remain a hard gate; Figma flow assumes immediate local scan interactions once team context exists. | Figma source: src/app/pages/RaceHub.tsx handleScan local simulation | Impact: user flow
       if (!activeScanIdentity) {
         setFeedback({
           level: 'warning',
@@ -276,7 +187,6 @@ export default function RaceHub() {
         return;
       }
 
-      // Snapshot scanner lifecycle so stop/restart can cancel stale async UI transitions.
       const submitEpoch = scannerEpochRef.current;
       isSubmittingRef.current = true;
       setScannerState('submitting');
@@ -294,10 +204,8 @@ export default function RaceHub() {
           throw new Error(`scan submission failed (${response.status})`);
         }
 
-        // Keep team/game state in sync even if scanner UI was canceled while awaiting the API.
         applyScanOutcome(response.data);
 
-        // User stopped or restarted scanner while request was in-flight; ignore stale UI updates.
         if (scannerEpochRef.current !== submitEpoch) {
           return;
         }
@@ -316,7 +224,6 @@ export default function RaceHub() {
           });
         }
 
-        // TODO(figma-sync): Validate hazard/pit-stop transition parity now that redirects are API-driven instead of deterministic local scan outcomes. | Figma source: src/app/pages/RaceHub.tsx handleScan -> navigate('/pit-stop') | Impact: user flow
         if (uiAction.navigateTo) {
           stopScanner('idle');
           navigate(uiAction.navigateTo);
@@ -332,7 +239,6 @@ export default function RaceHub() {
           event_id: activeScanIdentity.eventId,
         });
 
-        // Avoid surfacing stale error UI after the scanner was explicitly stopped/restarted.
         if (scannerEpochRef.current !== submitEpoch) {
           return;
         }
@@ -350,51 +256,102 @@ export default function RaceHub() {
         isSubmittingRef.current = false;
       }
 
-      // Do not resume decoding when this submit no longer belongs to the active scanner session.
       if (scannerEpochRef.current !== submitEpoch) {
         return;
       }
-      setScannerState('decoding');
+
+      setScannerState('ready');
     },
     [applyScanOutcome, navigate, scanIdentity, stopScanner]
   );
 
-  const decodeLoop = useCallback(async () => {
-    if (!streamRef.current) {
-      return;
-    }
-
-    try {
-      if (!isSubmittingRef.current) {
-        const payload = await detectPayloadFromFrame();
-        if (payload) {
-          if (shouldSuppressDuplicatePayload(payload, Date.now(), dedupeRef.current)) {
-            animationFrameRef.current = window.requestAnimationFrame(() => {
-              void decodeLoop();
-            });
-            return;
-          }
-
-          dedupeRef.current = createPayloadDedupeState(payload, Date.now());
-          trackAnalyticsEvent('scanner_decode_success', {
-            payload_length: payload.length,
-          });
-          void submitPayload(payload);
-        }
+  const handleDetectedCodes = useCallback(
+    (detectedCodes: IDetectedBarcode[]) => {
+      if (isSubmittingRef.current) {
+        return;
       }
-    } catch {
-      trackAnalyticsEvent('scanner_decode_failure', {
-        decoder: 'unknown',
-      });
-    }
 
-    animationFrameRef.current = window.requestAnimationFrame(() => {
-      void decodeLoop();
-    });
-  }, [detectPayloadFromFrame, submitPayload]);
+      const payload = getFirstDetectedPayload(detectedCodes);
+      if (!payload) {
+        return;
+      }
+
+      const now = Date.now();
+      if (shouldSuppressDuplicatePayload(payload, now, dedupeRef.current)) {
+        return;
+      }
+
+      dedupeRef.current = createPayloadDedupeState(payload, now);
+      trackAnalyticsEvent('scanner_decode_success', {
+        payload_length: payload.length,
+      });
+
+      const classifiedPayload = classifyQrPayload(payload, trustedRedirectOrigin);
+      if (classifiedPayload.kind === 'trusted_url') {
+        trackAnalyticsEvent('scanner_redirect_trusted_url', {
+          redirect_origin: trustedRedirectOrigin,
+        });
+        stopScanner('idle');
+        redirectToTrustedQrUrl(classifiedPayload.url);
+        return;
+      }
+
+      if (classifiedPayload.kind === 'untrusted_url') {
+        trackAnalyticsEvent('scanner_redirect_blocked', {
+          reason: classifiedPayload.reason,
+        });
+        setFeedback({
+          level: 'warning',
+          title: 'Untrusted QR URL',
+          message: classifiedPayload.message,
+          canRetry: true,
+        });
+        setScannerState('ready');
+        return;
+      }
+
+      setScannerState('decoding');
+      void submitPayload(classifiedPayload.payload);
+    },
+    [stopScanner, submitPayload, trustedRedirectOrigin]
+  );
+
+  const handleScannerError = useCallback(
+    (error: unknown) => {
+      const errorName = getScannerErrorName(error);
+
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
+        trackAnalyticsEvent('scanner_permission_denied', {
+          reason: errorName,
+        });
+        stopScanner('permission_denied');
+        setFeedback({
+          level: 'error',
+          title: 'Camera Permission Denied',
+          message: 'Allow camera access to continue scanning from Race Hub.',
+          canRetry: true,
+          showGuidance: true,
+        });
+        return;
+      }
+
+      trackAnalyticsEvent('scanner_decode_failure', {
+        decoder: 'react-qr-scanner',
+        reason: errorName,
+      });
+      stopScanner('error');
+      setFeedback({
+        level: 'error',
+        title: 'Scanner Error',
+        message: 'Unable to start camera scanning on this device right now.',
+        canRetry: true,
+        showGuidance: true,
+      });
+    },
+    [stopScanner]
+  );
 
   const startScanner = useCallback(async () => {
-    // TODO(figma-sync): Reconcile camera-permission state machine with the simpler Figma scan interaction model to keep designed scan/start states intuitive. | Figma source: src/app/pages/RaceHub.tsx scanner interaction states | Impact: user flow
     const activeScanIdentity = scanIdentityRef.current ?? scanIdentity;
     if (!activeScanIdentity) {
       setFeedback({
@@ -425,102 +382,15 @@ export default function RaceHub() {
     trackAnalyticsEvent('scanner_permission_prompted', {
       event_id: activeScanIdentity.eventId,
     });
-    setScannerState('requesting_permission');
-
-    // Snapshot startup attempt identity so Stop/Restart can invalidate stale async continuation.
-    const currentEpoch = scannerEpochRef.current;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-        },
-        audio: false,
-      });
-
-      // User canceled startup while getUserMedia was pending; stop the late stream and exit.
-      if (scannerEpochRef.current !== currentEpoch) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-
-      const video = videoRef.current;
-      if (!video) {
-        stream.getTracks().forEach((track) => track.stop());
-        throw new Error('video element unavailable');
-      }
-
-      streamRef.current = stream;
-      video.srcObject = stream;
-      await video.play();
-
-      // Stop can happen while video.play() is pending; ignore stale startup continuation.
-      if (scannerEpochRef.current !== currentEpoch) {
-        stream.getTracks().forEach((track) => track.stop());
-        if (streamRef.current === stream) {
-          streamRef.current = null;
-        }
-        if (video.srcObject === stream) {
-          video.srcObject = null;
-        }
-        return;
-      }
-
-      trackAnalyticsEvent('scanner_permission_granted', {
-        event_id: activeScanIdentity.eventId,
-      });
-
-      setFeedback({
-        level: 'info',
-        title: 'Scanner Active',
-        message: 'Point your camera at a Velocity GP QR code.',
-      });
-      dedupeRef.current = null;
-      setScannerState('ready');
-      animationFrameRef.current = window.requestAnimationFrame(() => {
-        // Prevent stale startup attempts from re-entering decoding after a stop/restart action.
-        if (scannerEpochRef.current !== currentEpoch) {
-          return;
-        }
-        setScannerState('decoding');
-        void decodeLoop();
-      });
-    } catch (error) {
-      // Ignore errors from startup attempts that were canceled by stop/restart.
-      if (scannerEpochRef.current !== currentEpoch) {
-        return;
-      }
-
-      const errorName =
-        typeof error === 'object' && error !== null && 'name' in error
-          ? String((error as { name?: string }).name)
-          : 'unknown';
-
-      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
-        trackAnalyticsEvent('scanner_permission_denied', {
-          reason: errorName,
-        });
-        stopScanner('permission_denied');
-        setFeedback({
-          level: 'error',
-          title: 'Camera Permission Denied',
-          message: 'Allow camera access to continue scanning from Race Hub.',
-          canRetry: true,
-          showGuidance: true,
-        });
-        return;
-      }
-
-      stopScanner('error');
-      setFeedback({
-        level: 'error',
-        title: 'Scanner Error',
-        message: 'Unable to start camera scanning on this device right now.',
-        canRetry: true,
-        showGuidance: true,
-      });
-    }
-  }, [decodeLoop, scanIdentity]);
+    dedupeRef.current = null;
+    setShowGuidance(false);
+    setFeedback({
+      level: 'info',
+      title: 'Scanner Active',
+      message: 'Point your camera at a Velocity GP QR code.',
+    });
+    setScannerState('ready');
+  }, [scanIdentity]);
 
   const guidanceLines = useMemo(() => fallbackGuidanceLines(), []);
 
@@ -567,15 +437,26 @@ export default function RaceHub() {
             <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-blue-500 rounded-bl-3xl" />
             <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-blue-500 rounded-br-3xl" />
 
-            <video
-              ref={videoRef}
-              className={`h-full w-full object-cover ${scannerActive ? 'block' : 'hidden'}`}
-              playsInline
-              muted
-            />
-            <canvas ref={canvasRef} className="hidden" />
-
-            {!scannerActive && (
+            {scannerActive ? (
+              <Scanner
+                allowMultiple
+                scanDelay={250}
+                paused={scannerState === 'submitting'}
+                formats={['qr_code']}
+                constraints={{
+                  facingMode: { ideal: 'environment' },
+                }}
+                onScan={handleDetectedCodes}
+                onError={handleScannerError}
+                components={{
+                  finder: true,
+                }}
+                classNames={{
+                  container: 'h-full w-full',
+                  video: 'h-full w-full object-cover',
+                }}
+              />
+            ) : (
               <div className="w-48 h-48 border-4 border-blue-500 rounded-2xl grid place-items-center">
                 {isHydratingIdentity ? (
                   <Loader2 className="w-16 h-16 text-blue-400/70 animate-spin" />
@@ -599,7 +480,11 @@ export default function RaceHub() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 ${feedbackClasses(feedback.level)}`}>
+          <div
+            className={`rounded-xl border p-3 ${feedbackClasses(feedback.level)}`}
+            role="status"
+            aria-live="polite"
+          >
             <p className="text-sm font-semibold">{feedback.title}</p>
             <p className="text-xs mt-1">{feedback.message}</p>
             {feedback.showGuidance && (
@@ -665,14 +550,6 @@ export default function RaceHub() {
               <RefreshCcw className="w-5 h-5" />
             </button>
           </div>
-
-          {!scanIdentity && !isHydratingIdentity && (
-            <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-3 text-xs text-yellow-200 flex items-start gap-2">
-              <TriangleAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              No seeded player profile is mapped for this session email, so scanner submission is
-              blocked.
-            </div>
-          )}
         </div>
       </div>
 

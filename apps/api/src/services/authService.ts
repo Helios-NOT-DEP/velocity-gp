@@ -19,6 +19,7 @@ import {
 } from './authTokens.js';
 import { getEmailDispatcher } from './emailDispatchService.js';
 import { logger } from '../lib/logger.js';
+import { AUTH_SESSION_COOKIE_NAME, resolveSessionToken } from './authSessionToken.js';
 
 /**
  * Authentication service for magic-link and session flows.
@@ -28,6 +29,9 @@ import { logger } from '../lib/logger.js';
  */
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
+
+export const AUTH_SESSION_COOKIE_MAX_AGE_MS = env.AUTH_SESSION_COOKIE_TTL_DAYS * 24 * 60 * 60_000;
+export { AUTH_SESSION_COOKIE_NAME };
 
 interface EligiblePlayer {
   readonly userId: string;
@@ -355,44 +359,54 @@ export async function verifyMagicLink(
 }
 
 /**
- * Extracts bearer token value from an Authorization header.
- */
-function parseBearerToken(authorizationHeaderValue: string | undefined): string | null {
-  if (!authorizationHeaderValue) {
-    return null;
-  }
-
-  const [scheme, token] = authorizationHeaderValue.split(' ');
-  if (!scheme || !token || scheme.toLowerCase() !== 'bearer') {
-    return null;
-  }
-
-  return token;
-}
-
-/**
  * Resolves and validates session context from the Authorization header.
  */
 export async function getSessionFromAuthorizationHeader(
   authorizationHeaderValue: string | undefined
 ): Promise<SessionResponse> {
+  return getSessionFromAuthInputs(authorizationHeaderValue, undefined);
+}
+
+/**
+ * Resolves and validates session context from Authorization and Cookie headers.
+ */
+export async function getSessionFromAuthInputs(
+  authorizationHeaderValue: string | undefined,
+  cookieHeaderValue: string | undefined
+): Promise<SessionResponse> {
   return withTraceSpan('auth.session.get', {}, async () => {
-    const token = parseBearerToken(authorizationHeaderValue);
-    if (!token) {
+    const bearerToken = resolveSessionToken(authorizationHeaderValue, undefined);
+    const cookieToken = resolveSessionToken(undefined, cookieHeaderValue);
+    const tokenCandidates = [...new Set([bearerToken, cookieToken].filter(Boolean))] as string[];
+
+    if (tokenCandidates.length === 0) {
       const authorizationScheme =
         authorizationHeaderValue?.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? null;
-      logger.debug('Missing bearer token in authorization header', {
+      logger.debug('Missing session token in authorization/cookie headers', {
         hasAuthorizationHeader: Boolean(authorizationHeaderValue),
         authorizationScheme,
+        hasCookieHeader: Boolean(cookieHeaderValue),
       });
       throw new AppError(401, 'AUTH_MISSING_TOKEN', 'Authentication is required.');
     }
 
-    let claims;
-    try {
-      claims = verifySessionToken(token);
-    } catch {
-      // Token parse/expiry errors intentionally map to a generic invalid-session response.
+    let claims: ReturnType<typeof verifySessionToken> | null = null;
+    for (const tokenCandidate of tokenCandidates) {
+      try {
+        claims = verifySessionToken(tokenCandidate);
+        if (tokenCandidate !== bearerToken && bearerToken) {
+          // Keep cookie-auth resilient when stale local bearer storage lags behind valid cookie auth.
+          logger.debug(
+            'Session auth fell back to cookie token after bearer token verification failed'
+          );
+        }
+        break;
+      } catch {
+        // Continue trying any remaining auth inputs before returning AUTH_INVALID_SESSION.
+      }
+    }
+
+    if (!claims) {
       throw new AppError(401, 'AUTH_INVALID_SESSION', 'Session is invalid or expired.');
     }
 
@@ -426,5 +440,19 @@ export async function getRoutingDecisionFromAuthorizationHeader(
   authorizationHeaderValue: string | undefined
 ): Promise<RoutingDecisionResponse> {
   const sessionResponse = await getSessionFromAuthorizationHeader(authorizationHeaderValue);
+  return buildRoutingDecision(sessionResponse.session);
+}
+
+/**
+ * Returns assignment-aware routing details for the authenticated session.
+ */
+export async function getRoutingDecisionFromAuthInputs(
+  authorizationHeaderValue: string | undefined,
+  cookieHeaderValue: string | undefined
+): Promise<RoutingDecisionResponse> {
+  const sessionResponse = await getSessionFromAuthInputs(
+    authorizationHeaderValue,
+    cookieHeaderValue
+  );
   return buildRoutingDecision(sessionResponse.session);
 }

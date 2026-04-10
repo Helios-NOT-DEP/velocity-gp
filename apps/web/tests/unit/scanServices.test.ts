@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   DEFAULT_DEDUPE_WINDOW_MS,
+  classifyQrPayload,
   createPayloadDedupeState,
   mapScanResponseToUiAction,
   resolveScanIdentityForEmail,
@@ -75,6 +76,83 @@ describe('scan identity resolver', () => {
 
     expect(result.expectedEventId).toBe('event-velocity-active');
     expect(result.currentEventId).toBe('event-other');
+  });
+});
+
+describe('QR payload classifier', () => {
+  it('treats non-URL payloads as gameplay scans', () => {
+    expect(classifyQrPayload('VG-ALPHA-01', 'https://dev.velocitygp.app')).toEqual({
+      kind: 'gameplay',
+      payload: 'VG-ALPHA-01',
+    });
+  });
+
+  it('accepts URL payloads whose origin exactly matches the trusted origin', () => {
+    expect(
+      classifyQrPayload(
+        'https://dev.velocitygp.app/login/callback?token=abc123',
+        'https://dev.velocitygp.app'
+      )
+    ).toEqual({
+      kind: 'trusted_url',
+      payload: 'https://dev.velocitygp.app/login/callback?token=abc123',
+      url: 'https://dev.velocitygp.app/login/callback?token=abc123',
+    });
+  });
+
+  it('rejects URL payloads with a different domain', () => {
+    const result = classifyQrPayload(
+      'https://evil.example/login/callback?token=abc123',
+      'https://dev.velocitygp.app'
+    );
+
+    expect(result.kind).toBe('untrusted_url');
+    if (result.kind !== 'untrusted_url') {
+      return;
+    }
+
+    expect(result.reason).toBe('origin_mismatch');
+  });
+
+  it('rejects URL payloads with the same host but a different protocol or port', () => {
+    const differentProtocol = classifyQrPayload(
+      'http://dev.velocitygp.app/login/callback?token=abc123',
+      'https://dev.velocitygp.app'
+    );
+    const differentPort = classifyQrPayload(
+      'https://dev.velocitygp.app:444/login/callback?token=abc123',
+      'https://dev.velocitygp.app'
+    );
+
+    expect(differentProtocol.kind).toBe('untrusted_url');
+    expect(differentPort.kind).toBe('untrusted_url');
+  });
+
+  it('rejects malformed URL-like payloads without crashing', () => {
+    const malformedUrl = classifyQrPayload('https://', 'https://dev.velocitygp.app');
+    const gameplayPayload = classifyQrPayload('VG-BRAVO-02', 'https://dev.velocitygp.app');
+
+    expect(malformedUrl.kind).toBe('untrusted_url');
+    if (malformedUrl.kind !== 'untrusted_url') {
+      return;
+    }
+
+    expect(malformedUrl.reason).toBe('invalid_url');
+    expect(gameplayPayload.kind).toBe('gameplay');
+  });
+
+  it('rejects URL payloads when the trusted origin is missing', () => {
+    const result = classifyQrPayload(
+      'https://dev.velocitygp.app/login/callback?token=abc123',
+      undefined
+    );
+
+    expect(result.kind).toBe('untrusted_url');
+    if (result.kind !== 'untrusted_url') {
+      return;
+    }
+
+    expect(result.reason).toBe('missing_trusted_origin');
   });
 });
 

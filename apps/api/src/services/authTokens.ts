@@ -154,7 +154,7 @@ export function createSessionToken(input: {
 }): string {
   const now = input.now ?? new Date();
   const issuedAt = now.getTime();
-  const expiresAt = issuedAt + env.AUTH_SESSION_TTL_HOURS * 60 * 60_000;
+  const expiresAt = issuedAt + env.AUTH_SESSION_COOKIE_TTL_DAYS * 24 * 60 * 60_000;
 
   return createToken({
     kind: 'session',

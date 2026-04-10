@@ -7,7 +7,8 @@ import { createApp } from '../../src/app/createApp.js';
 import { env } from '../../src/config/env.js';
 import { prisma } from '../../src/db/client.js';
 import { setEmailDispatcherForTests } from '../../src/services/emailDispatchService.js';
-import { createMagicLinkToken } from '../../src/services/authTokens.js';
+import { createMagicLinkToken, createSessionToken } from '../../src/services/authTokens.js';
+import { AUTH_SESSION_COOKIE_NAME } from '../../src/services/authSessionToken.js';
 
 describe('velocity gp backend', () => {
   const app = createApp();
@@ -550,7 +551,24 @@ describe('velocity gp backend', () => {
     expect(verifyResponse.body.data.redirectPath).toBe('/race-hub');
     expect(typeof verifyResponse.body.data.sessionToken).toBe('string');
 
+    const setCookieHeader = verifyResponse.headers['set-cookie'];
+    expect(setCookieHeader).toBeDefined();
+    expect(Array.isArray(setCookieHeader)).toBe(true);
+    expect(setCookieHeader?.[0]).toContain('velocitygp_session=');
+    expect(setCookieHeader?.[0]).toContain('Max-Age=432000');
+    expect(setCookieHeader?.[0]).toContain('HttpOnly');
+
     const sessionToken = String(verifyResponse.body.data.sessionToken);
+    const sessionCookie = setCookieHeader?.[0]?.split(';')[0];
+    expect(sessionCookie).toBeTruthy();
+
+    const cookieSessionResponse = await request(app)
+      .get(`${apiPrefix}/auth/session`)
+      .set('cookie', String(sessionCookie));
+
+    expect(cookieSessionResponse.status).toBe(200);
+    expect(cookieSessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
+
     const [sessionResponse, routingResponse] = await Promise.all([
       request(app).get(`${apiPrefix}/auth/session`).set('authorization', `Bearer ${sessionToken}`),
       request(app)
@@ -562,6 +580,106 @@ describe('velocity gp backend', () => {
     expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
     expect(routingResponse.status).toBe(200);
     expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
+  });
+
+  it('falls back to cookie auth when a stale bearer token is also present', async () => {
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+    const capturedLinks: string[] = [];
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
+    });
+
+    const requestResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: assignedEmail });
+
+    expect(requestResponse.status).toBe(202);
+    expect(capturedLinks.length).toBe(1);
+
+    const tokenFromLink = new URL(capturedLinks[0]).searchParams.get('token');
+    expect(tokenFromLink).toBeTruthy();
+    if (!tokenFromLink) {
+      throw new Error('Expected token in captured magic link URL.');
+    }
+
+    const verifyResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/verify`)
+      .send({ token: tokenFromLink });
+
+    expect(verifyResponse.status).toBe(200);
+
+    const sessionCookie = verifyResponse.headers['set-cookie']?.[0]?.split(';')[0];
+    expect(sessionCookie).toBeTruthy();
+
+    const staleBearerToken = 'stale-bearer-token';
+
+    const [sessionResponse, routingResponse] = await Promise.all([
+      request(app)
+        .get(`${apiPrefix}/auth/session`)
+        .set('authorization', `Bearer ${staleBearerToken}`)
+        .set('cookie', String(sessionCookie)),
+      request(app)
+        .get(`${apiPrefix}/auth/routing-decision`)
+        .set('authorization', `Bearer ${staleBearerToken}`)
+        .set('cookie', String(sessionCookie)),
+    ]);
+
+    expect(sessionResponse.status).toBe(200);
+    expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
+    expect(routingResponse.status).toBe(200);
+    expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
+  });
+
+  it('clears auth cookie on logout and removes cookie-authenticated access', async () => {
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+    const capturedLinks: string[] = [];
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
+    });
+
+    const requestResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: assignedEmail });
+
+    expect(requestResponse.status).toBe(202);
+    expect(capturedLinks.length).toBe(1);
+
+    const tokenFromLink = new URL(capturedLinks[0]).searchParams.get('token');
+    expect(tokenFromLink).toBeTruthy();
+    if (!tokenFromLink) {
+      throw new Error('Expected token in captured magic link URL.');
+    }
+
+    const agent = request.agent(app);
+    const verifyResponse = await agent.post(`${apiPrefix}/auth/magic-link/verify`).send({
+      token: tokenFromLink,
+    });
+
+    expect(verifyResponse.status).toBe(200);
+
+    const authenticatedSessionResponse = await agent.get(`${apiPrefix}/auth/session`);
+    expect(authenticatedSessionResponse.status).toBe(200);
+
+    const logoutResponse = await agent.post(`${apiPrefix}/auth/logout`);
+    expect(logoutResponse.status).toBe(200);
+    expect(logoutResponse.body.success).toBe(true);
+    expect(logoutResponse.body.data.loggedOut).toBe(true);
+    expect(logoutResponse.headers['set-cookie']?.[0]).toContain('velocitygp_session=;');
+
+    const postLogoutSessionResponse = await agent.get(`${apiPrefix}/auth/session`);
+    expect(postLogoutSessionResponse.status).toBe(401);
+    expect(postLogoutSessionResponse.body.success).toBe(false);
+    expect(postLogoutSessionResponse.body.error.code).toBe('AUTH_MISSING_TOKEN');
   });
 
   it('rejects unassigned players during verify with AUTH_ASSIGNMENT_REQUIRED', async () => {
@@ -799,6 +917,31 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.scope).toBe('admin');
     expect(response.body.data.userId).toBe('admin-1');
+    expect(response.body.data.role).toBe('admin');
+  });
+
+  it('allows legacy admin headers when a stale non-admin session cookie is present', async () => {
+    const stalePlayerSessionToken = createSessionToken({
+      userId: fixtureIds.playerUserId,
+      playerId: fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      teamId: fixtureIds.teamId,
+      teamStatus: 'ACTIVE',
+      role: 'player',
+      email: `player-${token}@velocitygp.dev`,
+      displayName: 'Player Fixture',
+    });
+
+    const response = await request(app)
+      .get(`${apiPrefix}/admin/session`)
+      .set('Cookie', `${AUTH_SESSION_COOKIE_NAME}=${stalePlayerSessionToken}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.scope).toBe('admin');
+    expect(response.body.data.userId).toBe(fixtureIds.adminUserId);
     expect(response.body.data.role).toBe('admin');
   });
 

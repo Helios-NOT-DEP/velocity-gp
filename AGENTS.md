@@ -71,8 +71,6 @@ Recent history favors short conventional commits such as `feat: ...`, `fix: ...`
 - List of impacted routes/components
 - Screenshots for UI changes
 - Verification that `npm run build` passes
-
-Before pushing any branch:
 - Run `npm run lint` and resolve reported issues.
 - Run `npm run format` and include any formatting updates in the push.
 

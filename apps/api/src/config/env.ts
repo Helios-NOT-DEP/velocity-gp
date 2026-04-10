@@ -126,7 +126,7 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().optional(),
   MAGIC_LINK_TOKEN_EXPIRY_DATE: z.string().nullable().default(null),
   MAGIC_LINK_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
-  AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(72),
+  AUTH_SESSION_COOKIE_TTL_DAYS: z.coerce.number().int().positive().default(5),
   MAILTRAP_WEBHOOK_SECRET: optionalMinString(16),
   MAILTRAP_AUDIT_ACTOR_EMAIL: optionalEmail.default('system+mailtrap@velocitygp.internal'),
   N8N_WEBHOOK_TOKEN: optionalMinString(16),

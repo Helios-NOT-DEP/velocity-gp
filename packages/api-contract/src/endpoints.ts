@@ -78,6 +78,7 @@ export const authEndpoints = {
   // Session/routing endpoints derive state from Authorization bearer tokens.
   getSession: '/auth/session',
   getRoutingDecision: '/auth/routing-decision',
+  logout: '/auth/logout',
 };
 
 // Legacy aliases retained while callers migrate.
