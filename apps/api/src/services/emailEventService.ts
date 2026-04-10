@@ -102,12 +102,12 @@ export async function ingestMailtrapEvents(
         continue;
       }
 
-        const result = await prisma.$transaction(async (tx) => {
-          const providerEventId = event.providerEventId ?? null;
+      const result = await prisma.$transaction(async (tx) => {
+        const providerEventId = event.providerEventId ?? null;
 
-          if (providerEventId) {
-            // Deduplicate by provider event id to make webhook retries idempotent.
-            const existing = await tx.emailEvent.findUnique({
+        if (providerEventId) {
+          // Deduplicate by provider event id to make webhook retries idempotent.
+          const existing = await tx.emailEvent.findUnique({
             where: {
               provider_providerEventId: {
                 provider: 'MAILTRAP',
