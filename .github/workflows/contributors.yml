@@ -25,5 +25,6 @@ jobs:
         with:
           readme_path: README.md
           commit_message: 'docs(readme): update contributors list'
+          auto_detect_branch_protection: false
         env:
           GITHUB_TOKEN: ${{ github.token }}
