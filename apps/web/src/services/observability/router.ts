@@ -20,6 +20,8 @@ function trackRoute(pathname: string) {
 }
 
 export function observeRouter(router: Router) {
+  // Deduplicates route events because router subscriptions can fire repeatedly
+  // during redirects and state-only transitions.
   let previousPathname: string | null = null;
 
   const emitCurrentRoute = () => {

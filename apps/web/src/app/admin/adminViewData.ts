@@ -57,10 +57,12 @@ export const adminDemoQrCodes: AdminQrCode[] = [
 ];
 
 export function toSortedTeams(teams: Team[]): Team[] {
+  // Centralized sorting keeps admin tables/cards in sync on score order.
   return [...teams].sort((a, b) => b.score - a.score);
 }
 
 export function toAdminPlayers(teams: Team[]): AdminPlayerRow[] {
+  // Demo player rows are derived from teams until roster APIs replace placeholder data.
   return toSortedTeams(teams).map((team, index) => ({
     id: `player-${team.id}`,
     name: `${team.name} Driver`,
@@ -70,6 +72,7 @@ export function toAdminPlayers(teams: Team[]): AdminPlayerRow[] {
 }
 
 export function rankBadgeClass(index: number): string {
+  // Visual hierarchy mirrors podium ordering for first three teams.
   if (index === 0) {
     return 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black';
   }

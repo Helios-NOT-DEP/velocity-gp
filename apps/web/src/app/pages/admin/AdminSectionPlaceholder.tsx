@@ -17,6 +17,7 @@ export default function AdminSectionPlaceholder({ title, description, issueLinks
         <p className="mt-4 max-w-3xl text-slate-200/85">{description}</p>
       </div>
 
+      {/* Shared scaffold used for admin tabs that are intentionally staged for later work. */}
       <article className="rounded-2xl border border-dashed border-cyan-300/35 bg-cyan-500/5 p-5">
         <h3 className="text-lg font-medium text-cyan-100">Implementation Placeholder</h3>
         <p className="mt-2 text-slate-200/85">

@@ -40,6 +40,8 @@ function resolveAuthHeaders(): Record<string, string> {
     }
 
     return {
+      // Transitional identity headers keep API authorization working before full
+      // cookie/session middleware is introduced end-to-end.
       'x-user-id': parsed.userId,
       'x-user-role': parsed.role,
     };
@@ -72,6 +74,7 @@ class ObservableApiClient extends ApiClient {
         },
       },
       async (span) => {
+        // Delegate actual request/response parsing to shared package client.
         const response = await super.request<T>(endpoint, requestOptions);
         span?.setAttribute('http.response.status_code', response.status);
 

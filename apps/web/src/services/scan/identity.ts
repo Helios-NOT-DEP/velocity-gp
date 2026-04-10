@@ -90,6 +90,7 @@ export async function resolveScanIdentityForEmail(
 
   let eventResponse;
   try {
+    // Guard against stale seeded identities by validating against current active event.
     eventResponse = await apiClient.get<EventSummary>(eventEndpoints.getCurrentEvent);
   } catch {
     return {
@@ -123,6 +124,7 @@ export async function resolveScanIdentityForEmail(
 }
 
 export function getSeededIdentityByEmail(email: string | undefined): ScanIdentity | null {
+  // Synchronous lookup helper used by UI paths that do not need event validation.
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
     return null;

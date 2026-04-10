@@ -37,6 +37,7 @@ export default function AdminTeams() {
     setLoadError(null);
 
     try {
+      // Keep team summary + roster rows in sync by loading both from the same event snapshot.
       const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
       const [nextTeamOptions, nextRoster] = await Promise.all([
         listAdminRosterTeams(resolvedEventId),
@@ -61,6 +62,7 @@ export default function AdminTeams() {
   }, []);
 
   const teamMembers = useMemo(() => {
+    // Build a quick team->members lookup map for table rendering.
     const grouped = new Map<string, AdminRosterRow[]>();
     for (const row of rosterRows) {
       if (!row.teamId) {

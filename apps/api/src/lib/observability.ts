@@ -8,6 +8,7 @@ type SpanAttributes = Record<string, AttributeValue>;
 const counters = new Map<string, number>();
 
 function buildCounterKey(name: string, labels: SpanAttributes): string {
+  // Sort labels for deterministic metric keys regardless of call-site object ordering.
   const sortedLabels = Object.entries(labels)
     .filter(([, value]) => value !== undefined)
     .sort(([left], [right]) => left.localeCompare(right))

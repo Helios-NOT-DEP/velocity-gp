@@ -17,6 +17,7 @@ export async function getRaceState(
   eventId: string,
   playerId: string
 ): Promise<GetRaceStateResponse> {
+  // Uses shared API client wrapper so telemetry/auth headers are applied consistently.
   const response = await apiClient.get<GetRaceStateResponse>(
     `/events/${eventId}/players/${playerId}/race-state`
   );

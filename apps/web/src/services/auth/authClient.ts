@@ -17,6 +17,15 @@ import {
   isAuthRole,
 } from './authTypes';
 
+/**
+ * Browser auth client for magic-link/session workflows.
+ *
+ * Responsibilities:
+ * - persist and hydrate session state from local storage
+ * - emit a session-updated event for interested UI subscribers
+ * - normalize API response contracts into frontend auth types
+ */
+
 interface AuthCredentials {
   email: string;
 }
@@ -61,6 +70,7 @@ function clearStoredSession(): void {
   const storage = getBrowserStorage();
   storage?.removeItem(AUTH_SESSION_STORAGE_KEY);
   storage?.removeItem(AUTH_SESSION_TOKEN_STORAGE_KEY);
+  // Clearing auth is a state transition; notify listeners immediately.
   emitSessionUpdatedEvent();
 }
 
@@ -72,6 +82,7 @@ function persistSession(session: AuthSession, sessionToken: string): void {
 
   storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
   storage.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, sessionToken);
+  // Emitted for route guards/context providers that react to auth transitions.
   emitSessionUpdatedEvent();
 }
 
@@ -172,6 +183,7 @@ export async function verifyMagicLink(token: string): Promise<MagicLinkVerifyRes
   }
 
   const normalizedSession = normalizeSessionFromResponse(response.data.session);
+  // Persist token + normalized session as the canonical signed-in state.
   persistSession(normalizedSession, response.data.sessionToken);
 
   return response.data;
@@ -180,6 +192,7 @@ export async function verifyMagicLink(token: string): Promise<MagicLinkVerifyRes
 export async function getSession(): Promise<AuthSession> {
   const storedToken = readAuthTokenFromStorage();
   if (!storedToken) {
+    // Without a bearer token we stay in storage-only mode (offline/anonymous-safe path).
     return readSessionFromStorage();
   }
 

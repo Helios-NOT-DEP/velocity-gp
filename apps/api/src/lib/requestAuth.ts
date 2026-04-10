@@ -12,6 +12,7 @@ export function resolveRequestAuthContext(request: Request): RequestAuthContext 
     const [scheme, token] = authorizationHeader.split(' ');
     if (scheme?.toLowerCase() === 'bearer' && token) {
       try {
+        // Primary auth path: parse and verify signed session token.
         const claims = verifySessionToken(token);
         return {
           userId: claims.userId,

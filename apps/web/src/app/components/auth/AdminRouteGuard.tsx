@@ -50,10 +50,12 @@ export default function AdminRouteGuard({ children }: Props) {
   }
 
   if (!isAuthenticatedSession(session)) {
+    // Unauthenticated users are sent to login rather than shown authorization UI.
     return <Navigate to="/" replace />;
   }
 
   if (!isAdminSession(session)) {
+    // Authenticated non-admins get an explicit forbidden state for clarity.
     return <ForbiddenAdminAccess />;
   }
 

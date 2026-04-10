@@ -16,6 +16,7 @@ export class AppError extends Error {
   }
 }
 
+// Convenience subclasses map directly to stable API error codes/statuses.
 export class NotFoundError extends AppError {
   constructor(message: string, details?: Record<string, unknown>) {
     super(404, 'NOT_FOUND', message, details);

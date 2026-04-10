@@ -26,6 +26,7 @@ export interface ApiErrorResponse {
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 export function successResponse<T>(data: T, meta?: ApiMeta): ApiSuccessResponse<T> {
+  // Keep envelope shape stable across endpoints and runtime implementations.
   return meta ? { success: true, data, meta } : { success: true, data };
 }
 

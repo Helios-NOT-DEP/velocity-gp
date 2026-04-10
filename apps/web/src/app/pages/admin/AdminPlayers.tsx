@@ -78,6 +78,7 @@ export default function AdminPlayers() {
     setLoadError(null);
 
     try {
+      // Resolve event once, then hydrate roster + team options in parallel for one UI refresh.
       const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
       const [nextRoster, nextTeamOptions] = await Promise.all([
         listAdminRoster(resolvedEventId, {
@@ -105,6 +106,7 @@ export default function AdminPlayers() {
   }, [appliedSearch, assignmentFilter, teamFilter]);
 
   const rosterRows = roster?.items ?? [];
+  // Team options drive assignment dropdowns and summary counters in the same screen.
   const teamSelectOptions = useMemo(() => teamOptions?.teams ?? [], [teamOptions]);
 
   async function handleSubmitSearch(event: React.FormEvent<globalThis.HTMLFormElement>) {

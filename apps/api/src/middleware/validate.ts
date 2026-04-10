@@ -16,6 +16,7 @@ export function validate<T>(
       return;
     }
 
+    // Replace request payload with parsed data so downstream handlers consume typed values.
     Object.defineProperty(request, source, {
       value: result.data,
       configurable: true,
