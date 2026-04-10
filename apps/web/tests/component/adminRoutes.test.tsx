@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { render, screen, waitFor } from '@testing-library/react';
 import { appRoutes } from '@/app/routes';
@@ -27,6 +27,40 @@ function renderWithRoute(pathname: string, session?: AuthSession) {
 }
 
 describe('admin route guards', () => {
+  beforeEach(() => {
+    const upstreamFetch = globalThis.fetch;
+    const authSessionFallbackFetch = vi.fn(
+      async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        const requestUrl =
+          typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+        if (/\/api\/auth\/session(?:\?|$)/i.test(requestUrl)) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: {
+                code: 'TEST_NON_AUTHORITATIVE_AUTH',
+                message:
+                  'Simulated non-authoritative auth/session transport failure for route-guard tests.',
+              },
+            }),
+            {
+              status: 503,
+              headers: {
+                'content-type': 'application/json',
+              },
+            }
+          );
+        }
+
+        return upstreamFetch(input, init);
+      }
+    );
+
+    vi.stubGlobal('fetch', authSessionFallbackFetch);
+    window.fetch = authSessionFallbackFetch as typeof window.fetch;
+  });
+
   afterEach(() => {
     window.localStorage.clear();
   });
