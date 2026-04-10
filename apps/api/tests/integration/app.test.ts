@@ -7,7 +7,8 @@ import { createApp } from '../../src/app/createApp.js';
 import { env } from '../../src/config/env.js';
 import { prisma } from '../../src/db/client.js';
 import { setEmailDispatcherForTests } from '../../src/services/emailDispatchService.js';
-import { createMagicLinkToken } from '../../src/services/authTokens.js';
+import { createMagicLinkToken, createSessionToken } from '../../src/services/authTokens.js';
+import { AUTH_SESSION_COOKIE_NAME } from '../../src/services/authSessionToken.js';
 
 describe('velocity gp backend', () => {
   const app = createApp();
@@ -863,6 +864,31 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.scope).toBe('admin');
     expect(response.body.data.userId).toBe('admin-1');
+    expect(response.body.data.role).toBe('admin');
+  });
+
+  it('allows legacy admin headers when a stale non-admin session cookie is present', async () => {
+    const stalePlayerSessionToken = createSessionToken({
+      userId: fixtureIds.playerUserId,
+      playerId: fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      teamId: fixtureIds.teamId,
+      teamStatus: 'ACTIVE',
+      role: 'player',
+      email: `player-${token}@velocitygp.dev`,
+      displayName: 'Player Fixture',
+    });
+
+    const response = await request(app)
+      .get(`${apiPrefix}/admin/session`)
+      .set('Cookie', `${AUTH_SESSION_COOKIE_NAME}=${stalePlayerSessionToken}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.scope).toBe('admin');
+    expect(response.body.data.userId).toBe(fixtureIds.adminUserId);
     expect(response.body.data.role).toBe('admin');
   });
 

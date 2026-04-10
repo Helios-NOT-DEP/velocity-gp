@@ -8,12 +8,14 @@ interface AuthResponseLocals {
 }
 
 export function resolveRequestAuthContext(request: Request): RequestAuthContext | null {
-  const token = resolveSessionToken(request.header('authorization'), request.header('cookie'));
+  const authorizationHeader = request.header('authorization');
+  const cookieHeader = request.header('cookie');
 
-  if (token) {
+  const bearerToken = resolveSessionToken(authorizationHeader, undefined);
+  if (bearerToken) {
     try {
       // Primary auth path: parse and verify signed session token.
-      const claims = verifySessionToken(token);
+      const claims = verifySessionToken(bearerToken);
       return {
         userId: claims.userId,
         role: claims.role,
@@ -23,6 +25,30 @@ export function resolveRequestAuthContext(request: Request): RequestAuthContext 
     }
   }
 
+  const cookieToken = resolveSessionToken(undefined, cookieHeader);
+  if (cookieToken) {
+    try {
+      const claims = verifySessionToken(cookieToken);
+      const legacyAuthContext = resolveLegacyHeaderAuthContext(request);
+
+      // Preserve header-based admin compatibility when a stale non-admin cookie exists.
+      if (claims.role !== 'admin' && legacyAuthContext?.role === 'admin') {
+        return legacyAuthContext;
+      }
+
+      return {
+        userId: claims.userId,
+        role: claims.role,
+      };
+    } catch {
+      // Fall back to legacy headers for compatibility in tests/local tooling.
+    }
+  }
+
+  return resolveLegacyHeaderAuthContext(request);
+}
+
+function resolveLegacyHeaderAuthContext(request: Request): RequestAuthContext | null {
   const userIdHeader = request.header('x-user-id');
   const userRoleHeader = request.header('x-user-role');
 
