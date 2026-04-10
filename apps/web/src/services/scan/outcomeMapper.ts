@@ -46,6 +46,7 @@ export function mapScanResponseToUiAction(response: SubmitScanResponse): ScanUiA
   }
 
   if (response.outcome === 'HAZARD_PIT') {
+    // Hazard outcomes intentionally route to pit-stop so players immediately see lockout timer.
     return {
       feedback: {
         level: 'warning',
@@ -66,6 +67,7 @@ export function mapScanResponseToUiAction(response: SubmitScanResponse): ScanUiA
   }
 
   if (response.errorCode === 'TEAM_IN_PIT') {
+    // TEAM_IN_PIT is represented as blocked scan but still navigates to pit-stop status screen.
     return {
       feedback: {
         level: 'warning',

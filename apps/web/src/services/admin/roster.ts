@@ -11,6 +11,7 @@ import type {
 import { adminEndpoints, apiClient, eventEndpoints, type EventSummary } from '@/services/api';
 
 function parseCsvRows(csvText: string): string[][] {
+  // Minimal CSV parser supporting quoted values and escaped quotes.
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentValue = '';
@@ -110,6 +111,7 @@ export async function parseRosterCsvFile(file: globalThis.File): Promise<RosterI
 }
 
 export async function getCurrentEventId(): Promise<string> {
+  // Admin pages scope all roster actions to the currently active event.
   const eventResponse = await apiClient.get<EventSummary>(eventEndpoints.getCurrentEvent);
   if (!eventResponse.ok) {
     throw new Error(`Unable to load current event (${eventResponse.status}).`);
@@ -149,6 +151,7 @@ export async function updateAdminRosterAssignment(
   playerId: string,
   teamId: string | null
 ): Promise<UpdateRosterAssignmentResponse> {
+  // PATCH is used so callers can set team assignment to a specific team or null (unassign).
   const response = await apiClient.request<UpdateRosterAssignmentResponse>(
     adminEndpoints.updateRosterAssignment(eventId, playerId),
     {

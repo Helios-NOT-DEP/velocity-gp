@@ -13,6 +13,7 @@ function loadEnvironmentFiles(): void {
     return;
   }
 
+  // Load from repo + package roots so workspace commands and direct package runs behave the same.
   const packageRoot = resolve(currentDirectory, '../..');
   const repoRoot = resolve(currentDirectory, '../../../../');
   const prioritizedEnvFiles =
@@ -151,6 +152,7 @@ export const packageJson = z
 const parsedEnv = envSchema.parse(process.env);
 const frontendOriginsFromEnv = parsedEnv.FRONTEND_ORIGIN;
 const frontendOrigin = frontendOriginsFromEnv[0];
+// Magic-link callback defaults to primary frontend origin when no override is provided.
 const frontendMagicLinkOrigin = parsedEnv.FRONTEND_MAGIC_LINK_ORIGIN ?? frontendOrigin;
 
 if (parsedEnv.NODE_ENV === 'production') {

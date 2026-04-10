@@ -112,6 +112,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
+    // Local countdown ticker used for optimistic pit-stop UX before realtime is wired in.
     const interval = setInterval(() => {
       setGameState((prev) => ({
         ...prev,
@@ -145,6 +146,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let active = true;
 
     const syncCurrentUserFromSession = async () => {
+      // Auth session is the source of truth for current user identity across route reloads.
       const session = await getAuthSession();
       if (!active) {
         return;
@@ -300,6 +302,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hydrateScanIdentity = (identity: ScanIdentity) => {
     setGameState((prev) => {
+      // Seed team/current user context from scanner identity so downstream scan calls can
+      // execute even before full roster hydration is available.
       const existingTeam = prev.teams.find((team) => team.id === identity.teamId);
       const seedTeam: Team = existingTeam ?? {
         id: identity.teamId,
@@ -337,6 +341,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const applyScanOutcome = (response: SubmitScanResponse) => {
     setGameState((prev) => {
       const fallbackTeamId = prev.currentTeam?.id ?? null;
+      // Backend teamId wins. Local team is fallback for older or partial response payloads.
       const resolvedTeamId = response.teamId ?? fallbackTeamId;
 
       const scanRecord: Scan = {
@@ -370,6 +375,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const nextTeam: Team = { ...team };
           if ('teamScore' in response) {
+            // Authoritative score from backend prevents drift from optimistic local mutations.
             nextTeam.score = response.teamScore;
           }
 
@@ -385,6 +391,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           if (response.outcome === 'BLOCKED' && response.errorCode === 'TEAM_IN_PIT') {
+            // Preserve pit-stop lock in UI when server rejects scans during lockout.
             nextTeam.inPitStop = true;
             if (!nextTeam.pitStopTimeLeft) {
               nextTeam.pitStopTimeLeft = 60;
@@ -392,6 +399,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           if (response.outcome === 'SAFE') {
+            // Explicitly clear stale pit-stop state when a safe scan resumes team activity.
             nextTeam.inPitStop = false;
             nextTeam.pitStopTimeLeft = undefined;
           }
@@ -436,6 +444,7 @@ function resolveCurrentUserFromSession(session: AuthSession): GameState['current
     return null;
   }
 
+  // Keep context shape stable even when optional profile fields are absent.
   return {
     name: session.displayName ?? session.email ?? 'Player',
     email: session.email ?? '',

@@ -22,6 +22,7 @@ export default function Garage() {
     setIsGenerating(true);
 
     setTimeout(() => {
+      // Local generation stub emulates async AI output until backend image/name generation is wired.
       const teamName = `${keyword1} ${keyword3}s`;
       setGeneratedTeamName(teamName);
       setGeneratedCarImage(
@@ -34,6 +35,7 @@ export default function Garage() {
 
   const handleFinalize = () => {
     // TODO(figma-sync): Route finalized onboarding to /team parity path (TeamPage) instead of direct /race-hub jump. | Figma source: src/app/pages/Garage.tsx handleContinue -> navigate('/team') | Impact: user flow
+    // Persist generated identity in shared context so race/pit/leaderboard pages can consume it.
     createTeam(generatedTeamName, generatedCarImage, [keyword1, keyword2, keyword3]);
     navigate('/race-hub');
   };

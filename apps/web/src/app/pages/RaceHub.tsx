@@ -80,6 +80,7 @@ function formatTimestamp(timestamp: Date): string {
 }
 
 export default function RaceHub() {
+  // RaceHub owns scanner lifecycle, scan submission, and feedback mapping for gameplay.
   const { gameState, hydrateScanIdentity, applyScanOutcome } = useGame();
   const navigate = useNavigate();
 
@@ -164,6 +165,7 @@ export default function RaceHub() {
   const refreshIdentity = async () => {
     setIsHydratingIdentity(true);
 
+    // Pull latest session/email first so roster assignment updates are reflected immediately.
     const session = await getSession();
     const email = gameState.currentUser?.email ?? session.email;
     const resolution = await resolveScanIdentityForEmail(email);

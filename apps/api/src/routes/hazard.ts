@@ -12,6 +12,7 @@ import { getHazard, listHazards, scanHazard } from '../services/hazardService.js
 
 export const hazardRouter = Router();
 
+// Legacy hazard endpoints retained while scan clients migrate to /events/:eventId/scans.
 hazardRouter.post(
   '/hazards/scan',
   validate(scanHazardSchema),

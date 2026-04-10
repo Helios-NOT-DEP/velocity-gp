@@ -11,6 +11,7 @@ export function shouldSuppressDuplicatePayload(
   previousState: PayloadDedupeState | null,
   dedupeWindowMs: number = DEFAULT_DEDUPE_WINDOW_MS
 ): boolean {
+  // Ignore repeated decodes of the same QR payload emitted by camera frames in quick succession.
   if (!previousState) {
     return false;
   }

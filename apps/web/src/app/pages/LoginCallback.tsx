@@ -22,6 +22,7 @@ export default function LoginCallback() {
       }
 
       try {
+        // Verify token server-side and use backend-provided redirect for assignment-aware routing.
         const verification = await verifyMagicLink(token);
         if (cancelled) {
           return;
@@ -36,6 +37,7 @@ export default function LoginCallback() {
         const code =
           verificationError instanceof Error ? verificationError.message : 'AUTH_INVALID_LINK';
         if (code === 'AUTH_ASSIGNMENT_REQUIRED') {
+          // Explicit unassigned path keeps onboarding messaging deterministic.
           navigate('/waiting-assignment', { replace: true });
           return;
         }

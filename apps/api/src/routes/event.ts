@@ -8,6 +8,7 @@ import { getCurrentEvent, getEvent, listEvents } from '../services/eventService.
 
 export const eventRouter = Router();
 
+// Event discovery endpoints for current context + detail lookup.
 eventRouter.get(
   '/events',
   asyncHandler(async (_request, response) => {

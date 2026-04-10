@@ -36,6 +36,7 @@ export function requireN8nWebhookAuth(
   _response: Response,
   next: NextFunction
 ): void {
+  // Shared bearer-token guard for internal webhook ingress endpoints.
   const authorizationHeader = request.header('authorization');
   const bearerToken = parseBearerToken(authorizationHeader);
   const requestMetadata = {

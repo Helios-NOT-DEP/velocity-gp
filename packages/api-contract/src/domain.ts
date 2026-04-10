@@ -1,3 +1,4 @@
+// Domain-level contract exports used by both API and frontend consumers.
 export * from './contracts/auth.js';
 export * from './contracts/adminControls.js';
 export * from './contracts/participants.js';

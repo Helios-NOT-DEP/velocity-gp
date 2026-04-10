@@ -5,6 +5,7 @@ import { adminDemoQrCodes } from '../../admin/adminViewData';
 
 export default function AdminGameControl() {
   const { gameState } = useGame();
+  // Derived counters mirror control-room summary cards until backend admin stats API is added.
   const activePenalties = gameState.teams.filter((team) => team.inPitStop).length;
   // TODO(figma-sync): Wire game active/pause controls to live admin state so this panel matches the interactive control card behavior in Figma Admin. | Figma source: src/app/pages/Admin.tsx Game Status card | Impact: admin flow
 

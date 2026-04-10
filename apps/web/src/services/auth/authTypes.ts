@@ -14,6 +14,7 @@ export interface AuthSession {
   displayName?: string;
 }
 
+// Storage/event keys are shared across hooks, context, and route guards.
 export const AUTH_SESSION_STORAGE_KEY = 'velocitygp.auth.session';
 export const AUTH_SESSION_TOKEN_STORAGE_KEY = 'velocitygp.auth.token';
 export const AUTH_SESSION_UPDATED_EVENT = 'velocitygp.auth.session.updated';
@@ -25,6 +26,7 @@ export const anonymousSession: AuthSession = {
 };
 
 export function isAuthenticatedSession(session: AuthSession): boolean {
+  // Require explicit user id and non-anonymous role to avoid half-hydrated states.
   return session.isAuthenticated && session.role !== 'anonymous' && session.userId !== null;
 }
 

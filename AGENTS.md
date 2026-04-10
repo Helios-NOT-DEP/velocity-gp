@@ -72,6 +72,10 @@ Recent history favors short conventional commits such as `feat: ...`, `fix: ...`
 - Screenshots for UI changes
 - Verification that `npm run build` passes
 
+Before pushing any branch:
+- Run `npm run lint` and resolve reported issues.
+- Run `npm run format` and include any formatting updates in the push.
+
 GitHub Issues is the backlog of record for this repository. Track feature work, bugs, and follow-up tasks in the Helios project board:
 
 - Backlog: `https://github.com/orgs/Helios-NOT-DEP/projects/4`

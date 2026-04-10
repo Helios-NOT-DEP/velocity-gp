@@ -30,6 +30,7 @@ function resolveRuntimeDatabaseUrl(): string {
       DATABASE_URL: env.DATABASE_URL,
     }).url;
   } catch (error) {
+    // Development fallback keeps local API bootable before env wiring is complete.
     if (env.DATABASE_URL === undefined) {
       return 'postgresql://postgres:postgres@localhost:5432/postgres';
     }
@@ -63,6 +64,7 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') {
+  // Reuse pool/client across HMR reloads to avoid exhausting Postgres connections.
   globalForPrisma.prismaPool = prismaPool;
   globalForPrisma.prisma = prisma;
 }

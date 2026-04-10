@@ -6,6 +6,7 @@ import { adminDemoQrCodes, rankBadgeClass, toSortedTeams } from '../../admin/adm
 export default function AdminStatistics() {
   const { gameState } = useGame();
   const sortedTeams = toSortedTeams(gameState.teams);
+  // Dashboard totals are derived from local state until dedicated admin metrics endpoints are used.
   const totalScans = gameState.scans.length;
   const totalPitStops = gameState.teams.filter((team) => team.inPitStop).length;
   const totalPoints = gameState.teams.reduce((sum, team) => sum + team.score, 0);

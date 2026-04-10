@@ -12,6 +12,7 @@ import { createPlayer, getPlayerProfile, updatePlayerProfile } from '../services
 
 export const playerRouter = Router();
 
+// Player CRUD/profile endpoints used by onboarding and profile screens.
 playerRouter.post(
   '/players',
   validate(createPlayerSchema),

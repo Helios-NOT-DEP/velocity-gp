@@ -8,6 +8,7 @@ export default function HeliosProfile() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Ensure profile visit upgrades context role for Helios-specific UI affordances.
     if (gameState.currentUser && !gameState.currentUser.isHelios) {
       becomeHelios();
     }

@@ -13,6 +13,7 @@ import { teamRouter } from './team.js';
 
 export const apiRouter = Router();
 
+// Route order is intentionally stable so broad prefixes do not shadow specific handlers.
 apiRouter.use(adminRouter);
 apiRouter.use(authRouter);
 apiRouter.use(emailWebhookRouter);
