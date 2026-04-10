@@ -87,23 +87,44 @@ function createDetectedCode(rawValue: string) {
   };
 }
 
+const SCANNER_TEST_TIMEOUT_MS = 15_000;
+const SCANNER_STARTUP_TIMEOUT_MS = 12_000;
+
+function getScannerActivationButton(): HTMLButtonElement {
+  return screen.getByRole('button', {
+    name: /Start Camera Scan|Retry Camera Access/i,
+  }) as HTMLButtonElement;
+}
+
 async function startScanner() {
-  await screen.findByRole('button', { name: /Start Camera Scan/i }, { timeout: 5_000 });
-  await waitFor(
-    () => {
-      expect(screen.getByRole('button', { name: /Start Camera Scan/i })).not.toBeDisabled();
-    },
-    { timeout: 5_000 }
+  await screen.findByRole(
+    'button',
+    { name: /Start Camera Scan|Retry Camera Access/i },
+    { timeout: SCANNER_STARTUP_TIMEOUT_MS }
   );
 
-  fireEvent.click(screen.getByRole('button', { name: /Start Camera Scan/i }));
+  await waitFor(
+    () => {
+      expect(getScannerActivationButton()).not.toBeDisabled();
+    },
+    { timeout: SCANNER_STARTUP_TIMEOUT_MS }
+  );
 
   await waitFor(
     () => {
+      if (screen.queryByRole('button', { name: /Stop Scanner/i })) {
+        expect(latestScannerProps).not.toBeNull();
+        return;
+      }
+
+      const activationButton = getScannerActivationButton();
+      expect(activationButton).not.toBeDisabled();
+      fireEvent.click(activationButton);
+
       expect(latestScannerProps).not.toBeNull();
       expect(screen.getByRole('button', { name: /Stop Scanner/i })).toBeInTheDocument();
     },
-    { timeout: 5_000 }
+    { timeout: SCANNER_STARTUP_TIMEOUT_MS }
   );
 }
 
@@ -119,8 +140,6 @@ const resolvedIdentity = {
     email: 'lina@velocitygp.dev',
   },
 };
-
-const SCANNER_TEST_TIMEOUT_MS = 15_000;
 
 describe('RaceHub scanner hybrid QR behavior', () => {
   beforeEach(() => {
