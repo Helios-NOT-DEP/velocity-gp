@@ -19,8 +19,8 @@
     "@velocity-gp/api-client": "0.1.0",
     "@velocity-gp/api-contract": "0.1.0",
     "@velocity-gp/ui": "0.1.0",
+    "@yudiel/react-qr-scanner": "^2.5.1",
     "canvas-confetti": "1.9.4",
-    "jsqr": "^1.4.0",
     "lucide-react": "0.487.0",
     "motion": "12.23.24",
     "posthog-js": "^1.364.5",
@@ -33,6 +33,7 @@
     "react-slick": "0.31.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/vite": "4.1.12",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -43,7 +44,6 @@
     "@velocity-gp/config-typescript": "0.1.0",
     "@vitejs/plugin-react": "4.7.0",
     "happy-dom": "^20.8.9",
-    "@playwright/test": "^1.56.1",
     "tailwindcss": "4.1.12",
     "typescript": "^6.0.2",
     "vite": "^6.4.2",

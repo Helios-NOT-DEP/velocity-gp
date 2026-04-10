@@ -194,16 +194,18 @@ Copy `.env.example` to `.env.local` and update as needed:
 cp .env.example .env.local
 ```
 
-| Variable            | Purpose         | Example                     |
-| ------------------- | --------------- | --------------------------- |
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:4000/api` |
-| `VITE_EVENT_ID`     | Current event   | `event-123`                 |
+| Variable                          | Purpose                                         | Example                     |
+| --------------------------------- | ----------------------------------------------- | --------------------------- |
+| `VITE_API_BASE_URL`               | Backend API URL                                 | `http://localhost:4000/api` |
+| `VITE_FRONTEND_MAGIC_LINK_ORIGIN` | Trusted frontend origin for QR redirect checks  | `https://dev.velocitygp.app` |
+| `VITE_EVENT_ID`                   | Current event                                   | `event-123`                 |
 
 `#TODO(#12)`: Add Auth.js + SendGrid runtime variables to this table once magic-link authentication is implemented.
 
 The backend package has its own `apps/api/.env.example` file for server-side configuration.
 Set `FRONTEND_MAGIC_LINK_ORIGIN` to the web domain that should be embedded in emailed login links
 (for example `https://dev.velocitygp.app` in remote dev).
+Mirror that same value into `VITE_FRONTEND_MAGIC_LINK_ORIGIN` so the web app can validate trusted QR redirects locally.
 
 **Never commit `.env.local`** — it's in `.gitignore`.
 

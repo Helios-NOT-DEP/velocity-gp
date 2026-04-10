@@ -3,22 +3,55 @@
 
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 import RaceHub from '@/app/pages/RaceHub';
 import { GameProvider } from '@/app/context/GameContext';
 
-const { getSessionMock, resolveScanIdentityForEmailMock, trackAnalyticsEventMock } = vi.hoisted(
-  () => ({
-    getSessionMock: vi.fn(),
-    resolveScanIdentityForEmailMock: vi.fn(),
-    trackAnalyticsEventMock: vi.fn(),
-  })
-);
+const {
+  getSessionMock,
+  resolveScanIdentityForEmailMock,
+  trackAnalyticsEventMock,
+  submitScanMock,
+  redirectToTrustedQrUrlMock,
+} = vi.hoisted(() => ({
+  getSessionMock: vi.fn(),
+  resolveScanIdentityForEmailMock: vi.fn(),
+  trackAnalyticsEventMock: vi.fn(),
+  submitScanMock: vi.fn(),
+  redirectToTrustedQrUrlMock: vi.fn(),
+}));
+
+let latestScannerProps: {
+  onScan: (detectedCodes: Array<{ rawValue: string }>) => void;
+  onError?: (error: unknown) => void;
+  paused?: boolean;
+} | null = null;
+
+vi.mock('@yudiel/react-qr-scanner', () => ({
+  Scanner: (props: {
+    onScan: (detectedCodes: Array<{ rawValue: string }>) => void;
+    onError?: (error: unknown) => void;
+    paused?: boolean;
+  }) => {
+    latestScannerProps = props;
+    return <div data-testid="mock-qr-scanner">Scanner mounted</div>;
+  },
+}));
 
 vi.mock('@/services/auth', () => ({
   getSession: getSessionMock,
+  AUTH_SESSION_UPDATED_EVENT: 'velocitygp.auth.session.updated',
+}));
+
+vi.mock('@/services/api', () => ({
+  apiClient: {
+    post: submitScanMock,
+  },
+  scanEndpoints: {
+    submitScan: (eventId: string) => `/events/${eventId}/scans`,
+  },
 }));
 
 vi.mock('@/services/observability', () => ({
@@ -31,6 +64,7 @@ vi.mock('@/services/scan', async () => {
   return {
     ...actual,
     resolveScanIdentityForEmail: resolveScanIdentityForEmailMock,
+    redirectToTrustedQrUrl: redirectToTrustedQrUrlMock,
   };
 });
 
@@ -44,101 +78,156 @@ function renderRaceHub() {
   );
 }
 
+function createDetectedCode(rawValue: string) {
+  return {
+    rawValue,
+    format: 'qr_code',
+    boundingBox: { x: 0, y: 0, width: 100, height: 100 },
+    cornerPoints: [],
+  };
+}
+
+async function startScanner() {
+  await screen.findByRole('button', { name: /Start Camera Scan/i });
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: /Start Camera Scan/i })).not.toBeDisabled();
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: /Start Camera Scan/i }));
+
+  await screen.findByTestId('mock-qr-scanner');
+  expect(latestScannerProps).not.toBeNull();
+}
+
 const originalMediaDevices = navigator.mediaDevices;
 
-describe('RaceHub scanner recovery states', () => {
+const resolvedIdentity = {
+  status: 'resolved' as const,
+  identity: {
+    eventId: 'event-velocity-active',
+    playerId: 'player-lina-active',
+    teamId: 'team-apex-comets',
+    teamName: 'Apex Comets',
+    email: 'lina@velocitygp.dev',
+  },
+};
+
+describe('RaceHub scanner hybrid QR behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('VITE_FRONTEND_MAGIC_LINK_ORIGIN', 'https://dev.velocitygp.app');
+    latestScannerProps = null;
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn(),
+      },
+    });
+
     getSessionMock.mockResolvedValue({
+      userId: null,
+      role: 'anonymous',
+      isAuthenticated: false,
       email: 'lina@velocitygp.dev',
     });
-    resolveScanIdentityForEmailMock.mockResolvedValue({
-      status: 'resolved',
-      identity: {
+    resolveScanIdentityForEmailMock.mockResolvedValue(resolvedIdentity);
+    submitScanMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        outcome: 'SAFE',
         eventId: 'event-velocity-active',
         playerId: 'player-lina-active',
         teamId: 'team-apex-comets',
-        teamName: 'Apex Comets',
-        email: 'lina@velocitygp.dev',
+        qrCodeId: 'qr-1',
+        qrPayload: 'VG-001',
+        scannedAt: new Date().toISOString(),
+        message: 'safe',
+        pointsAwarded: 120,
+        teamScore: 1000,
+        claimCreated: true,
+        hazardRatioUsed: 8,
       },
     });
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: originalMediaDevices,
     });
   });
 
-  it.skip('shows unsupported guidance when camera APIs are unavailable', async () => {
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: undefined,
-    });
-
+  it('redirects when the scanned QR URL matches the trusted frontend origin', async () => {
     renderRaceHub();
+    await startScanner();
 
-    await screen.findByRole('button', { name: /Start Camera Scan/i });
-    await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: /Start Camera Scan/i }).hasAttribute('disabled')
-      ).toBe(false);
+    await act(async () => {
+      latestScannerProps?.onScan([
+        createDetectedCode('https://dev.velocitygp.app/login/callback?token=abc123'),
+      ]);
     });
-    const startButton = screen.getByRole('button', { name: /Start Camera Scan/i });
-    fireEvent.click(startButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('Scanner Unsupported')).toBeTruthy();
-      expect(screen.getByText('This browser cannot access camera scanning APIs.')).toBeTruthy();
-    });
+    expect(redirectToTrustedQrUrlMock).toHaveBeenCalledWith(
+      'https://dev.velocitygp.app/login/callback?token=abc123'
+    );
+    expect(submitScanMock).not.toHaveBeenCalled();
   });
 
-  it.skip('shows permission denied feedback when user rejects camera access', async () => {
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockRejectedValue({
-          name: 'NotAllowedError',
-        }),
-      },
-    });
-
+  it('blocks redirect when the scanned QR URL uses a different origin', async () => {
     renderRaceHub();
+    await startScanner();
 
-    await screen.findByRole('button', { name: /Start Camera Scan/i });
-    await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: /Start Camera Scan/i }).hasAttribute('disabled')
-      ).toBe(false);
+    await act(async () => {
+      latestScannerProps?.onScan([
+        createDetectedCode('https://evil.example/login/callback?token=abc123'),
+      ]);
     });
-    const startButton = screen.getByRole('button', { name: /Start Camera Scan/i });
-    fireEvent.click(startButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('Camera Permission Denied')).toBeTruthy();
-      expect(
-        screen.getByText('Allow camera access to continue scanning from Race Hub.')
-      ).toBeTruthy();
-    });
+    expect(redirectToTrustedQrUrlMock).not.toHaveBeenCalled();
+    expect(submitScanMock).not.toHaveBeenCalled();
+    await screen.findByText('Untrusted QR URL');
+    expect(
+      screen.getByText('Only QR links from https://dev.velocitygp.app can redirect from Race Hub.')
+    ).toBeInTheDocument();
   });
 
-  it.skip('shows unmapped profile guidance when no seeded identity is available', async () => {
-    resolveScanIdentityForEmailMock.mockResolvedValueOnce({
-      status: 'unmapped',
-      message: 'No assigned player profile was found for this email.',
-    });
-
+  it('submits non-URL QR payloads to the gameplay scan API', async () => {
     renderRaceHub();
+    await startScanner();
+
+    await act(async () => {
+      latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+    });
 
     await waitFor(() => {
-      expect(screen.getByText('Scan Profile Unavailable')).toBeTruthy();
-      expect(screen.getByText('No assigned player profile was found for this email.')).toBeTruthy();
-      expect(
-        screen.getByText(
-          'No seeded player profile is mapped for this session email, so scanner submission is blocked.'
-        )
-      ).toBeTruthy();
+      expect(submitScanMock).toHaveBeenCalledWith('/events/event-velocity-active/scans', {
+        playerId: 'player-lina-active',
+        qrPayload: 'VG-001',
+      });
     });
+    expect(redirectToTrustedQrUrlMock).not.toHaveBeenCalled();
+    expect(await screen.findByText('Scan Registered')).toBeInTheDocument();
+  });
+
+  it('suppresses duplicate gameplay payloads within the dedupe window', async () => {
+    renderRaceHub();
+    await startScanner();
+
+    await act(async () => {
+      latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+    });
+
+    await waitFor(() => {
+      expect(submitScanMock).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+    });
+
+    expect(submitScanMock).toHaveBeenCalledTimes(1);
   });
 });
