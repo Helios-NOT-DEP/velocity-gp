@@ -90,10 +90,10 @@ function createDetectedCode(rawValue: string) {
 const SCANNER_TEST_TIMEOUT_MS = 15_000;
 const SCANNER_STARTUP_TIMEOUT_MS = 12_000;
 
-function getScannerActivationButton(): HTMLButtonElement {
+function getScannerActivationButton() {
   return screen.getByRole('button', {
     name: /Start Camera Scan|Retry Camera Access/i,
-  }) as HTMLButtonElement;
+  });
 }
 
 async function startScanner() {
