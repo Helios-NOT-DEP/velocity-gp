@@ -39,11 +39,9 @@ export class ApiClient {
   private baseUrl: string;
 
   constructor(config: ApiClientConfig | string = {}) {
-    if (typeof config === 'string') {
-      this.baseUrl = config;
-    } else {
-      this.baseUrl = config.baseUrl || this.getDefaultBaseUrl();
-    }
+    const raw = typeof config === 'string' ? config : config.baseUrl || this.getDefaultBaseUrl();
+    // Normalize: collapse any double (or more) slashes in the path portion, preserving ://
+    this.baseUrl = raw.replace(/([^:])(\/\/+)/g, '$1/');
   }
 
   private getDefaultBaseUrl(): string {

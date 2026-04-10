@@ -213,7 +213,7 @@ static_sites:
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
       - key: VITE_API_BASE_URL
-        value: "${_self.PUBLIC_URL}/api"
+        value: "${_self.PUBLIC_URL}api"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
       - key: VITE_PUBLIC_POSTHOG_KEY
