@@ -24,7 +24,7 @@ export default defineConfig({
 
   // Enable production source maps only when explicitly requested.
   build: {
-    sourcemap: true,
+    sourcemap: buildSourceMapEnabled,
   },
 
   // Disable source maps in dev
