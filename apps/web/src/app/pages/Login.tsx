@@ -44,14 +44,16 @@ export default function Login() {
       <div className="absolute inset-0 bg-black/40" />
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-md">
+      <div className="relative z-10 w-full max-w-[448px]">
         {/* Logo */}
         <div className="mb-5 relative h-[100px] md:h-[170px]">
-          <img
-            src={logoImage}
-            alt="Velocity GP"
-            className="absolute left-1/2 -translate-x-1/2 w-[380px] h-[140px] -top-[20px] md:translate-x-0 md:top-[-15px] md:-left-[16px] md:w-[480px] md:h-[170px] pointer-events-none select-none"
-          />
+          <div className="absolute left-1/2 -translate-x-1/2 w-[380px] h-[140px] -top-[20px] md:translate-x-0 md:-top-[-15px] md:-left-[16px] md:w-[480px] md:h-[170px]">
+            <img
+              src={logoImage}
+              alt="Velocity GP"
+              className="absolute inset-0 max-w-none object-cover pointer-events-none size-full"
+            />
+          </div>
         </div>
         <p className="text-gray-400 text-sm text-center mb-8">
           High-speed race to the checkered code.
