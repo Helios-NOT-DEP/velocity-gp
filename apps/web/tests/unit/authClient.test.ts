@@ -23,6 +23,7 @@ import type { SessionResponse } from '@velocity-gp/api-contract';
 import {
   AUTH_SESSION_STORAGE_KEY,
   AUTH_SESSION_TOKEN_STORAGE_KEY,
+  AUTH_SESSION_UPDATED_EVENT,
   getSession,
 } from '@/services/auth/authClient';
 import type { AuthSession } from '@/services/auth/authTypes';
@@ -118,6 +119,9 @@ describe('authClient.getSession', () => {
   });
 
   it('clears local session when server reports an authoritative auth failure', async () => {
+    const sessionUpdatedSpy = vi.fn();
+    window.addEventListener(AUTH_SESSION_UPDATED_EVENT, sessionUpdatedSpy);
+
     const storedSession = createStoredSession();
     window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(storedSession));
     window.localStorage.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, 'expired-token-123');
@@ -136,6 +140,9 @@ describe('authClient.getSession', () => {
     expect(session).toEqual(anonymousSession);
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY)).toBeNull();
+    expect(sessionUpdatedSpy).toHaveBeenCalledTimes(1);
+
+    window.removeEventListener(AUTH_SESSION_UPDATED_EVENT, sessionUpdatedSpy);
   });
 
   it('clears local session when server reports AUTH_ASSIGNMENT_REQUIRED', async () => {
@@ -157,5 +164,29 @@ describe('authClient.getSession', () => {
     expect(session).toEqual(anonymousSession);
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('does not emit session-updated when already anonymous on AUTH_MISSING_TOKEN', async () => {
+    const sessionUpdatedSpy = vi.fn();
+    window.addEventListener(AUTH_SESSION_UPDATED_EVENT, sessionUpdatedSpy);
+
+    apiGetMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      data: undefined,
+      error: {
+        code: 'AUTH_MISSING_TOKEN',
+        message: 'Authentication is required.',
+      },
+    });
+
+    const session = await getSession();
+
+    expect(session).toEqual(anonymousSession);
+    expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY)).toBeNull();
+    expect(sessionUpdatedSpy).not.toHaveBeenCalled();
+
+    window.removeEventListener(AUTH_SESSION_UPDATED_EVENT, sessionUpdatedSpy);
   });
 });

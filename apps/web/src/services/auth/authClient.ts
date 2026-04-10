@@ -85,10 +85,15 @@ function shouldClearStoredSession(response: {
 
 function clearStoredSession(): void {
   const storage = getBrowserStorage();
+  const hadStoredSession = storage?.getItem(AUTH_SESSION_STORAGE_KEY) !== null;
+  const hadStoredToken = storage?.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY) !== null;
+
   storage?.removeItem(AUTH_SESSION_STORAGE_KEY);
   storage?.removeItem(AUTH_SESSION_TOKEN_STORAGE_KEY);
-  // Clearing auth is a state transition; notify listeners immediately.
-  emitSessionUpdatedEvent();
+  if (hadStoredSession || hadStoredToken) {
+    // Clearing non-empty auth state is a transition; notify listeners immediately.
+    emitSessionUpdatedEvent();
+  }
 }
 
 function persistSession(session: AuthSession, sessionToken: string): void {
