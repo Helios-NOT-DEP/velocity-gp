@@ -209,7 +209,9 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       expect(submitScanMock).not.toHaveBeenCalled();
       await screen.findByText('Untrusted QR URL');
       expect(
-        screen.getByText('Only QR links from https://dev.velocitygp.app can redirect from Race Hub.')
+        screen.getByText(
+          'Only QR links from https://dev.velocitygp.app can redirect from Race Hub.'
+        )
       ).toBeInTheDocument();
     }
   );
