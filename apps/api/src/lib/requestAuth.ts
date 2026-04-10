@@ -36,7 +36,7 @@ function parseCookieValue(cookieHeaderValue: string | undefined, name: string): 
 
 export function resolveRequestAuthContext(request: Request): RequestAuthContext | null {
   const authorizationHeader = request.header('authorization');
-  const [scheme, bearerToken] = (authorizationHeader ?? '').split(' ');
+  const [scheme, bearerToken] = (authorizationHeader ?? '').trim().split(/\s+/);
   const authCookieToken = parseCookieValue(request.header('cookie'), AUTH_SESSION_COOKIE_NAME);
   const token = scheme?.toLowerCase() === 'bearer' && bearerToken ? bearerToken : authCookieToken;
 
