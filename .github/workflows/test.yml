@@ -240,7 +240,7 @@ jobs:
 
       - name: Publish API Coverage Report
         uses: davelosert/vitest-coverage-report-action@v2
-        if: always()
+        if: always() && hashFiles('coverage/api/coverage-summary.json') != ''
         with:
           name: API Coverage
           json-summary-path: coverage/api/coverage-summary.json
@@ -249,7 +249,7 @@ jobs:
 
       - name: Publish Web Coverage Report
         uses: davelosert/vitest-coverage-report-action@v2
-        if: always()
+        if: always() && hashFiles('coverage/web/coverage-summary.json') != ''
         with:
           name: Web Coverage
           json-summary-path: coverage/web/coverage-summary.json

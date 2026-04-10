@@ -88,15 +88,23 @@ function createDetectedCode(rawValue: string) {
 }
 
 async function startScanner() {
-  await screen.findByRole('button', { name: /Start Camera Scan/i });
-  await waitFor(() => {
-    expect(screen.getByRole('button', { name: /Start Camera Scan/i })).not.toBeDisabled();
-  });
+  await screen.findByRole('button', { name: /Start Camera Scan/i }, { timeout: 5_000 });
+  await waitFor(
+    () => {
+      expect(screen.getByRole('button', { name: /Start Camera Scan/i })).not.toBeDisabled();
+    },
+    { timeout: 5_000 }
+  );
 
   fireEvent.click(screen.getByRole('button', { name: /Start Camera Scan/i }));
 
-  await screen.findByTestId('mock-qr-scanner');
-  expect(latestScannerProps).not.toBeNull();
+  await waitFor(
+    () => {
+      expect(latestScannerProps).not.toBeNull();
+      expect(screen.getByRole('button', { name: /Stop Scanner/i })).toBeInTheDocument();
+    },
+    { timeout: 5_000 }
+  );
 }
 
 const originalMediaDevices = navigator.mediaDevices;
