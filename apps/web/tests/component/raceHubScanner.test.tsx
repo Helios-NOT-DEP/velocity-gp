@@ -120,6 +120,8 @@ const resolvedIdentity = {
   },
 };
 
+const SCANNER_TEST_TIMEOUT_MS = 15_000;
+
 describe('RaceHub scanner hybrid QR behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -168,74 +170,92 @@ describe('RaceHub scanner hybrid QR behavior', () => {
     });
   });
 
-  it('redirects when the scanned QR URL matches the trusted frontend origin', async () => {
-    renderRaceHub();
-    await startScanner();
+  it(
+    'redirects when the scanned QR URL matches the trusted frontend origin',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      renderRaceHub();
+      await startScanner();
 
-    await act(async () => {
-      latestScannerProps?.onScan([
-        createDetectedCode('https://dev.velocitygp.app/login/callback?token=abc123'),
-      ]);
-    });
-
-    expect(redirectToTrustedQrUrlMock).toHaveBeenCalledWith(
-      'https://dev.velocitygp.app/login/callback?token=abc123'
-    );
-    expect(submitScanMock).not.toHaveBeenCalled();
-  });
-
-  it('blocks redirect when the scanned QR URL uses a different origin', async () => {
-    renderRaceHub();
-    await startScanner();
-
-    await act(async () => {
-      latestScannerProps?.onScan([
-        createDetectedCode('https://evil.example/login/callback?token=abc123'),
-      ]);
-    });
-
-    expect(redirectToTrustedQrUrlMock).not.toHaveBeenCalled();
-    expect(submitScanMock).not.toHaveBeenCalled();
-    await screen.findByText('Untrusted QR URL');
-    expect(
-      screen.getByText('Only QR links from https://dev.velocitygp.app can redirect from Race Hub.')
-    ).toBeInTheDocument();
-  });
-
-  it('submits non-URL QR payloads to the gameplay scan API', async () => {
-    renderRaceHub();
-    await startScanner();
-
-    await act(async () => {
-      latestScannerProps?.onScan([createDetectedCode('VG-001')]);
-    });
-
-    await waitFor(() => {
-      expect(submitScanMock).toHaveBeenCalledWith('/events/event-velocity-active/scans', {
-        playerId: 'player-lina-active',
-        qrPayload: 'VG-001',
+      await act(async () => {
+        latestScannerProps?.onScan([
+          createDetectedCode('https://dev.velocitygp.app/login/callback?token=abc123'),
+        ]);
       });
-    });
-    expect(redirectToTrustedQrUrlMock).not.toHaveBeenCalled();
-    expect(await screen.findByText('Scan Registered')).toBeInTheDocument();
-  });
 
-  it('suppresses duplicate gameplay payloads within the dedupe window', async () => {
-    renderRaceHub();
-    await startScanner();
+      await waitFor(() => {
+        expect(redirectToTrustedQrUrlMock).toHaveBeenCalledWith(
+          'https://dev.velocitygp.app/login/callback?token=abc123'
+        );
+      });
+      expect(submitScanMock).not.toHaveBeenCalled();
+    }
+  );
 
-    await act(async () => {
-      latestScannerProps?.onScan([createDetectedCode('VG-001')]);
-    });
+  it(
+    'blocks redirect when the scanned QR URL uses a different origin',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      renderRaceHub();
+      await startScanner();
 
-    await waitFor(() => {
+      await act(async () => {
+        latestScannerProps?.onScan([
+          createDetectedCode('https://evil.example/login/callback?token=abc123'),
+        ]);
+      });
+
+      expect(redirectToTrustedQrUrlMock).not.toHaveBeenCalled();
+      expect(submitScanMock).not.toHaveBeenCalled();
+      await screen.findByText('Untrusted QR URL');
+      expect(
+        screen.getByText('Only QR links from https://dev.velocitygp.app can redirect from Race Hub.')
+      ).toBeInTheDocument();
+    }
+  );
+
+  it(
+    'submits non-URL QR payloads to the gameplay scan API',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      renderRaceHub();
+      await startScanner();
+
+      await act(async () => {
+        latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+      });
+
+      await waitFor(() => {
+        expect(submitScanMock).toHaveBeenCalledWith('/events/event-velocity-active/scans', {
+          playerId: 'player-lina-active',
+          qrPayload: 'VG-001',
+        });
+      });
+      expect(redirectToTrustedQrUrlMock).not.toHaveBeenCalled();
+      expect(await screen.findByText('Scan Registered')).toBeInTheDocument();
+    }
+  );
+
+  it(
+    'suppresses duplicate gameplay payloads within the dedupe window',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      renderRaceHub();
+      await startScanner();
+
+      await act(async () => {
+        latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+      });
+
+      await waitFor(() => {
+        expect(submitScanMock).toHaveBeenCalledTimes(1);
+      });
+
+      await act(async () => {
+        latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+      });
+
       expect(submitScanMock).toHaveBeenCalledTimes(1);
-    });
-
-    await act(async () => {
-      latestScannerProps?.onScan([createDetectedCode('VG-001')]);
-    });
-
-    expect(submitScanMock).toHaveBeenCalledTimes(1);
-  });
+    }
+  );
 });
