@@ -25,7 +25,7 @@ ingress:
       name: api
     match:
       path:
-        prefix: /api/v1
+        prefix: /api
   - component:
       name: client
     match:
@@ -52,7 +52,7 @@ services:
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
       - key: API_PREFIX
-        value: ""
+        value: "/api"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
       - key: CLIENT_BASE_URL
@@ -192,7 +192,7 @@ services:
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
     # liveness_health_check:
-    #   http_path: /api/v1/health
+    #   http_path: /api/health
     #   period_seconds: 10
     #   success_threshold: 1
     #   failure_threshold: 3

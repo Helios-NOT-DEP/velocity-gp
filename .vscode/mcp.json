@@ -4,6 +4,20 @@
 			"command": "npx",
 			"args": ["-y", "chrome-devtools-mcp@latest", "--slim", "--headless"]
 		},
+		 "mcpDigitalOcean": {
+			"command": "npx",
+			"args": [
+				"@digitalocean/mcp",
+				"--services",
+				"apps",
+				"docs",
+				"insights",
+				"spaces"
+			],
+			"env": {
+				"DIGITALOCEAN_API_TOKEN": "${input:digitalocean-token}"
+			}
+    	},
 		"mailtrap": {
 			"command": "npx",
 			"args": [
@@ -40,6 +54,12 @@
 			"type": "promptString",
 			"id": "mailtrapTestInboxId",
 			"description": "Mailtrap Test Inbox ID (optional)"
+		},
+		{
+			"id": "digitalocean-token",
+			"type": "promptString",
+			"description": "DigitalOcean API Token",
+			"password": true
 		}
 	]
 }
