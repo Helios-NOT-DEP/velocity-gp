@@ -137,4 +137,25 @@ describe('authClient.getSession', () => {
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY)).toBeNull();
   });
+
+  it('clears local session when server reports AUTH_ASSIGNMENT_REQUIRED', async () => {
+    const storedSession = createStoredSession();
+    window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(storedSession));
+    window.localStorage.setItem(AUTH_SESSION_TOKEN_STORAGE_KEY, 'session-token-123');
+    apiGetMock.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      data: undefined,
+      error: {
+        code: 'AUTH_ASSIGNMENT_REQUIRED',
+        message: 'Player is not currently assigned to a team.',
+      },
+    });
+
+    const session = await getSession();
+
+    expect(session).toEqual(anonymousSession);
+    expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY)).toBeNull();
+  });
 });

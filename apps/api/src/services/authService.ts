@@ -375,11 +375,14 @@ export async function getSessionFromAuthInputs(
   cookieHeaderValue: string | undefined
 ): Promise<SessionResponse> {
   return withTraceSpan('auth.session.get', {}, async () => {
-    const token = resolveSessionToken(authorizationHeaderValue, cookieHeaderValue);
-    if (!token) {
+    const bearerToken = resolveSessionToken(authorizationHeaderValue, undefined);
+    const cookieToken = resolveSessionToken(undefined, cookieHeaderValue);
+    const tokenCandidates = [...new Set([bearerToken, cookieToken].filter(Boolean))] as string[];
+
+    if (tokenCandidates.length === 0) {
       const authorizationScheme =
         authorizationHeaderValue?.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? null;
-      logger.debug('Missing bearer token in authorization header', {
+      logger.debug('Missing session token in authorization/cookie headers', {
         hasAuthorizationHeader: Boolean(authorizationHeaderValue),
         authorizationScheme,
         hasCookieHeader: Boolean(cookieHeaderValue),
@@ -387,11 +390,23 @@ export async function getSessionFromAuthInputs(
       throw new AppError(401, 'AUTH_MISSING_TOKEN', 'Authentication is required.');
     }
 
-    let claims;
-    try {
-      claims = verifySessionToken(token);
-    } catch {
-      // Token parse/expiry errors intentionally map to a generic invalid-session response.
+    let claims: ReturnType<typeof verifySessionToken> | null = null;
+    for (const tokenCandidate of tokenCandidates) {
+      try {
+        claims = verifySessionToken(tokenCandidate);
+        if (tokenCandidate !== bearerToken && bearerToken) {
+          // Keep cookie-auth resilient when stale local bearer storage lags behind valid cookie auth.
+          logger.debug(
+            'Session auth fell back to cookie token after bearer token verification failed'
+          );
+        }
+        break;
+      } catch {
+        // Continue trying any remaining auth inputs before returning AUTH_INVALID_SESSION.
+      }
+    }
+
+    if (!claims) {
       throw new AppError(401, 'AUTH_INVALID_SESSION', 'Session is invalid or expired.');
     }
 

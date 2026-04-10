@@ -582,6 +582,59 @@ describe('velocity gp backend', () => {
     expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
   });
 
+  it('falls back to cookie auth when a stale bearer token is also present', async () => {
+    const assignedEmail = `player-${token}@velocitygp.dev`;
+    const capturedLinks: string[] = [];
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
+    });
+
+    const requestResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: assignedEmail });
+
+    expect(requestResponse.status).toBe(202);
+    expect(capturedLinks.length).toBe(1);
+
+    const tokenFromLink = new URL(capturedLinks[0]).searchParams.get('token');
+    expect(tokenFromLink).toBeTruthy();
+    if (!tokenFromLink) {
+      throw new Error('Expected token in captured magic link URL.');
+    }
+
+    const verifyResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/verify`)
+      .send({ token: tokenFromLink });
+
+    expect(verifyResponse.status).toBe(200);
+
+    const sessionCookie = verifyResponse.headers['set-cookie']?.[0]?.split(';')[0];
+    expect(sessionCookie).toBeTruthy();
+
+    const staleBearerToken = 'stale-bearer-token';
+
+    const [sessionResponse, routingResponse] = await Promise.all([
+      request(app)
+        .get(`${apiPrefix}/auth/session`)
+        .set('authorization', `Bearer ${staleBearerToken}`)
+        .set('cookie', String(sessionCookie)),
+      request(app)
+        .get(`${apiPrefix}/auth/routing-decision`)
+        .set('authorization', `Bearer ${staleBearerToken}`)
+        .set('cookie', String(sessionCookie)),
+    ]);
+
+    expect(sessionResponse.status).toBe(200);
+    expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
+    expect(routingResponse.status).toBe(200);
+    expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
+  });
+
   it('clears auth cookie on logout and removes cookie-authenticated access', async () => {
     const assignedEmail = `player-${token}@velocitygp.dev`;
     const capturedLinks: string[] = [];

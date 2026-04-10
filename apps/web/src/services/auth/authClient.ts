@@ -74,7 +74,8 @@ function shouldClearStoredSession(response: {
 }): boolean {
   if (
     response.error?.code === 'AUTH_INVALID_SESSION' ||
-    response.error?.code === 'AUTH_MISSING_TOKEN'
+    response.error?.code === 'AUTH_MISSING_TOKEN' ||
+    response.error?.code === 'AUTH_ASSIGNMENT_REQUIRED'
   ) {
     return true;
   }
