@@ -40,6 +40,43 @@ beforeEach(() => {
   if (typeof window !== 'undefined') {
     window.fetch = fetchMock as typeof window.fetch;
   }
+
+  // Create an explicit mock for localStorage to avoid Node 22's partial/experimental localStorage from breaking tests.
+  const localStorageMock = (function () {
+    let store: Record<string, string> = {};
+    return {
+      getItem: function (key: string) {
+        return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
+      },
+      setItem: function (key: string, value: string) {
+        store[key] = String(value);
+      },
+      removeItem: function (key: string) {
+        delete store[key];
+      },
+      clear: function () {
+        store = {};
+      },
+      get length() {
+        return Object.keys(store).length;
+      },
+      key: function (i: number) {
+        return Object.keys(store)[i] ?? null;
+      },
+    };
+  })();
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: localStorageMock,
+    configurable: true,
+  });
+
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+      configurable: true,
+    });
+  }
 });
 
 afterEach(() => {
