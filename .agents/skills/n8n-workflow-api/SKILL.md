@@ -1,6 +1,13 @@
 ---
 name: n8n-workflow-api
-description: Manage n8n workflows through the Public API: create (add), update, delete, activate/deactivate, and execution operations. Use when users ask to add/update/delete workflows, run or stop executions, retry failed runs, or automate n8n workflow lifecycle from API calls. Triggers on phrases like "create n8n workflow", "update workflow JSON", "delete workflow", "execute workflow", "retry execution", "activate workflow", or "n8n API workflow management".
+description: >-
+  Manage n8n workflows through the Public API: create (add), update, delete,
+  activate/deactivate, and execution operations. Use when users ask to
+  add/update/delete workflows, run or stop executions, retry failed runs, or
+  automate n8n workflow lifecycle from API calls. Triggers on phrases like
+  "create n8n workflow", "update workflow JSON", "delete workflow",
+  "execute workflow", "retry execution", "activate workflow", or
+  "n8n API workflow management".
 argument-hint: Provide n8n instance base URL, auth method (API key), target operation (create/update/delete/execute), and workflow/execution ID if known.
 ---
 
