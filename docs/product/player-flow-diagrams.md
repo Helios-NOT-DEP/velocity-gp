@@ -11,7 +11,7 @@ This document shows how the Velocity GP application should behave for player act
 
 ## 1. Logging In and Authentication
 
-``` mermaid
+```mermaid
 sequenceDiagram
   autonumber
   actor Player
@@ -124,10 +124,10 @@ sequenceDiagram
   participant Leaderboard as Leaderboard Projection<br/>Current route '/leaderboard'
 
   Player->>RaceHubUI: Tap "Start Camera Scan"
-  RaceHubUI->>Identity: Resolve scan identity from session email
-  Identity->>BFF: GET /events/current
-  BFF-->>Identity: Return active event id
-  Identity-->>RaceHubUI: Return resolved {eventId, playerId, teamId}
+  RaceHubUI->>Identity: Resolve scan identity
+  Identity->>BFF: GET /events/current/players/me
+  BFF-->>Identity: Return PlayerActiveIdentity
+  Identity-->>RaceHubUI: Return resolved {eventId, playerId, teamId, teamName}
   Note over RaceHubUI,Identity: If unmapped/event mismatch/event unavailable, scan submit is blocked and camera guidance is shown.
 
   RaceHubUI->>Browser: Request rear camera (getUserMedia facingMode=environment)
@@ -384,7 +384,6 @@ sequenceDiagram
 
 - `Login` currently requests magic links using work email only; the broader BDD identity capture requirements still include additional personal contact fields and full name.
 - `Garage` currently lets one player locally generate/finalize a team identity; the updated target flow collects every teammate's self-description first, then generates one team logo from all descriptions plus the preassigned team name.
-- `RaceHub` now submits real scans to `POST /events/:eventId/scans`, but scan identity is still bridged by client-side seeded email mapping (no backend player-session bootstrap endpoint yet).
 - Camera fallback in `RaceHub` is guidance + retry only; manual payload entry and image-upload fallback are intentionally not implemented in v1.
 - `PitStop` currently clears penalties with a local demo button; the BDD flow expects backend Helios rescue validation, self-rescue rejection, and cooldown handling.
 - `HeliosProfile` currently enables Helios mode on page visit; the BDD flow expects role assignment to be controlled by event/admin rules.

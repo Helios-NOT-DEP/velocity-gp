@@ -1,3 +1,7 @@
+/**
+ * @file select.tsx
+ * @description Displays a list of options for the user to pick from.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,18 +10,22 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Custom styled generic dropdown pickers. */
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
 
+/** Standardized sub-component or utility serving SelectGroup. */
 function SelectGroup({ ...props }: React.ComponentProps<typeof SelectPrimitive.Group>) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />;
 }
 
+/** Standardized sub-component or utility serving SelectValue. */
 function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
+/** Standardized sub-component or utility serving SelectTrigger. */
 function SelectTrigger({
   className,
   size = 'default',
@@ -44,6 +52,7 @@ function SelectTrigger({
   );
 }
 
+/** Standardized sub-component or utility serving SelectContent. */
 function SelectContent({
   className,
   children,
@@ -79,6 +88,7 @@ function SelectContent({
   );
 }
 
+/** Standardized sub-component or utility serving SelectLabel. */
 function SelectLabel({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Label>) {
   return (
     <SelectPrimitive.Label
@@ -89,6 +99,7 @@ function SelectLabel({ className, ...props }: React.ComponentProps<typeof Select
   );
 }
 
+/** Standardized sub-component or utility serving SelectItem. */
 function SelectItem({
   className,
   children,
@@ -113,6 +124,7 @@ function SelectItem({
   );
 }
 
+/** Standardized sub-component or utility serving SelectSeparator. */
 function SelectSeparator({
   className,
   ...props
@@ -126,6 +138,7 @@ function SelectSeparator({
   );
 }
 
+/** Standardized sub-component or utility serving SelectScrollUpButton. */
 function SelectScrollUpButton({
   className,
   ...props
@@ -141,6 +154,7 @@ function SelectScrollUpButton({
   );
 }
 
+/** Standardized sub-component or utility serving SelectScrollDownButton. */
 function SelectScrollDownButton({
   className,
   ...props

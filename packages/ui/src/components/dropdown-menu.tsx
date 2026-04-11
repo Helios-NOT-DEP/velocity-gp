@@ -1,3 +1,7 @@
+/**
+ * @file dropdown-menu.tsx
+ * @description Displays a menu to the user — such as a set of actions or functions — triggered by a button.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,22 +10,26 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Renders actionable menus descending from buttons. */
 function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DropdownMenuPortal. */
 function DropdownMenuPortal({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
   return <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DropdownMenuTrigger. */
 function DropdownMenuTrigger({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
   return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DropdownMenuContent. */
 function DropdownMenuContent({
   className,
   sideOffset = 4,
@@ -42,10 +50,12 @@ function DropdownMenuContent({
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuGroup. */
 function DropdownMenuGroup({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Group>) {
   return <DropdownMenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DropdownMenuItem. */
 function DropdownMenuItem({
   className,
   inset,
@@ -69,6 +79,7 @@ function DropdownMenuItem({
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuCheckboxItem. */
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -95,12 +106,14 @@ function DropdownMenuCheckboxItem({
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuRadioGroup. */
 function DropdownMenuRadioGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
   return <DropdownMenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DropdownMenuRadioItem. */
 function DropdownMenuRadioItem({
   className,
   children,
@@ -125,6 +138,7 @@ function DropdownMenuRadioItem({
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuLabel. */
 function DropdownMenuLabel({
   className,
   inset,
@@ -142,6 +156,7 @@ function DropdownMenuLabel({
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuSeparator. */
 function DropdownMenuSeparator({
   className,
   ...props
@@ -155,6 +170,7 @@ function DropdownMenuSeparator({
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuShortcut. */
 function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
@@ -165,10 +181,12 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<'spa
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuSub. */
 function DropdownMenuSub({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
   return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DropdownMenuSubTrigger. */
 function DropdownMenuSubTrigger({
   className,
   inset,
@@ -193,6 +211,7 @@ function DropdownMenuSubTrigger({
   );
 }
 
+/** Standardized sub-component or utility serving DropdownMenuSubContent. */
 function DropdownMenuSubContent({
   className,
   ...props

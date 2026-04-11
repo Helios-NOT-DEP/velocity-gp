@@ -1,3 +1,7 @@
+/**
+ * @file input-otp.tsx
+ * @description Accessible one-time password component.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,6 +10,7 @@ import { MinusIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Captures security pins and verification codes. */
 function InputOTP({
   className,
   containerClassName,
@@ -23,6 +28,7 @@ function InputOTP({
   );
 }
 
+/** Standardized sub-component or utility serving InputOTPGroup. */
 function InputOTPGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -33,6 +39,7 @@ function InputOTPGroup({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving InputOTPSlot. */
 function InputOTPSlot({
   index,
   className,
@@ -63,6 +70,7 @@ function InputOTPSlot({
   );
 }
 
+/** Standardized sub-component or utility serving InputOTPSeparator. */
 function InputOTPSeparator({ ...props }: React.ComponentProps<'div'>) {
   return (
     <div data-slot="input-otp-separator" role="separator" {...props}>

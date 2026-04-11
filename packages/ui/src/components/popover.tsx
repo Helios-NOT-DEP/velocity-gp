@@ -1,3 +1,7 @@
+/**
+ * @file popover.tsx
+ * @description Displays rich content in a portal, triggered by a button.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,14 +9,17 @@ import * as PopoverPrimitive from '@radix-ui/react-popover';
 
 import { cn } from './utils';
 
+/** Floats supplementary content adjacent to an anchor element. */
 function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
+/** Standardized sub-component or utility serving PopoverTrigger. */
 function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving PopoverContent. */
 function PopoverContent({
   className,
   align = 'center',
@@ -35,6 +42,7 @@ function PopoverContent({
   );
 }
 
+/** Standardized sub-component or utility serving PopoverAnchor. */
 function PopoverAnchor({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />;
 }

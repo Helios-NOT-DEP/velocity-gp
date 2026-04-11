@@ -1,135 +1,57 @@
-import { apiClient, eventEndpoints, type EventSummary } from '@/services/api';
+import type { PlayerActiveIdentity } from '@velocity-gp/api-contract';
+import { apiClient, eventEndpoints } from '@/services/api';
 
-import type { ScanIdentity, ScanIdentityResolution } from './types';
+import type { ScanIdentityResolution } from './types';
 
-interface SeededIdentityRecord {
-  readonly email: string;
-  readonly eventId: string;
-  readonly playerId: string;
-  readonly teamId: string;
-  readonly teamName: string;
-}
-
-const seededIdentityByEmail: Record<string, SeededIdentityRecord> = {
-  'lina@velocitygp.dev': {
-    email: 'lina@velocitygp.dev',
-    eventId: 'event-velocity-active',
-    playerId: 'player-lina-active',
-    teamId: 'team-apex-comets',
-    teamName: 'Apex Comets',
-  },
-  'mason@velocitygp.dev': {
-    email: 'mason@velocitygp.dev',
-    eventId: 'event-velocity-active',
-    playerId: 'player-mason-active',
-    teamId: 'team-apex-comets',
-    teamName: 'Apex Comets',
-  },
-  'noah@velocitygp.dev': {
-    email: 'noah@velocitygp.dev',
-    eventId: 'event-velocity-active',
-    playerId: 'player-noah-active',
-    teamId: 'team-nova-thunder',
-    teamName: 'Nova Thunder',
-  },
-  'olivia@velocitygp.dev': {
-    email: 'olivia@velocitygp.dev',
-    eventId: 'event-velocity-active',
-    playerId: 'player-olivia-active',
-    teamId: 'team-nova-thunder',
-    teamName: 'Nova Thunder',
-  },
-  'parker@velocitygp.dev': {
-    email: 'parker@velocitygp.dev',
-    eventId: 'event-velocity-active',
-    playerId: 'player-parker-active',
-    teamId: 'team-drift-runners',
-    teamName: 'Drift Runners',
-  },
-};
-
-function normalizeEmail(email: string | undefined): string | null {
-  if (typeof email !== 'string') {
-    return null;
-  }
-
-  const normalized = email.trim().toLowerCase();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function toIdentity(record: SeededIdentityRecord): ScanIdentity {
-  return {
-    eventId: record.eventId,
-    playerId: record.playerId,
-    teamId: record.teamId,
-    teamName: record.teamName,
-    email: record.email,
-  };
-}
-
+/**
+ * Resolves the authenticated session into a typed ScanIdentity used by the QR scanner.
+ *
+ * It calls the backend /events/current/players/me endpoint directly to derive all
+ * required fields. The email parameter is ignored since the backend reads from session,
+ * but retained in signature for compatibility.
+ */
 export async function resolveScanIdentityForEmail(
-  email: string | undefined
+  _email: string | undefined
 ): Promise<ScanIdentityResolution> {
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) {
-    return {
-      status: 'unmapped',
-      message:
-        'No player email is available in this session. Sign in with a seeded player profile to start scanning.',
-    };
-  }
-
-  const seededRecord = seededIdentityByEmail[normalizedEmail];
-  if (!seededRecord) {
-    return {
-      status: 'unmapped',
-      message:
-        'No assigned player profile was found for this email in the current demo roster. Use a seeded event account to scan.',
-    };
-  }
-
-  let eventResponse;
+  let response;
   try {
-    // Guard against stale seeded identities by validating against current active event.
-    eventResponse = await apiClient.get<EventSummary>(eventEndpoints.getCurrentEvent);
+    // Fetch the player identity securely derived from the current session
+    response = await apiClient.get<PlayerActiveIdentity>(eventEndpoints.getCurrentEventPlayer);
   } catch {
+    // Catch-all for network failures or API availability issues
     return {
       status: 'event_unavailable',
       message: 'Current event could not be loaded. Check connectivity and try scanning again.',
     };
   }
 
-  if (!eventResponse.ok) {
+  if (!response.ok) {
+    // 401/403/404 errors indicate the user session is invalid, lacks a team/roster
+    // assignment for the active event, or the team could not be found.
+    if (response.status === 404 || response.status === 403 || response.status === 401) {
+      return {
+        status: 'unmapped',
+        message:
+          'No assigned player profile was found for this session in the current event roster.',
+      };
+    }
+
+    // Fallback for 500s or unexpected errors
     return {
       status: 'event_unavailable',
-      message: 'Current event is unavailable right now. Try again in a moment.',
+      message: 'Your player profile could not be loaded for the active event.',
     };
   }
 
-  const currentEventId = eventResponse.data.id;
-  if (seededRecord.eventId !== currentEventId) {
-    return {
-      status: 'event_mismatch',
-      message:
-        'Your seeded player profile belongs to a different event than the current active event.',
-      expectedEventId: seededRecord.eventId,
-      currentEventId,
-    };
-  }
-
+  // Successfully derived identity from backend session context
   return {
     status: 'resolved',
-    identity: toIdentity(seededRecord),
+    identity: {
+      eventId: response.data.eventId,
+      playerId: response.data.playerId,
+      teamId: response.data.teamId,
+      teamName: response.data.teamName,
+      email: response.data.email,
+    },
   };
-}
-
-export function getSeededIdentityByEmail(email: string | undefined): ScanIdentity | null {
-  // Synchronous lookup helper used by UI paths that do not need event validation.
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) {
-    return null;
-  }
-
-  const seededRecord = seededIdentityByEmail[normalizedEmail];
-  return seededRecord ? toIdentity(seededRecord) : null;
 }

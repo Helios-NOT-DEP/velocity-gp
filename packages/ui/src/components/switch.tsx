@@ -1,3 +1,7 @@
+/**
+ * @file switch.tsx
+ * @description A control that allows the user to toggle between checked and not checked.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,6 +9,7 @@ import * as SwitchPrimitive from '@radix-ui/react-switch';
 
 import { cn } from './utils';
 
+/** Visual boolean toggle rendering like a hardware switch. */
 function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimitive.Root>) {
   return (
     <SwitchPrimitive.Root

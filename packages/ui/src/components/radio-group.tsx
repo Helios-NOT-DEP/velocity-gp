@@ -1,3 +1,7 @@
+/**
+ * @file radio-group.tsx
+ * @description A set of checkable buttons—known as radio buttons.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,6 +10,7 @@ import { CircleIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Captures singular selection from an exclusive block of options. */
 function RadioGroup({
   className,
   ...props
@@ -19,6 +24,7 @@ function RadioGroup({
   );
 }
 
+/** Standardized sub-component or utility serving RadioGroupItem. */
 function RadioGroupItem({
   className,
   ...props

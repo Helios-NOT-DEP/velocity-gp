@@ -1,13 +1,19 @@
+/**
+ * @file breadcrumb.tsx
+ * @description Displays the path to the current resource using a hierarchy of links.
+ */
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { ChevronRight, MoreHorizontal } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Provides navigational context showing hierarchical page depth. */
 function Breadcrumb({ ...props }: React.ComponentProps<'nav'>) {
   return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;
 }
 
+/** Standardized sub-component or utility serving BreadcrumbList. */
 function BreadcrumbList({ className, ...props }: React.ComponentProps<'ol'>) {
   return (
     <ol
@@ -21,6 +27,7 @@ function BreadcrumbList({ className, ...props }: React.ComponentProps<'ol'>) {
   );
 }
 
+/** Standardized sub-component or utility serving BreadcrumbItem. */
 function BreadcrumbItem({ className, ...props }: React.ComponentProps<'li'>) {
   return (
     <li
@@ -31,6 +38,7 @@ function BreadcrumbItem({ className, ...props }: React.ComponentProps<'li'>) {
   );
 }
 
+/** Standardized sub-component or utility serving BreadcrumbLink. */
 function BreadcrumbLink({
   asChild,
   className,
@@ -49,6 +57,7 @@ function BreadcrumbLink({
   );
 }
 
+/** Standardized sub-component or utility serving BreadcrumbPage. */
 function BreadcrumbPage({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
@@ -62,6 +71,7 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
+/** Standardized sub-component or utility serving BreadcrumbSeparator. */
 function BreadcrumbSeparator({ children, className, ...props }: React.ComponentProps<'li'>) {
   return (
     <li
@@ -76,6 +86,7 @@ function BreadcrumbSeparator({ children, className, ...props }: React.ComponentP
   );
 }
 
+/** Standardized sub-component or utility serving BreadcrumbEllipsis. */
 function BreadcrumbEllipsis({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span

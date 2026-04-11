@@ -1,3 +1,7 @@
+/**
+ * @file avatar.tsx
+ * @description An image element with a fallback for representing the user.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,6 +9,7 @@ import * as AvatarPrimitive from '@radix-ui/react-avatar';
 
 import { cn } from './utils';
 
+/** Renders rounded indicator graphics representing users or entities. */
 function Avatar({ className, ...props }: React.ComponentProps<typeof AvatarPrimitive.Root>) {
   return (
     <AvatarPrimitive.Root
@@ -15,6 +20,7 @@ function Avatar({ className, ...props }: React.ComponentProps<typeof AvatarPrimi
   );
 }
 
+/** Standardized sub-component or utility serving AvatarImage. */
 function AvatarImage({ className, ...props }: React.ComponentProps<typeof AvatarPrimitive.Image>) {
   return (
     <AvatarPrimitive.Image
@@ -25,6 +31,7 @@ function AvatarImage({ className, ...props }: React.ComponentProps<typeof Avatar
   );
 }
 
+/** Standardized sub-component or utility serving AvatarFallback. */
 function AvatarFallback({
   className,
   ...props

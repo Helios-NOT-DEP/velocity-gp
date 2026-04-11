@@ -1,3 +1,7 @@
+/**
+ * @file hover-card.tsx
+ * @description For sighted users to preview content available behind a link.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,14 +9,17 @@ import * as HoverCardPrimitive from '@radix-ui/react-hover-card';
 
 import { cn } from './utils';
 
+/** Displays lightweight summary info on element hover. */
 function HoverCard({ ...props }: React.ComponentProps<typeof HoverCardPrimitive.Root>) {
   return <HoverCardPrimitive.Root data-slot="hover-card" {...props} />;
 }
 
+/** Standardized sub-component or utility serving HoverCardTrigger. */
 function HoverCardTrigger({ ...props }: React.ComponentProps<typeof HoverCardPrimitive.Trigger>) {
   return <HoverCardPrimitive.Trigger data-slot="hover-card-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving HoverCardContent. */
 function HoverCardContent({
   className,
   align = 'center',

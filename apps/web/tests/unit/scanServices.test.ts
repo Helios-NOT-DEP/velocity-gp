@@ -9,29 +9,33 @@ import {
   shouldSuppressDuplicatePayload,
 } from '@/services/scan';
 
-const { getCurrentEventMock } = vi.hoisted(() => ({
-  getCurrentEventMock: vi.fn(),
+const { getCurrentEventPlayerMock } = vi.hoisted(() => ({
+  getCurrentEventPlayerMock: vi.fn(),
 }));
 
 vi.mock('@/services/api', () => ({
   apiClient: {
-    get: getCurrentEventMock,
+    get: getCurrentEventPlayerMock,
   },
   eventEndpoints: {
-    getCurrentEvent: '/events/current',
+    getCurrentEventPlayer: '/events/current/players/me',
   },
 }));
 
 describe('scan identity resolver', () => {
   beforeEach(() => {
-    getCurrentEventMock.mockReset();
+    getCurrentEventPlayerMock.mockReset();
   });
 
-  it('resolves known seeded email when current event matches', async () => {
-    getCurrentEventMock.mockResolvedValue({
+  it('resolves active player identity when API call succeeds', async () => {
+    getCurrentEventPlayerMock.mockResolvedValue({
       ok: true,
       data: {
-        id: 'event-velocity-active',
+        eventId: 'event-velocity-active',
+        playerId: 'player-lina-active',
+        teamId: 'team-apex-comets',
+        teamName: 'Apex Comets',
+        email: 'lina@velocitygp.dev',
       },
     });
 
@@ -49,33 +53,30 @@ describe('scan identity resolver', () => {
       teamName: 'Apex Comets',
       email: 'lina@velocitygp.dev',
     });
-    expect(getCurrentEventMock).toHaveBeenCalledTimes(1);
+    expect(getCurrentEventPlayerMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns unmapped for unknown email and skips event API lookup', async () => {
-    const result = await resolveScanIdentityForEmail('unknown@velocitygp.dev');
-
-    expect(result.status).toBe('unmapped');
-    expect(getCurrentEventMock).not.toHaveBeenCalled();
-  });
-
-  it('returns event mismatch when seeded event differs from current event', async () => {
-    getCurrentEventMock.mockResolvedValue({
-      ok: true,
-      data: {
-        id: 'event-other',
-      },
+  it('returns unmapped when identity API returns 404', async () => {
+    getCurrentEventPlayerMock.mockResolvedValue({
+      ok: false,
+      status: 404,
     });
 
-    const result = await resolveScanIdentityForEmail('parker@velocitygp.dev');
+    const result = await resolveScanIdentityForEmail('lina@velocitygp.dev');
 
-    expect(result.status).toBe('event_mismatch');
-    if (result.status !== 'event_mismatch') {
-      return;
-    }
+    expect(result.status).toBe('unmapped');
+    expect(getCurrentEventPlayerMock).toHaveBeenCalledTimes(1);
+  });
 
-    expect(result.expectedEventId).toBe('event-velocity-active');
-    expect(result.currentEventId).toBe('event-other');
+  it('returns event unavailable when API returns 500', async () => {
+    getCurrentEventPlayerMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+    });
+
+    const result = await resolveScanIdentityForEmail('zina@velocitygp.dev');
+
+    expect(result.status).toBe('event_unavailable');
   });
 });
 

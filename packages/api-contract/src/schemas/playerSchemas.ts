@@ -1,9 +1,20 @@
+/**
+ * @file playerSchemas.ts
+ * @description Safety thresholds applied toward user profile updates and creations.
+ * Strips dangerous inputs from arbitrary player profile writes or registrations.
+ */
+
 import { z } from 'zod';
 
+/** URL extractor enforcing presence of player entity identifiers. */
 export const playerParamsSchema = z.object({
   playerId: z.string().min(1),
 });
 
+/**
+ * Constrains registration creation structures. Requires an email and display name
+ * but optionally catches Team inclusion.
+ */
 export const createPlayerSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2),
@@ -11,6 +22,7 @@ export const createPlayerSchema = z.object({
   teamId: z.string().min(1).optional(),
 });
 
+/** Guards mutation commands allowing name changes or team shuffling logic dynamically. */
 export const updatePlayerSchema = z.object({
   name: z.string().min(2).optional(),
   teamId: z.string().min(1).nullable().optional(),

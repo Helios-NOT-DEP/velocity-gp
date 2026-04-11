@@ -1,3 +1,7 @@
+/**
+ * @file menubar.tsx
+ * @description A visually persistent menu common in desktop applications.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,6 +10,7 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Renders complex hierarchical navigation bars. */
 function Menubar({ className, ...props }: React.ComponentProps<typeof MenubarPrimitive.Root>) {
   return (
     <MenubarPrimitive.Root
@@ -19,22 +24,27 @@ function Menubar({ className, ...props }: React.ComponentProps<typeof MenubarPri
   );
 }
 
+/** Standardized sub-component or utility serving MenubarMenu. */
 function MenubarMenu({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Menu>) {
   return <MenubarPrimitive.Menu data-slot="menubar-menu" {...props} />;
 }
 
+/** Standardized sub-component or utility serving MenubarGroup. */
 function MenubarGroup({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Group>) {
   return <MenubarPrimitive.Group data-slot="menubar-group" {...props} />;
 }
 
+/** Standardized sub-component or utility serving MenubarPortal. */
 function MenubarPortal({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Portal>) {
   return <MenubarPrimitive.Portal data-slot="menubar-portal" {...props} />;
 }
 
+/** Standardized sub-component or utility serving MenubarRadioGroup. */
 function MenubarRadioGroup({ ...props }: React.ComponentProps<typeof MenubarPrimitive.RadioGroup>) {
   return <MenubarPrimitive.RadioGroup data-slot="menubar-radio-group" {...props} />;
 }
 
+/** Standardized sub-component or utility serving MenubarTrigger. */
 function MenubarTrigger({
   className,
   ...props
@@ -51,6 +61,7 @@ function MenubarTrigger({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarContent. */
 function MenubarContent({
   className,
   align = 'start',
@@ -75,6 +86,7 @@ function MenubarContent({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarItem. */
 function MenubarItem({
   className,
   inset,
@@ -98,6 +110,7 @@ function MenubarItem({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarCheckboxItem. */
 function MenubarCheckboxItem({
   className,
   children,
@@ -124,6 +137,7 @@ function MenubarCheckboxItem({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarRadioItem. */
 function MenubarRadioItem({
   className,
   children,
@@ -148,6 +162,7 @@ function MenubarRadioItem({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarLabel. */
 function MenubarLabel({
   className,
   inset,
@@ -165,6 +180,7 @@ function MenubarLabel({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarSeparator. */
 function MenubarSeparator({
   className,
   ...props
@@ -178,6 +194,7 @@ function MenubarSeparator({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarShortcut. */
 function MenubarShortcut({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
@@ -188,10 +205,12 @@ function MenubarShortcut({ className, ...props }: React.ComponentProps<'span'>) 
   );
 }
 
+/** Standardized sub-component or utility serving MenubarSub. */
 function MenubarSub({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Sub>) {
   return <MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />;
 }
 
+/** Standardized sub-component or utility serving MenubarSubTrigger. */
 function MenubarSubTrigger({
   className,
   inset,
@@ -216,6 +235,7 @@ function MenubarSubTrigger({
   );
 }
 
+/** Standardized sub-component or utility serving MenubarSubContent. */
 function MenubarSubContent({
   className,
   ...props

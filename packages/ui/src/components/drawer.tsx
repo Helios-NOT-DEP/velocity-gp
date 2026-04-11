@@ -1,3 +1,7 @@
+/**
+ * @file drawer.tsx
+ * @description A drawer component for React.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,22 +9,27 @@ import { Drawer as DrawerPrimitive } from 'vaul';
 
 import { cn } from './utils';
 
+/** Slide-out panel typically used on mobile screens. */
 function Drawer({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
   return <DrawerPrimitive.Root data-slot="drawer" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DrawerTrigger. */
 function DrawerTrigger({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DrawerPortal. */
 function DrawerPortal({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
   return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DrawerClose. */
 function DrawerClose({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Close>) {
   return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DrawerOverlay. */
 function DrawerOverlay({
   className,
   ...props
@@ -37,6 +46,7 @@ function DrawerOverlay({
   );
 }
 
+/** Standardized sub-component or utility serving DrawerContent. */
 function DrawerContent({
   className,
   children,
@@ -64,6 +74,7 @@ function DrawerContent({
   );
 }
 
+/** Standardized sub-component or utility serving DrawerHeader. */
 function DrawerHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -74,6 +85,7 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving DrawerFooter. */
 function DrawerFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -84,6 +96,7 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving DrawerTitle. */
 function DrawerTitle({ className, ...props }: React.ComponentProps<typeof DrawerPrimitive.Title>) {
   return (
     <DrawerPrimitive.Title
@@ -94,6 +107,7 @@ function DrawerTitle({ className, ...props }: React.ComponentProps<typeof Drawer
   );
 }
 
+/** Standardized sub-component or utility serving DrawerDescription. */
 function DrawerDescription({
   className,
   ...props

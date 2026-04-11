@@ -1,4 +1,10 @@
-// Zod schema exports used by backend validation middleware and tests.
+/**
+ * @file index.ts
+ * @description Master Barrel exporting all Zod runtime validations.
+ * Prevents consumer systems (like backend middleware and frontend React-hook-form resolvers)
+ * from having to import specific files individually.
+ */
+
 export * from './authSchemas.js';
 export * from './adminSchemas.js';
 export * from './eventSchemas.js';

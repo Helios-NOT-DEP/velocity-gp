@@ -1,3 +1,7 @@
+/**
+ * @file alert.tsx
+ * @description Displays a callout for user attention.
+ */
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
@@ -19,6 +23,7 @@ const alertVariants = cva(
   }
 );
 
+/** Provides contextual feedback messages for typical user actions. */
 function Alert({
   className,
   variant,
@@ -34,6 +39,7 @@ function Alert({
   );
 }
 
+/** Standardized sub-component or utility serving AlertTitle. */
 function AlertTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -44,6 +50,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving AlertDescription. */
 function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div

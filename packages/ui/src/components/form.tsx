@@ -1,3 +1,7 @@
+/**
+ * @file form.tsx
+ * @description Building forms with React Hook Form and Zod.
+ */
 'use client';
 
 import * as React from 'react';
@@ -16,6 +20,7 @@ import {
 import { cn } from './utils';
 import { Label } from './label';
 
+/** Wrappers integrating complex form state with UI error reporting. */
 const Form = FormProvider;
 
 type FormFieldContextValue<
@@ -27,6 +32,7 @@ type FormFieldContextValue<
 
 const FormFieldContext = React.createContext<FormFieldContextValue>({} as FormFieldContextValue);
 
+/** Standardized sub-component or utility serving FormField. */
 const FormField = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
@@ -40,6 +46,7 @@ const FormField = <
   );
 };
 
+/** Standardized sub-component or utility serving useFormField. */
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext);
   const itemContext = React.useContext(FormItemContext);
@@ -69,6 +76,7 @@ type FormItemContextValue = {
 
 const FormItemContext = React.createContext<FormItemContextValue>({} as FormItemContextValue);
 
+/** Standardized sub-component or utility serving FormItem. */
 function FormItem({ className, ...props }: React.ComponentProps<'div'>) {
   const id = React.useId();
 
@@ -79,6 +87,7 @@ function FormItem({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving FormLabel. */
 function FormLabel({ className, ...props }: React.ComponentProps<typeof LabelPrimitive.Root>) {
   const { error, formItemId } = useFormField();
 
@@ -93,6 +102,7 @@ function FormLabel({ className, ...props }: React.ComponentProps<typeof LabelPri
   );
 }
 
+/** Standardized sub-component or utility serving FormControl. */
 function FormControl({ ...props }: React.ComponentProps<typeof Slot>) {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
 
@@ -107,6 +117,7 @@ function FormControl({ ...props }: React.ComponentProps<typeof Slot>) {
   );
 }
 
+/** Standardized sub-component or utility serving FormDescription. */
 function FormDescription({ className, ...props }: React.ComponentProps<'p'>) {
   const { formDescriptionId } = useFormField();
 
@@ -120,6 +131,7 @@ function FormDescription({ className, ...props }: React.ComponentProps<'p'>) {
   );
 }
 
+/** Standardized sub-component or utility serving FormMessage. */
 function FormMessage({ className, ...props }: React.ComponentProps<'p'>) {
   const { error, formMessageId } = useFormField();
   const body = error ? String(error?.message ?? '') : props.children;

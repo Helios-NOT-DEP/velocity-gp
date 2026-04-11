@@ -13,6 +13,7 @@ import {
   type RaceRealtimeEventType,
 } from '../src/contracts/realtime.js';
 
+/** Create Safe Scan Event */
 function createSafeScanEvent(): RaceRealtimeEvent<'SCAN_SUCCESS'> {
   return createRaceRealtimeEventEnvelope({
     id: 'evt-safe-1',
@@ -40,6 +41,7 @@ function createSafeScanEvent(): RaceRealtimeEvent<'SCAN_SUCCESS'> {
   });
 }
 
+/** Create Hazard Hit Event */
 function createHazardHitEvent(): RaceRealtimeEvent<'HAZARD_HIT'> {
   return createRaceRealtimeEventEnvelope({
     id: 'evt-hazard-1',
@@ -67,6 +69,7 @@ function createHazardHitEvent(): RaceRealtimeEvent<'HAZARD_HIT'> {
   });
 }
 
+/** Create Pit Released Event */
 function createPitReleasedEvent(): RaceRealtimeEvent<'PIT_RELEASED'> {
   return createRaceRealtimeEventEnvelope({
     id: 'evt-pit-1',
@@ -85,6 +88,7 @@ function createPitReleasedEvent(): RaceRealtimeEvent<'PIT_RELEASED'> {
   });
 }
 
+/** Create Rescue Updated Event */
 function createRescueUpdatedEvent(): RaceRealtimeEvent<'RESCUE_UPDATED'> {
   return createRaceRealtimeEventEnvelope({
     id: 'evt-rescue-1',
@@ -106,6 +110,7 @@ function createRescueUpdatedEvent(): RaceRealtimeEvent<'RESCUE_UPDATED'> {
   });
 }
 
+/** Create Race Control Updated Event */
 function createRaceControlUpdatedEvent(): RaceRealtimeEvent<'RACE_CONTROL_UPDATED'> {
   return createRaceRealtimeEventEnvelope({
     id: 'evt-race-control-1',
@@ -125,6 +130,7 @@ function createRaceControlUpdatedEvent(): RaceRealtimeEvent<'RACE_CONTROL_UPDATE
   });
 }
 
+/** Create Leaderboard Changed Event */
 function createLeaderboardChangedEvent(): RaceRealtimeEvent<'LEADERBOARD_CHANGED'> {
   return createRaceRealtimeEventEnvelope({
     id: 'evt-board-1',
