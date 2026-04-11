@@ -46,7 +46,7 @@ beforeEach(() => {
     let store: Record<string, string> = {};
     return {
       getItem: function (key: string) {
-        return store[key] || null;
+        return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
       },
       setItem: function (key: string, value: string) {
         store[key] = value.toString();
@@ -61,7 +61,7 @@ beforeEach(() => {
         return Object.keys(store).length;
       },
       key: function (i: number) {
-        return Object.keys(store)[i] || null;
+        return Object.keys(store)[i] ?? null;
       },
     };
   })();
