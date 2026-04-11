@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useGame } from '../context/GameContext';
+import { useGame, type Team } from '../context/GameContext';
 import { Zap, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -39,7 +39,7 @@ export default function Leaderboard() {
   const sortedTeams = [...gameState.teams].sort((a, b) => b.score - a.score);
   const leaderScore = sortedTeams[0]?.score || 0;
 
-  const getPitStopTimeLeft = (team: any) => {
+  const getPitStopTimeLeft = (team: Team) => {
     if (!team.inPitStop || !team.pitStopExpiresAt) return 0;
     const expiresAt = new Date(team.pitStopExpiresAt).getTime();
     return Math.max(0, Math.floor((expiresAt - currentTime.getTime()) / 1000));
