@@ -49,7 +49,7 @@ beforeEach(() => {
         return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
       },
       setItem: function (key: string, value: string) {
-        store[key] = value.toString();
+        store[key] = String(value);
       },
       removeItem: function (key: string) {
         delete store[key];
