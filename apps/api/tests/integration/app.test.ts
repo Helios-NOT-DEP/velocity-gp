@@ -1214,7 +1214,9 @@ describe('velocity gp backend', () => {
 
   it('updates QR status through admin endpoints', async () => {
     const response = await request(app)
-      .patch(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}/status`)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}/status`
+      )
       .set('x-user-id', fixtureIds.adminUserId)
       .set('x-user-role', 'admin')
       .send({ status: 'DISABLED', reason: 'leaked code' });
@@ -1254,7 +1256,9 @@ describe('velocity gp backend', () => {
     expect(persisted?.deletedAt).not.toBeNull();
     expect(persisted?.status).toBe('DISABLED');
     expect(inventory.status).toBe(200);
-    const inventoryIds = (inventory.body.data.qrCodes as Array<{ id: string }>).map((item) => item.id);
+    const inventoryIds = (inventory.body.data.qrCodes as Array<{ id: string }>).map(
+      (item) => item.id
+    );
     expect(inventoryIds).not.toContain(fixtureIds.qrCodeId);
   });
 

@@ -91,7 +91,9 @@ export const createAdminQRCodeSchema = z
         return true;
       }
 
-      return new Date(value.activationStartsAt).getTime() < new Date(value.activationEndsAt).getTime();
+      return (
+        new Date(value.activationStartsAt).getTime() < new Date(value.activationEndsAt).getTime()
+      );
     },
     {
       message: 'activationEndsAt must be later than activationStartsAt.',

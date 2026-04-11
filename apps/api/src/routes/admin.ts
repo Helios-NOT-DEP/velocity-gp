@@ -176,7 +176,9 @@ adminRouter.get(
   asyncHandler(async (request, response) => {
     const eventId = String(request.params.eventId);
 
-    response.json(successResponse(await listAdminQRCodes(eventId), { requestId: response.locals.requestId }));
+    response.json(
+      successResponse(await listAdminQRCodes(eventId), { requestId: response.locals.requestId })
+    );
   })
 );
 
