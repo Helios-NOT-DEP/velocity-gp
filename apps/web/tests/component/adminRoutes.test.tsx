@@ -103,15 +103,30 @@ describe('admin route guards', () => {
   });
 
   it('redirects legacy /garage alias to canonical /team-setup', async () => {
-    renderWithRoute('/garage', {
-      userId: 'player-1',
-      role: 'player',
-      isAuthenticated: true,
-      email: 'player@example.com',
+    window.localStorage.clear();
+    window.localStorage.setItem(
+      AUTH_SESSION_STORAGE_KEY,
+      JSON.stringify({
+        userId: 'player-1',
+        role: 'player',
+        isAuthenticated: true,
+        email: 'player@example.com',
+      } satisfies AuthSession)
+    );
+
+    const router = createMemoryRouter(appRoutes, {
+      initialEntries: ['/garage'],
     });
+
+    render(
+      <GameProvider>
+        <RouterProvider router={router} />
+      </GameProvider>
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Create Your Team' })).toBeTruthy();
+      expect(router.state.location.pathname).toBe('/team-setup');
     });
   });
 
