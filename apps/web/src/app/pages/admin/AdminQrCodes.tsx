@@ -1,15 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Check,
-  Download,
-  Loader2,
-  Plus,
-  QrCode,
-  RefreshCcw,
-  Save,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Check, Download, Loader2, Plus, QrCode, RefreshCcw, Save, Trash2, X } from 'lucide-react';
 import {
   adminEndpoints,
   apiClient,
@@ -42,6 +32,19 @@ function toAdminQrCode(qrCode: QRCodeSummary): AdminQrCode {
     activationStartsAt: qrCode.activationStartsAt,
     activationEndsAt: qrCode.activationEndsAt,
   };
+}
+
+function toApiIsoDateTime(value: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  return parsed.toISOString();
 }
 
 function clampHazardWeight(value: number): number {
@@ -131,7 +134,9 @@ export default function AdminQrCodes() {
         setEventId(null);
         setQrCodes(adminDemoQrCodes);
         setDraftWeights(
-          Object.fromEntries(adminDemoQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0]))
+          Object.fromEntries(
+            adminDemoQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0])
+          )
         );
         setLoadError('Live QR inventory unavailable. Showing local demo data.');
       } finally {
@@ -176,12 +181,14 @@ export default function AdminQrCodes() {
     setLoadError(null);
 
     try {
+      const activationStartsAtIso = toApiIsoDateTime(activationStartsAt);
+      const activationEndsAtIso = toApiIsoDateTime(activationEndsAt);
       const request: CreateQRCodeRequest = {
         label: newQRName.trim(),
         value: points,
         zone: newQRZone.trim() || undefined,
-        activationStartsAt: activationStartsAt || undefined,
-        activationEndsAt: activationEndsAt || undefined,
+        activationStartsAt: activationStartsAtIso,
+        activationEndsAt: activationEndsAtIso,
       };
 
       const created = await createAdminQRCode(eventId, request);
@@ -411,7 +418,11 @@ export default function AdminQrCodes() {
               disabled={isDemoMode || isCreating}
               className="w-full py-3 px-6 bg-gradient-to-r from-[#00D4FF] to-[#00A3CC] text-black font-['DM_Sans'] font-bold rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
-              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {isCreating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
               Generate QR Code
             </button>
           </div>
@@ -476,7 +487,9 @@ export default function AdminQrCodes() {
                   <span className="text-gray-400">Scans:</span>
                   <span className="font-mono text-[#00D4FF]">{qrCode.scanCount}</span>
                 </div>
-                <div className="text-xs text-gray-400">{formatActivationWindow(qrCode.activationStartsAt, qrCode.activationEndsAt)}</div>
+                <div className="text-xs text-gray-400">
+                  {formatActivationWindow(qrCode.activationStartsAt, qrCode.activationEndsAt)}
+                </div>
               </div>
 
               <div className="mb-4 rounded-lg border border-gray-700/80 bg-black/30 p-3 space-y-3">
@@ -485,7 +498,9 @@ export default function AdminQrCodes() {
                     Hazard Randomizer
                   </p>
                   <span className="text-xs font-mono text-[#00D4FF]">
-                    {qrCode.hazardWeightOverride === null ? 'Fallback' : `${qrCode.hazardWeightOverride}%`}
+                    {qrCode.hazardWeightOverride === null
+                      ? 'Fallback'
+                      : `${qrCode.hazardWeightOverride}%`}
                   </span>
                 </div>
 
@@ -517,7 +532,11 @@ export default function AdminQrCodes() {
                     disabled={isSaving}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#00D4FF]/15 border border-[#00D4FF]/30 text-[#00D4FF] text-xs font-semibold disabled:opacity-60"
                   >
-                    {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    {isSaving ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Save className="w-3 h-3" />
+                    )}
                     Save
                   </button>
                   <button

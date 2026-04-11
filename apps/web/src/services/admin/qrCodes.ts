@@ -10,7 +10,9 @@ import type {
 import { adminEndpoints, apiClient } from '@/services/api';
 
 export async function listAdminQRCodes(eventId: string): Promise<ListEventQRCodesResponse> {
-  const response = await apiClient.get<ListEventQRCodesResponse>(adminEndpoints.listAdminQRCodes(eventId));
+  const response = await apiClient.get<ListEventQRCodesResponse>(
+    adminEndpoints.listAdminQRCodes(eventId)
+  );
 
   if (!response.ok) {
     throw new Error(`Unable to load QR inventory (${response.status}).`);
@@ -23,10 +25,13 @@ export async function createAdminQRCode(
   eventId: string,
   request: CreateQRCodeRequest
 ): Promise<CreateQRCodeResponse> {
-  const response = await apiClient.request<CreateQRCodeResponse>(adminEndpoints.createAdminQRCode(eventId), {
-    method: 'POST',
-    body: request,
-  });
+  const response = await apiClient.request<CreateQRCodeResponse>(
+    adminEndpoints.createAdminQRCode(eventId),
+    {
+      method: 'POST',
+      body: request,
+    }
+  );
 
   if (!response.ok) {
     throw new Error(`Unable to create QR code (${response.status}).`);

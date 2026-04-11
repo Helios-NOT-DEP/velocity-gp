@@ -189,12 +189,23 @@ describe('AdminQrCodes operations', () => {
 
     const [, , createCall] = fetchMock.mock.calls;
     const [createUrl, createOptions] = createCall as [string, RequestInit];
+    const createBody = JSON.parse(String(createOptions.body)) as {
+      label: string;
+      value: number;
+      zone?: string;
+      activationStartsAt?: string;
+      activationEndsAt?: string;
+    };
     expect(createUrl).toContain('/admin/events/event-1/qr-codes');
-    expect(JSON.parse(String(createOptions.body))).toMatchObject({
+    expect(createBody).toMatchObject({
       label: 'Checkpoint Delta',
       value: 150,
       zone: 'Roof',
     });
+    expect(createBody.activationStartsAt).toMatch(/Z$/);
+    expect(createBody.activationEndsAt).toMatch(/Z$/);
+    expect(createBody.activationStartsAt).not.toBe('2026-04-06T10:00');
+    expect(createBody.activationEndsAt).not.toBe('2026-04-06T16:00');
   });
 
   it('updates status and deletes a QR code using admin endpoints', async () => {
