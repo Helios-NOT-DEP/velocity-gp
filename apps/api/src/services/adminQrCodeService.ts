@@ -124,7 +124,11 @@ function createHs512Jwt(secret: string, correlationId: string): string {
 }
 
 function getN8nWebhookUrl(): string {
-  const baseUrl = env.N8N_HOST ?? 'https://n8n.velocitygp.app';
+  if (!env.N8N_HOST) {
+    throw new ValidationError('N8N_HOST must be configured for QR asset generation.');
+  }
+
+  const baseUrl = env.N8N_HOST;
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   const environmentSegment = env.NODE_ENV === 'production' ? 'prod' : 'dev';
   // Keep the webhook path environment-configurable with a single template variable.
@@ -247,6 +251,30 @@ export async function createAdminQRCode(
   context: AdminActionContext = {}
 ): Promise<CreateQRCodeResponse> {
   return withTraceSpan('admin.qr_code.create', { eventId }, async () => {
+    const [eventExists, duplicateLabel] = await Promise.all([
+      prisma.event.findUnique({
+        where: { id: eventId },
+        select: { id: true },
+      }),
+      prisma.qRCode.findFirst({
+        where: { eventId, label: request.label },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!eventExists) {
+      throw new ValidationError('Event does not exist for QR code creation.', {
+        eventId,
+      });
+    }
+
+    if (duplicateLabel) {
+      throw new ValidationError('A QR code with this label already exists for the event.', {
+        eventId,
+        label: request.label,
+      });
+    }
+
     const qrCodeId = `qr-${randomUUID()}`;
     const payload = buildQrPayload();
     const trustedScanUrl = buildTrustedScanUrl(payload);

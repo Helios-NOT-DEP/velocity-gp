@@ -63,7 +63,7 @@ export const prisma =
     log: ['error', 'warn'],
   });
 
-if (process.env.NODE_ENV !== 'production') {
+if (env.NODE_ENV !== 'production') {
   // Reuse pool/client across HMR reloads to avoid exhausting Postgres connections.
   globalForPrisma.prismaPool = prismaPool;
   globalForPrisma.prisma = prisma;
