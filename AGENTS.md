@@ -58,7 +58,9 @@ For any non-trivial feature, add tests in the correct tier and prefer names such
 Before opening a PR:
 - Run `npm run build` to verify production build succeeds
 - Run `npm test` to verify tests pass
+- Run `npm test:web:e2e` to verify tests pass
 - Manually smoke-test affected routes with `npm run dev`
+- Run `npm run format` and `npm run lint`, and fix any issues they report before pushing code.
 
 When introducing backend or integration work, favor testable seams and clean boundaries so the planned stack can be added without forcing a rewrite later. See [apps/web/tests/README.md](../../apps/web/tests/README.md) for full testing guidelines.
 
@@ -72,7 +74,9 @@ Recent history favors short conventional commits such as `feat: ...`, `fix: ...`
 - Screenshots for UI changes
 - Verification that `npm run build` passes
 - Run `npm run lint` and resolve reported issues.
-- Run `npm run format` and include any formatting updates in the push.
+- Run `npm run format` and resolve any issues.
+- Run `npm test` to verify tests pass
+- Run `npm test:web:e2e` to verify e2e tests pass
 
 GitHub Issues is the backlog of record for this repository. Track feature work, bugs, and follow-up tasks in the Helios project board:
 
