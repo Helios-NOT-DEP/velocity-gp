@@ -1,14 +1,19 @@
 import { Router } from 'express';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
-import type { PlayerActiveIdentity } from '@velocity-gp/api-contract';
+import type { ListTeamActivityFeedQuery, PlayerActiveIdentity } from '@velocity-gp/api-contract';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
-import { eventParamsSchema } from '@velocity-gp/api-contract/schemas';
+import {
+  eventParamsSchema,
+  teamActivityFeedParamsSchema,
+  teamActivityFeedQuerySchema,
+} from '@velocity-gp/api-contract/schemas';
 import { getCurrentEvent, getEvent, listEvents } from '../services/eventService.js';
 import { getSessionFromAuthInputs } from '../services/authService.js';
 import { prisma } from '../db/client.js';
 import { AppError } from '../utils/appError.js';
+import { listTeamActivityFeed } from '../services/teamActivityFeedService.js';
 
 export const eventRouter = Router();
 
@@ -84,6 +89,40 @@ eventRouter.get(
     };
 
     response.json(successResponse(identity, { requestId: response.locals.requestId }));
+  })
+);
+
+eventRouter.get(
+  '/events/:eventId/teams/:teamId/activity-feed',
+  validate(teamActivityFeedParamsSchema, 'params'),
+  validate(teamActivityFeedQuerySchema, 'query'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const teamId = String(request.params.teamId);
+    const query = request.query as ListTeamActivityFeedQuery;
+
+    const { session } = await getSessionFromAuthInputs(
+      request.header('authorization'),
+      request.header('cookie')
+    );
+
+    if (session.eventId !== eventId) {
+      throw new AppError(
+        403,
+        'AUTH_EVENT_CONTEXT_MISMATCH',
+        'Session is not scoped to this event.'
+      );
+    }
+
+    if (!session.teamId || session.teamId !== teamId) {
+      throw new AppError(403, 'AUTH_TEAM_CONTEXT_MISMATCH', 'Session is not scoped to this team.');
+    }
+
+    response.json(
+      successResponse(await listTeamActivityFeed(eventId, teamId, query.limit), {
+        requestId: response.locals.requestId,
+      })
+    );
   })
 );
 

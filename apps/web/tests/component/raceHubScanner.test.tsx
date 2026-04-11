@@ -14,12 +14,14 @@ const {
   resolveScanIdentityForEmailMock,
   trackAnalyticsEventMock,
   submitScanMock,
+  getTeamActivityFeedMock,
   redirectToTrustedQrUrlMock,
 } = vi.hoisted(() => ({
   getSessionMock: vi.fn(),
   resolveScanIdentityForEmailMock: vi.fn(),
   trackAnalyticsEventMock: vi.fn(),
   submitScanMock: vi.fn(),
+  getTeamActivityFeedMock: vi.fn(),
   redirectToTrustedQrUrlMock: vi.fn(),
 }));
 
@@ -47,7 +49,12 @@ vi.mock('@/services/auth', () => ({
 
 vi.mock('@/services/api', () => ({
   apiClient: {
+    get: getTeamActivityFeedMock,
     post: submitScanMock,
+  },
+  eventEndpoints: {
+    listTeamActivityFeed: (eventId: string, teamId: string) =>
+      `/events/${eventId}/teams/${teamId}/activity-feed`,
   },
   scanEndpoints: {
     submitScan: (eventId: string) => `/events/${eventId}/scans`,
@@ -161,6 +168,13 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       email: 'lina@velocitygp.dev',
     });
     resolveScanIdentityForEmailMock.mockResolvedValue(resolvedIdentity);
+    getTeamActivityFeedMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        items: [],
+      },
+    });
     submitScanMock.mockResolvedValue({
       ok: true,
       status: 200,
@@ -188,6 +202,58 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       value: originalMediaDevices,
     });
   });
+
+  it(
+    'renders team activity feed entries from the backend feed endpoint',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      getTeamActivityFeedMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        data: {
+          items: [
+            {
+              id: 'activity-1',
+              eventId: 'event-velocity-active',
+              teamId: 'team-apex-comets',
+              playerId: 'player-lina-active',
+              playerName: 'Lina',
+              type: 'PLAYER_ONBOARDING_COMPLETED',
+              occurredAt: new Date().toISOString(),
+              summary: 'Lina completed onboarding and is now race-ready.',
+            },
+            {
+              id: 'activity-2',
+              eventId: 'event-velocity-active',
+              teamId: 'team-apex-comets',
+              playerId: 'player-lina-active',
+              playerName: 'Lina',
+              type: 'PLAYER_QR_SCAN',
+              occurredAt: new Date().toISOString(),
+              qrCodeId: 'qr-1',
+              qrCodeLabel: 'Bridge Marker',
+              qrPayload: 'VG-001',
+              scanOutcome: 'SAFE',
+              pointsAwarded: 120,
+              errorCode: null,
+              summary: 'Bridge Marker scanned for +120 points.',
+            },
+          ],
+        },
+      });
+
+      renderRaceHub();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Lina completed onboarding and is now race-ready.')
+        ).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Lina scanned Bridge Marker for +120')).toBeInTheDocument();
+      expect(screen.getByText('SAFE • +120 points')).toBeInTheDocument();
+    }
+  );
 
   it(
     'redirects when the scanned QR URL matches the trusted frontend origin',
