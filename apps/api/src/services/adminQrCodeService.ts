@@ -15,7 +15,7 @@ import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
 import { logger } from '../lib/logger.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
-import { ValidationError } from '../utils/appError.js';
+import { DependencyError, ValidationError } from '../utils/appError.js';
 
 interface AdminActionContext {
   readonly actorUserId?: string;
@@ -166,6 +166,14 @@ function buildTrustedScanUrl(payload: string): string {
   return `${originWithNoTrailingSlash}/scan/${encodeURIComponent(payload)}`;
 }
 
+/**
+ * Requests the generation of a downloadable QR code asset via an external n8n webhook.
+ * Connects securely to the N8N instance via HS512 JWT verification.
+ *
+ * @param input - The unique QR ID and the trusted URL payload it should encode.
+ * @returns The verifiable absolute URL string for the externally hosted QR code image.
+ * @throws {DependencyError} If the n8n webhook fails, times out, or returns an invalid URL format.
+ */
 async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
   const endpoint = getN8nWebhookUrl();
   const correlationId = randomUUID();
@@ -189,17 +197,35 @@ async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
     });
 
     if (!response.ok) {
-      throw new ValidationError(`QR asset generation failed with status ${response.status}.`, {
+      throw new DependencyError(`QR asset generation failed with status ${response.status}.`, {
         status: response.status,
       });
     }
 
     const payload = (await response.json()) as QrGenerationResponse;
     if (typeof payload.qrImageURL !== 'string' || payload.qrImageURL.length === 0) {
-      throw new ValidationError('QR asset generation response did not include qrImageURL.');
+      throw new DependencyError('QR asset generation response did not include qrImageURL.');
     }
 
-    return payload.qrImageURL;
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(payload.qrImageURL);
+    } catch {
+      throw new DependencyError('QR asset generation response provided a malformed qrImageURL.', {
+        qrImageURL: payload.qrImageURL,
+      });
+    }
+
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      throw new DependencyError(
+        'QR asset generation response provided an unsafe qrImageURL protocol.',
+        {
+          protocol: parsedUrl.protocol,
+        }
+      );
+    }
+
+    return parsedUrl.toString();
   } catch (error) {
     logger.error('admin QR asset generation failed', {
       endpoint,
@@ -213,6 +239,13 @@ async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
   }
 }
 
+/**
+ * Retrieves the full active inventory of QR codes for an event.
+ * Excludes soft-deleted QR codes.
+ *
+ * @param eventId - The unique identifier of the event context.
+ * @returns An array of QR codes summarizing current stats, logic overrides, and scanning activity.
+ */
 export async function listAdminQRCodes(eventId: string): Promise<ListEventQRCodesResponse> {
   const qrCodes = await prisma.qRCode.findMany({
     where: {
@@ -245,6 +278,16 @@ export async function listAdminQRCodes(eventId: string): Promise<ListEventQRCode
   };
 }
 
+/**
+ * Creates a new QR code within the event inventory, orchestrating database records,
+ * n8n asset generation, and audit logging simultaneously within a transaction.
+ *
+ * @param eventId - The unique identifier of the event.
+ * @param request - Configuration options including physical label, points value, and activation windows.
+ * @param context - The context containing the identity of the Admin acting upon the platform.
+ * @returns A summary representation of the created code alongside its transaction audit ID.
+ * @throws {ValidationError} If a QR with the requested label already exists or the event is missing.
+ */
 export async function createAdminQRCode(
   eventId: string,
   request: CreateQRCodeRequest,
@@ -370,6 +413,17 @@ export async function createAdminQRCode(
   });
 }
 
+/**
+ * Updates the operational status (ACTIVE/DISABLED) of an existing QR code.
+ * Used by admins to manually disable specific hazards or objectives mid-event.
+ *
+ * @param eventId - The unique identifier of the event.
+ * @param qrCodeId - The unique identifier of the QR code being operated on.
+ * @param request - Payload detailing the target status and an optional audit reason.
+ * @param context - Admin contextual identity.
+ * @returns Updated status configuration and its associated audit ID.
+ * @throws {ValidationError} If the requested QR code does not exist.
+ */
 export async function setAdminQRCodeStatus(
   eventId: string,
   qrCodeId: string,
@@ -446,6 +500,16 @@ export async function setAdminQRCodeStatus(
   );
 }
 
+/**
+ * Soft deletes a QR code, immediately disabling its ability to accept new scans
+ * and hiding it from list queries. Retains the code for database integrity and history.
+ *
+ * @param eventId - The unique identifier of the event.
+ * @param qrCodeId - The unique identifier of the QR code to be deleted.
+ * @param context - Admin contextual identity.
+ * @returns Deletion timestamp and its associated audit ID.
+ * @throws {ValidationError} If the requested QR code does not exist.
+ */
 export async function softDeleteAdminQRCode(
   eventId: string,
   qrCodeId: string,

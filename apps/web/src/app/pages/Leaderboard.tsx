@@ -39,6 +39,12 @@ export default function Leaderboard() {
   const sortedTeams = [...gameState.teams].sort((a, b) => b.score - a.score);
   const leaderScore = sortedTeams[0]?.score || 0;
 
+  const getPitStopTimeLeft = (team: any) => {
+    if (!team.inPitStop || !team.pitStopExpiresAt) return 0;
+    const expiresAt = new Date(team.pitStopExpiresAt).getTime();
+    return Math.max(0, Math.floor((expiresAt - currentTime.getTime()) / 1000));
+  };
+
   useEffect(() => {
     // Rotating commentary keeps leaderboard visually "live" while realtime feed is pending.
     const commentaries = [
@@ -245,8 +251,8 @@ export default function Leaderboard() {
                 <div className="hidden lg:flex justify-end">
                   {isPitStop ? (
                     <span className="px-2 py-0.5 bg-red-600/80 text-white text-[10px] tracking-wider rounded-sm">
-                      PIT {Math.floor((team.pitStopTimeLeft || 0) / 60)}:
-                      {String((team.pitStopTimeLeft || 0) % 60).padStart(2, '0')}
+                      PIT {Math.floor(getPitStopTimeLeft(team) / 60)}:
+                      {String(getPitStopTimeLeft(team) % 60).padStart(2, '0')}
                     </span>
                   ) : isTopThree ? (
                     <span className="px-2 py-0.5 bg-green-600/30 text-green-400 text-[10px] tracking-wider rounded-sm">

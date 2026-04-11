@@ -17,7 +17,7 @@ export interface Team {
   score: number;
   rank: number;
   inPitStop: boolean;
-  pitStopTimeLeft?: number;
+  pitStopExpiresAt?: string;
   keywords?: string[];
 }
 
@@ -78,7 +78,7 @@ const MOCK_TEAMS: Team[] = [
     score: 920,
     rank: 3,
     inPitStop: true,
-    pitStopTimeLeft: 660,
+    pitStopExpiresAt: new Date(Date.now() + 660 * 1000).toISOString(),
   },
   { id: 'team-turbo-tigers', name: 'Turbo Tigers', score: 880, rank: 4, inPitStop: false },
   { id: 'team-neon-ninjas', name: 'Neon Ninjas', score: 820, rank: 5, inPitStop: false },
@@ -110,37 +110,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentTeam: null,
     scans: [],
   });
-
-  useEffect(() => {
-    // Local countdown ticker used for optimistic pit-stop UX before realtime is wired in.
-    const interval = setInterval(() => {
-      setGameState((prev) => ({
-        ...prev,
-        teams: prev.teams.map((team) => {
-          if (team.inPitStop && team.pitStopTimeLeft) {
-            const nextTime = team.pitStopTimeLeft - 1;
-            if (nextTime <= 0) {
-              return { ...team, inPitStop: false, pitStopTimeLeft: undefined };
-            }
-
-            return { ...team, pitStopTimeLeft: nextTime };
-          }
-
-          return team;
-        }),
-        currentTeam:
-          prev.currentTeam && prev.currentTeam.inPitStop && prev.currentTeam.pitStopTimeLeft
-            ? {
-                ...prev.currentTeam,
-                pitStopTimeLeft: Math.max(0, prev.currentTeam.pitStopTimeLeft - 1),
-                inPitStop: prev.currentTeam.pitStopTimeLeft > 1,
-              }
-            : prev.currentTeam,
-      }));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -271,16 +240,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       duration_seconds: duration,
     });
 
-    setGameState((prev) => ({
-      ...prev,
-      teams: prev.teams.map((team) =>
-        team.id === teamId ? { ...team, inPitStop: true, pitStopTimeLeft: duration } : team
-      ),
-      currentTeam:
-        prev.currentTeam?.id === teamId
-          ? { ...prev.currentTeam, inPitStop: true, pitStopTimeLeft: duration }
-          : prev.currentTeam,
-    }));
+    setGameState((prev) => {
+      const expiresAt = new Date(Date.now() + duration * 1000).toISOString();
+      return {
+        ...prev,
+        teams: prev.teams.map((team) =>
+          team.id === teamId ? { ...team, inPitStop: true, pitStopExpiresAt: expiresAt } : team
+        ),
+        currentTeam:
+          prev.currentTeam?.id === teamId
+            ? { ...prev.currentTeam, inPitStop: true, pitStopExpiresAt: expiresAt }
+            : prev.currentTeam,
+      };
+    });
   };
 
   const clearPitStop = (teamId: string) => {
@@ -291,11 +263,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameState((prev) => ({
       ...prev,
       teams: prev.teams.map((team) =>
-        team.id === teamId ? { ...team, inPitStop: false, pitStopTimeLeft: undefined } : team
+        team.id === teamId ? { ...team, inPitStop: false, pitStopExpiresAt: undefined } : team
       ),
       currentTeam:
         prev.currentTeam?.id === teamId
-          ? { ...prev.currentTeam, inPitStop: false, pitStopTimeLeft: undefined }
+          ? { ...prev.currentTeam, inPitStop: false, pitStopExpiresAt: undefined }
           : prev.currentTeam,
     }));
   };
@@ -383,25 +355,25 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const pitStopDuration = resolvePitStopSeconds(response.pitStopExpiresAt);
             if (pitStopDuration > 0) {
               nextTeam.inPitStop = true;
-              nextTeam.pitStopTimeLeft = pitStopDuration;
+              nextTeam.pitStopExpiresAt = response.pitStopExpiresAt;
             } else {
               nextTeam.inPitStop = false;
-              nextTeam.pitStopTimeLeft = undefined;
+              nextTeam.pitStopExpiresAt = undefined;
             }
           }
 
           if (response.outcome === 'BLOCKED' && response.errorCode === 'TEAM_IN_PIT') {
             // Preserve pit-stop lock in UI when server rejects scans during lockout.
             nextTeam.inPitStop = true;
-            if (!nextTeam.pitStopTimeLeft) {
-              nextTeam.pitStopTimeLeft = 60;
+            if (!nextTeam.pitStopExpiresAt) {
+              nextTeam.pitStopExpiresAt = new Date(Date.now() + 60 * 1000).toISOString();
             }
           }
 
           if (response.outcome === 'SAFE') {
             // Explicitly clear stale pit-stop state when a safe scan resumes team activity.
             nextTeam.inPitStop = false;
-            nextTeam.pitStopTimeLeft = undefined;
+            nextTeam.pitStopExpiresAt = undefined;
           }
 
           return nextTeam;
