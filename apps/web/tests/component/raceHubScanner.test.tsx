@@ -94,6 +94,17 @@ function createDetectedCode(rawValue: string) {
   };
 }
 
+function createDeferred<T>() {
+  let resolve: (value: T | PromiseLike<T>) => void = () => {};
+  let reject: (reason?: unknown) => void = () => {};
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
+
 const SCANNER_TEST_TIMEOUT_MS = 15_000;
 const SCANNER_STARTUP_TIMEOUT_MS = 12_000;
 
@@ -316,6 +327,104 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       expect(
         screen.queryByText('Lina completed onboarding and is now race-ready.')
       ).not.toBeInTheDocument();
+    }
+  );
+
+  it(
+    'ignores stale poll responses that resolve after a newer post-scan refresh',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      const stalePollResponse = createDeferred<{
+        ok: boolean;
+        status: number;
+        data: {
+          items: Array<{
+            id: string;
+            eventId: string;
+            teamId: string;
+            playerId: string;
+            playerName: string;
+            type: 'PLAYER_QR_SCAN';
+            occurredAt: string;
+            qrCodeId: string | null;
+            qrCodeLabel: string | null;
+            qrPayload: string;
+            scanOutcome: 'SAFE';
+            pointsAwarded: number;
+            errorCode: null;
+            summary: string;
+          }>;
+        };
+      }>();
+
+      getTeamActivityFeedMock
+        .mockImplementationOnce(() => stalePollResponse.promise)
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          data: {
+            items: [
+              {
+                id: 'activity-latest',
+                eventId: 'event-velocity-active',
+                teamId: 'team-apex-comets',
+                playerId: 'player-lina-active',
+                playerName: 'Lina',
+                type: 'PLAYER_QR_SCAN',
+                occurredAt: new Date().toISOString(),
+                qrCodeId: 'qr-latest',
+                qrCodeLabel: 'Latest Marker',
+                qrPayload: 'VG-LATEST',
+                scanOutcome: 'SAFE',
+                pointsAwarded: 77,
+                errorCode: null,
+                summary: 'Latest Marker scanned for +77 points.',
+              },
+            ],
+          },
+        });
+
+      renderRaceHub();
+      await startScanner();
+
+      await act(async () => {
+        latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Lina scanned Latest Marker for +77')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        stalePollResponse.resolve({
+          ok: true,
+          status: 200,
+          data: {
+            items: [
+              {
+                id: 'activity-stale-poll',
+                eventId: 'event-velocity-active',
+                teamId: 'team-apex-comets',
+                playerId: 'player-lina-active',
+                playerName: 'Lina',
+                type: 'PLAYER_QR_SCAN',
+                occurredAt: new Date(Date.now() - 10_000).toISOString(),
+                qrCodeId: 'qr-stale',
+                qrCodeLabel: 'Old Marker',
+                qrPayload: 'VG-OLD',
+                scanOutcome: 'SAFE',
+                pointsAwarded: 5,
+                errorCode: null,
+                summary: 'Old Marker scanned for +5 points.',
+              },
+            ],
+          },
+        });
+        await Promise.resolve();
+      });
+
+      expect(screen.queryByText('Lina scanned Old Marker for +5')).not.toBeInTheDocument();
+      expect(screen.getByText('Lina scanned Latest Marker for +77')).toBeInTheDocument();
     }
   );
 

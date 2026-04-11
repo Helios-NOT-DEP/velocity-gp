@@ -83,6 +83,7 @@ const ids = {
 async function clearDatabase(): Promise<void> {
   await prisma.adminActionAudit.deleteMany();
   await prisma.teamStateTransition.deleteMany();
+  await prisma.teamActivityEvent.deleteMany();
   await prisma.rescue.deleteMany();
   await prisma.scanRecord.deleteMany();
   await prisma.qRCodeClaim.deleteMany();
