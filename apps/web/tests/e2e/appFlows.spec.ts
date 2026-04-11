@@ -215,6 +215,23 @@ test.describe('Velocity GP web flows', () => {
       });
     });
 
+    await page.route('**/api/events/current/players/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            eventId: 'event-velocity-active',
+            playerId: 'player-1',
+            teamId: 'team-apex-comets',
+            teamName: 'Apex Comets',
+            email: 'lina@velocitygp.dev',
+          },
+        }),
+      });
+    });
+
     await page.route('**/api/events/event-velocity-active/scans', async (route) => {
       const requestPayload = route.request().postDataJSON() as {
         playerId: string;
