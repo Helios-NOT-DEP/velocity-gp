@@ -75,6 +75,7 @@ jobs:
           if [ "${{ inputs.environment }}" = "dev" ]; then
             npm run db:deploy
             echo "Running seed script for dev environment"
+            npm rundb:generate
             npm run db:seed
           else
             npm run db:deploy
