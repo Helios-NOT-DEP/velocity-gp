@@ -113,10 +113,12 @@ function resolveRedirectPath(session: PlayerAuthSession): VerifyMagicLinkRespons
   }
 
   if (session.assignmentStatus === 'ASSIGNED_PENDING') {
-    return '/garage';
+    // Canonical pending setup path (legacy /garage is now an alias redirect).
+    return '/team-setup';
   }
 
-  return '/race-hub';
+  // Canonical active race path (legacy /race-hub is now an alias redirect).
+  return '/race';
 }
 
 function buildRoutingDecision(session: PlayerAuthSession): RoutingDecisionResponse {

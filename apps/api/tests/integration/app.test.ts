@@ -548,7 +548,7 @@ describe('velocity gp backend', () => {
     expect(verifyResponse.body.data.session.userId).toBe(fixtureIds.playerUserId);
     expect(verifyResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
     expect(verifyResponse.body.data.session.assignmentStatus).toBe('ASSIGNED_ACTIVE');
-    expect(verifyResponse.body.data.redirectPath).toBe('/race-hub');
+    expect(verifyResponse.body.data.redirectPath).toBe('/race');
     expect(typeof verifyResponse.body.data.sessionToken).toBe('string');
 
     const setCookieHeader = verifyResponse.headers['set-cookie'];
@@ -579,7 +579,7 @@ describe('velocity gp backend', () => {
     expect(sessionResponse.status).toBe(200);
     expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
     expect(routingResponse.status).toBe(200);
-    expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
+    expect(routingResponse.body.data.redirectPath).toBe('/race');
   });
 
   it('falls back to cookie auth when a stale bearer token is also present', async () => {
@@ -632,7 +632,7 @@ describe('velocity gp backend', () => {
     expect(sessionResponse.status).toBe(200);
     expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
     expect(routingResponse.status).toBe(200);
-    expect(routingResponse.body.data.redirectPath).toBe('/race-hub');
+    expect(routingResponse.body.data.redirectPath).toBe('/race');
   });
 
   it('clears auth cookie on logout and removes cookie-authenticated access', async () => {

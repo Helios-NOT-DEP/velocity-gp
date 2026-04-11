@@ -126,7 +126,7 @@ export default function Leaderboard() {
           <div className="text-xs text-gray-500 tracking-wider">72-HOUR CHAMPIONSHIP</div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/race-hub')}
+              onClick={() => navigate('/race')}
               className="lg:hidden px-3 py-1 bg-[#222] text-gray-400 rounded text-xs tracking-wider hover:bg-[#2a2a2a] transition-colors"
             >
               RACE HUB

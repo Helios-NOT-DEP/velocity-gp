@@ -8,7 +8,8 @@ _As an attendee, I want a frictionless login to join the multi-day event without
 
 #### Scenario: Requesting a Magic Link
 
-- **Given** the Player is on the public Sign Up page (/signup)
+- **Given** the Player is on the public login entry route (/)
+- **And** `/signup` remains a supported legacy alias that redirects to `/`
 - **When** the Player enters their email work email address
 - **And** Personal email or cellphone number and full name
 - **And** the Player clicks "Submit"

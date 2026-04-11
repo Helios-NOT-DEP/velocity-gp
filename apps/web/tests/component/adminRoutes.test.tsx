@@ -73,16 +73,16 @@ describe('admin route guards', () => {
     });
   });
 
-  it('redirects unauthenticated users from /garage to /', async () => {
-    renderWithRoute('/garage');
+  it('redirects unauthenticated users from /team-setup to /', async () => {
+    renderWithRoute('/team-setup');
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeTruthy();
     });
   });
 
-  it('allows authenticated users to access /garage', async () => {
-    renderWithRoute('/garage', {
+  it('allows authenticated users to access /team-setup', async () => {
+    renderWithRoute('/team-setup', {
       userId: 'player-1',
       role: 'player',
       isAuthenticated: true,
@@ -99,6 +99,19 @@ describe('admin route guards', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeTruthy();
+    });
+  });
+
+  it('redirects legacy /garage alias to canonical /team-setup', async () => {
+    renderWithRoute('/garage', {
+      userId: 'player-1',
+      role: 'player',
+      isAuthenticated: true,
+      email: 'player@example.com',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Create Your Team' })).toBeTruthy();
     });
   });
 
