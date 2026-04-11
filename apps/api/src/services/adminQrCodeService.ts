@@ -123,8 +123,10 @@ function getN8nWebhookUrl(): string {
   const baseUrl = env.N8N_HOST ?? 'https://n8n.velocitygp.app';
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   const environmentSegment = env.NODE_ENV === 'production' ? 'prod' : 'dev';
+  // Keep the webhook path environment-configurable with a single template variable.
+  const webhookPath = env.N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE.replace('{env}', environmentSegment);
 
-  return `${normalizedBase}/webhook/${environmentSegment}/QRCodeGen`;
+  return `${normalizedBase}${webhookPath.startsWith('/') ? webhookPath : `/${webhookPath}`}`;
 }
 
 function getN8nWebhookToken(): string {

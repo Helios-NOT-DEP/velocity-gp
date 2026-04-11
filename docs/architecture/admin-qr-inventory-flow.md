@@ -17,11 +17,16 @@ Each mutation writes an admin audit row (`QR_CREATED`, `QR_STATUS_UPDATED`, `QR_
 
 ## n8n QR Asset Generation
 
-Creation uses the n8n webhook path:
+Creation uses `N8N_HOST + N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE`.
 
-- `https://n8n.velocitygp.app/webhook/{dev|prod}/QRCodeGen`
+Default template:
 
-`{dev|prod}` is selected from runtime environment (`NODE_ENV=production` -> `prod`, otherwise `dev`).
+- `N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE=/webhook/{env}/QRCodeGen`
+
+Runtime expansion:
+
+- `NODE_ENV=development|test` -> `/webhook/dev/QRCodeGen`
+- `NODE_ENV=production` -> `/webhook/prod/QRCodeGen`
 
 Request body sent by the API service:
 
