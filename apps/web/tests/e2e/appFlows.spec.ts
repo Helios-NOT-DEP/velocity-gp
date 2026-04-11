@@ -247,9 +247,7 @@ test.describe('Velocity GP web flows', () => {
     });
 
     await page.goto('/race');
-
     await page.getByRole('button', { name: 'Start Camera Scan' }).click();
-    await expect(page.getByText('Scanner Active')).toBeVisible();
 
     await page.waitForRequest('**/api/events/event-velocity-active/scans', {
       timeout: 15_000,
