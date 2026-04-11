@@ -224,6 +224,10 @@ static_sites:
         value: "${POSTHOG_KEY}"
         scope: RUN_AND_BUILD_TIME
         type: SECRET
+      - key: VITE_FRONTEND_MAGIC_LINK_ORIGIN
+        value: "${FRONTEND_MAGIC_LINK_ORIGIN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: VITE_PUBLIC_POSTHOG_HOST
         value: "${POSTHOG_HOST}"
         scope: RUN_AND_BUILD_TIME
@@ -236,7 +240,7 @@ static_sites:
         value: "${VITE_OTEL_TRACE_SAMPLING_RATE}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
-      - key: DEBUG
+      - key: VITE_DEBUG
         value: "${DEBUG}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
