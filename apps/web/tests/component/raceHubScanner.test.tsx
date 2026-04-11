@@ -256,6 +256,70 @@ describe('RaceHub scanner hybrid QR behavior', () => {
   );
 
   it(
+    'clears stale activity entries when identity changes and the new feed fetch fails',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      const nextIdentity = {
+        status: 'resolved' as const,
+        identity: {
+          ...resolvedIdentity.identity,
+          teamId: 'team-drift-runners',
+          teamName: 'Drift Runners',
+        },
+      };
+
+      let identityResolutionCount = 0;
+      resolveScanIdentityForEmailMock.mockImplementation(async () => {
+        identityResolutionCount += 1;
+        return identityResolutionCount <= 2 ? resolvedIdentity : nextIdentity;
+      });
+
+      getTeamActivityFeedMock
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          data: {
+            items: [
+              {
+                id: 'activity-stale',
+                eventId: 'event-velocity-active',
+                teamId: 'team-apex-comets',
+                playerId: 'player-lina-active',
+                playerName: 'Lina',
+                type: 'PLAYER_ONBOARDING_COMPLETED',
+                occurredAt: new Date().toISOString(),
+                summary: 'Lina completed onboarding and is now race-ready.',
+              },
+            ],
+          },
+        })
+        .mockRejectedValueOnce(new Error('feed unavailable for new team'));
+
+      renderRaceHub();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Lina completed onboarding and is now race-ready.')
+        ).toBeInTheDocument();
+      });
+
+      const refreshButton = screen
+        .getAllByRole('button')
+        .find((button) => button.textContent?.trim() === '');
+      expect(refreshButton).toBeDefined();
+      fireEvent.click(refreshButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Unable to load team activity right now.')).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByText('Lina completed onboarding and is now race-ready.')
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it(
     'redirects when the scanned QR URL matches the trusted frontend origin',
     { timeout: SCANNER_TEST_TIMEOUT_MS },
     async () => {

@@ -350,8 +350,12 @@ export async function verifyMagicLink(
           playerName: session.displayName,
         });
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
         logger.warn('Unable to record onboarding completion team activity event', {
-          err: error,
+          errorMessage,
+          errorStack,
           eventId: session.eventId,
           teamId: session.teamId,
           playerId: session.playerId,

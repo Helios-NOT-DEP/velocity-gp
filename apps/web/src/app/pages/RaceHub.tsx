@@ -158,6 +158,7 @@ export default function RaceHub() {
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
   const scannerEpochRef = useRef<number>(0);
+  const isRaceHubMountedRef = useRef(true);
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
@@ -179,6 +180,12 @@ export default function RaceHub() {
     isSubmittingRef.current = false;
     scannerEpochRef.current += 1;
     setScannerState(nextState);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      isRaceHubMountedRef.current = false;
+    };
   }, []);
 
   const applyIdentityResolution = (
@@ -273,6 +280,7 @@ export default function RaceHub() {
     }
 
     let isMounted = true;
+    let pollTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
 
     const refreshTeamActivity = async () => {
       try {
@@ -296,15 +304,28 @@ export default function RaceHub() {
       }
     };
 
+    const runPollCycle = async () => {
+      await refreshTeamActivity();
+      if (!isMounted) {
+        return;
+      }
+
+      pollTimeout = globalThis.setTimeout(() => {
+        void runPollCycle();
+      }, TEAM_ACTIVITY_POLL_INTERVAL_MS);
+    };
+
+    // Reset feed state when identity/team context changes to avoid cross-team stale entries.
+    setTeamActivity([]);
+    setTeamActivityLoadError(null);
     setIsLoadingTeamActivity(true);
-    void refreshTeamActivity();
-    const interval = globalThis.setInterval(() => {
-      void refreshTeamActivity();
-    }, TEAM_ACTIVITY_POLL_INTERVAL_MS);
+    void runPollCycle();
 
     return () => {
       isMounted = false;
-      globalThis.clearInterval(interval);
+      if (pollTimeout !== null) {
+        globalThis.clearTimeout(pollTimeout);
+      }
     };
   }, [fetchTeamActivity, scanIdentity]);
 
@@ -341,12 +362,32 @@ export default function RaceHub() {
         }
 
         applyScanOutcome(response.data);
+        const activityRefreshEpoch = scannerEpochRef.current;
+        const canApplyActivityRefresh = () => {
+          const currentIdentity = scanIdentityRef.current;
+          return (
+            isRaceHubMountedRef.current &&
+            scannerEpochRef.current === activityRefreshEpoch &&
+            currentIdentity?.eventId === activeScanIdentity.eventId &&
+            currentIdentity?.teamId === activeScanIdentity.teamId &&
+            currentIdentity?.playerId === activeScanIdentity.playerId
+          );
+        };
+
         void fetchTeamActivity(activeScanIdentity)
           .then((items) => {
+            if (!canApplyActivityRefresh()) {
+              return;
+            }
+
             setTeamActivity(items);
             setTeamActivityLoadError(null);
           })
           .catch(() => {
+            if (!canApplyActivityRefresh()) {
+              return;
+            }
+
             setTeamActivityLoadError('Unable to refresh team activity feed after scan.');
           });
 

@@ -344,6 +344,53 @@ describe('velocity gp backend', () => {
     expect(postScanFeedResponse.body.data.items[0].pointsAwarded).toBe(55);
   });
 
+  it('normalizes unexpected activity feed errorCode values to null', async () => {
+    const playerEmail = `player-${token}@velocitygp.dev`;
+    const sessionToken = createSessionToken({
+      userId: fixtureIds.playerUserId,
+      playerId: fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      teamId: fixtureIds.teamId,
+      teamStatus: 'ACTIVE',
+      role: 'player',
+      email: playerEmail,
+      displayName: 'Player Fixture',
+    });
+
+    const unexpectedPayload = `VG-UNEXPECTED-${token.toUpperCase()}`;
+    await prisma.teamActivityEvent.create({
+      data: {
+        eventId: fixtureIds.eventId,
+        teamId: fixtureIds.teamId,
+        playerId: fixtureIds.playerId,
+        type: 'PLAYER_QR_SCAN',
+        sourceKey: `unexpected-error:${fixtureIds.playerId}:${token}`,
+        scanOutcome: 'BLOCKED',
+        pointsAwarded: 0,
+        errorCode: 'UNMAPPED_ERROR_CODE',
+        qrCodeLabel: 'Unexpected Error QR',
+        qrPayload: unexpectedPayload,
+        summary: 'Unexpected error code persisted in historical feed row.',
+        occurredAt: new Date(Date.now() + 1_000),
+      },
+    });
+
+    const response = await request(app)
+      .get(`${apiPrefix}/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/activity-feed`)
+      .set('authorization', `Bearer ${sessionToken}`)
+      .query({ limit: 25 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+
+    const insertedItem = response.body.data.items.find(
+      (item: { type: string; qrPayload?: string }) =>
+        item.type === 'PLAYER_QR_SCAN' && item.qrPayload === unexpectedPayload
+    );
+    expect(insertedItem).toBeDefined();
+    expect(insertedItem.errorCode).toBeNull();
+  });
+
   it('rejects team activity feed requests outside the authenticated team context', async () => {
     const playerEmail = `player-${token}@velocitygp.dev`;
     const sessionToken = createSessionToken({

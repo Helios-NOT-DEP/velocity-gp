@@ -11,6 +11,16 @@ import { withTraceSpan } from '../lib/observability.js';
 
 const DEFAULT_FEED_LIMIT = 25;
 const MAX_FEED_LIMIT = 100;
+const STABLE_ERROR_CODES = new Set<StableErrorCode>([
+  'SELF_RESCUE_FORBIDDEN',
+  'RACE_PAUSED',
+  'QR_DISABLED',
+  'QR_NOT_FOUND',
+  'ALREADY_CLAIMED',
+  'TEAM_IN_PIT',
+  'HELIOS_COOLDOWN_ACTIVE',
+  'NO_ACTIVE_PIT',
+]);
 
 export interface RecordOnboardingCompletedActivityInput {
   readonly eventId: string;
@@ -41,6 +51,16 @@ function clampFeedLimit(limit: number | undefined): number {
   }
 
   return Math.max(1, Math.min(MAX_FEED_LIMIT, Math.floor(limit)));
+}
+
+function toStableErrorCodeOrNull(errorCode: string | null): StableErrorCode | null {
+  if (!errorCode) {
+    return null;
+  }
+
+  return STABLE_ERROR_CODES.has(errorCode as StableErrorCode)
+    ? (errorCode as StableErrorCode)
+    : null;
 }
 
 export function buildScanActivitySummary(input: {
@@ -198,7 +218,7 @@ export async function listTeamActivityFeed(
         qrPayload: row.qrPayload ?? '',
         scanOutcome: row.scanOutcome ?? 'BLOCKED',
         pointsAwarded: row.pointsAwarded ?? 0,
-        errorCode: (row.errorCode as StableErrorCode | null) ?? null,
+        errorCode: toStableErrorCodeOrNull(row.errorCode),
         summary: row.summary,
       };
     });
