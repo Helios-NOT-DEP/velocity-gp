@@ -56,6 +56,11 @@ enum RescueStatus {
     REJECTED
 }
 
+enum TeamActivityType {
+    PLAYER_ONBOARDING_COMPLETED
+    PLAYER_QR_SCAN
+}
+
 enum TeamTransitionReason {
     HAZARD_TRIGGER
     RESCUE_CLEARED
@@ -122,6 +127,7 @@ model Event {
     qrCodes           QRCode[]
     qrCodeClaims      QRCodeClaim[]
     scanRecords       ScanRecord[]
+    teamActivityEvents TeamActivityEvent[]
     rescues           Rescue[]
     teamTransitions   TeamStateTransition[]
     adminActionAudits AdminActionAudit[]
@@ -154,6 +160,7 @@ model Team {
     event            Event                 @relation(fields: [eventId], references: [id])
     players          Player[]
     scanRecords      ScanRecord[]
+    teamActivityEvents TeamActivityEvent[]
     rescuesRequested Rescue[]              @relation("RescueRequestingTeam")
     teamTransitions  TeamStateTransition[]
 
@@ -180,6 +187,7 @@ model Player {
     team             Team?                 @relation(fields: [teamId], references: [id])
     qrClaims         QRCodeClaim[]
     scanRecords      ScanRecord[]
+    teamActivityEvents TeamActivityEvent[]
     rescuesRequested Rescue[]              @relation("RescueRequestingPlayer")
     teamTransitions  TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
     emailEvents      EmailEvent[]
@@ -208,6 +216,7 @@ model QRCode {
     event       Event         @relation(fields: [eventId], references: [id])
     claims      QRCodeClaim[]
     scanRecords ScanRecord[]
+    teamActivityEvents TeamActivityEvent[]
 
     @@unique([eventId, label])
     @@index([eventId])
@@ -346,4 +355,32 @@ model Rescue {
     @@index([eventId, initiatedAt])
     @@index([requestingPlayerId])
     @@index([requestingTeamId])
+}
+
+model TeamActivityEvent {
+    id           String           @id @default(cuid())
+    eventId      String
+    teamId       String
+    playerId     String
+    qrCodeId     String?
+    type         TeamActivityType
+    sourceKey    String
+    scanOutcome  ScanOutcome?
+    pointsAwarded Int?
+    errorCode    String?
+    qrCodeLabel  String?
+    qrPayload    String?
+    summary      String
+    occurredAt   DateTime
+    createdAt    DateTime         @default(now())
+
+    event  Event   @relation(fields: [eventId], references: [id])
+    team   Team    @relation(fields: [teamId], references: [id])
+    player Player  @relation(fields: [playerId], references: [id])
+    qrCode QRCode? @relation(fields: [qrCodeId], references: [id])
+
+    @@unique([eventId, sourceKey])
+    @@index([eventId, teamId, occurredAt])
+    @@index([teamId, occurredAt])
+    @@index([playerId, occurredAt])
 }

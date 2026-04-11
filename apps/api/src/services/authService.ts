@@ -20,6 +20,7 @@ import {
 import { getEmailDispatcher } from './emailDispatchService.js';
 import { logger } from '../lib/logger.js';
 import { AUTH_SESSION_COOKIE_NAME, resolveSessionToken } from './authSessionToken.js';
+import { recordOnboardingCompletedActivity } from './teamActivityFeedService.js';
 
 /**
  * Authentication service for magic-link and session flows.
@@ -338,6 +339,28 @@ export async function verifyMagicLink(
         'AUTH_ASSIGNMENT_REQUIRED',
         'Player is not assigned to a team for this event.'
       );
+    }
+
+    if (session.assignmentStatus === 'ASSIGNED_ACTIVE' && session.teamId) {
+      try {
+        await recordOnboardingCompletedActivity({
+          eventId: session.eventId,
+          teamId: session.teamId,
+          playerId: session.playerId,
+          playerName: session.displayName,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        logger.warn('Unable to record onboarding completion team activity event', {
+          errorMessage,
+          errorStack,
+          eventId: session.eventId,
+          teamId: session.teamId,
+          playerId: session.playerId,
+        });
+      }
     }
 
     const sessionToken = createSessionToken({

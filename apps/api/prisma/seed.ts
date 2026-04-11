@@ -46,6 +46,7 @@ const ids = {
     racerThree: 'user-player-noah',
     racerFour: 'user-player-olivia',
     racerFive: 'user-player-parker',
+    ankit: 'user-player-ankit',
     neerPatel: 'user-player-neer',
   },
   events: {
@@ -63,6 +64,7 @@ const ids = {
     noah: 'player-noah-active',
     olivia: 'player-olivia-active',
     parker: 'player-parker-active',
+    ankit: 'player-ankit-active',
     neer: 'player-neer-active',
   },
   qrCodes: {
@@ -81,6 +83,7 @@ const ids = {
 async function clearDatabase(): Promise<void> {
   await prisma.adminActionAudit.deleteMany();
   await prisma.teamStateTransition.deleteMany();
+  await prisma.teamActivityEvent.deleteMany();
   await prisma.rescue.deleteMany();
   await prisma.scanRecord.deleteMany();
   await prisma.qRCodeClaim.deleteMany();
@@ -155,6 +158,13 @@ async function seedUsers(): Promise<void> {
         id: ids.users.racerFive,
         email: 'parker@velocitygp.dev',
         displayName: 'Parker Pulse',
+        role: 'PLAYER',
+        isHelios: false,
+      },
+      {
+        id: ids.users.ankit,
+        email: 'jn.ankit@yahoo.com',
+        displayName: 'Ankit',
         role: 'PLAYER',
         isHelios: false,
       },
@@ -300,6 +310,16 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         individualScore: 355,
         isFlaggedForReview: false,
         joinedAt: new Date(now.getTime() - hours(2)),
+      },
+      {
+        id: ids.players.ankit,
+        userId: ids.users.ankit,
+        eventId: ids.events.active,
+        teamId: ids.teams.drift,
+        status: 'RACING',
+        individualScore: 0,
+        isFlaggedForReview: false,
+        joinedAt: new Date(now.getTime() - minutes(5)),
       },
       {
         id: ids.players.neer,

@@ -14,6 +14,7 @@ export * from './contracts/raceState.js';
 export * from './contracts/realtime.js';
 export * from './contracts/roster.js';
 export * from './contracts/scans.js';
+export * from './contracts/teamActivity.js';
 
 // Legacy alias retained for compatibility with older callers over older API versions.
 /** Represents the macro-status of an ongoing race event. */

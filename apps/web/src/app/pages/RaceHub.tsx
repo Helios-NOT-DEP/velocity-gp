@@ -2,10 +2,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
-import { Camera, CameraOff, Loader2, Plus, RefreshCcw, Scan } from 'lucide-react';
+import {
+  AlertTriangle,
+  Camera,
+  CameraOff,
+  Loader2,
+  Plus,
+  RefreshCcw,
+  Scan,
+  ShieldAlert,
+  UserPlus,
+} from 'lucide-react';
 
-import type { SubmitScanResponse } from '@velocity-gp/api-contract';
-import { apiClient, scanEndpoints } from '@/services/api';
+import type {
+  ListTeamActivityFeedResponse,
+  SubmitScanResponse,
+  TeamActivityFeedItem,
+} from '@velocity-gp/api-contract';
+import { apiClient, eventEndpoints, scanEndpoints } from '@/services/api';
 import { getSession } from '@/services/auth';
 import { trackAnalyticsEvent } from '@/services/observability';
 import {
@@ -75,6 +89,66 @@ function getScannerErrorName(error: unknown): string {
   return 'unknown';
 }
 
+const TEAM_ACTIVITY_POLL_INTERVAL_MS = 5_000;
+const TEAM_ACTIVITY_LIMIT = 25;
+
+function getActivityIcon(item: TeamActivityFeedItem) {
+  if (item.type === 'PLAYER_ONBOARDING_COMPLETED') {
+    return <UserPlus className="w-5 h-5 text-blue-300" />;
+  }
+
+  if (item.scanOutcome === 'SAFE') {
+    return <Plus className="w-5 h-5 text-green-400" />;
+  }
+
+  if (item.scanOutcome === 'HAZARD_PIT') {
+    return <AlertTriangle className="w-5 h-5 text-red-400" />;
+  }
+
+  return <ShieldAlert className="w-5 h-5 text-yellow-300" />;
+}
+
+function getActivityIconContainerClasses(item: TeamActivityFeedItem): string {
+  if (item.type === 'PLAYER_ONBOARDING_COMPLETED') {
+    return 'bg-blue-500/20 border-blue-500/30';
+  }
+
+  if (item.scanOutcome === 'SAFE') {
+    return 'bg-green-500/20 border-green-500/30';
+  }
+
+  if (item.scanOutcome === 'HAZARD_PIT') {
+    return 'bg-red-500/20 border-red-500/30';
+  }
+
+  return 'bg-yellow-500/20 border-yellow-500/30';
+}
+
+function formatActivityHeadline(item: TeamActivityFeedItem): string {
+  if (item.type === 'PLAYER_ONBOARDING_COMPLETED') {
+    return `${item.playerName} joined the team`;
+  }
+
+  const qrLabel = item.qrCodeLabel ?? item.qrPayload;
+  if (item.scanOutcome === 'SAFE') {
+    return `${item.playerName} scanned ${qrLabel} for +${item.pointsAwarded}`;
+  }
+
+  if (item.scanOutcome === 'HAZARD_PIT') {
+    return `${item.playerName} triggered a hazard on ${qrLabel}`;
+  }
+
+  if (item.scanOutcome === 'INVALID') {
+    return `${item.playerName} scanned an invalid QR`;
+  }
+
+  if (item.scanOutcome === 'DUPLICATE') {
+    return `${item.playerName} re-scanned ${qrLabel}`;
+  }
+
+  return `${item.playerName} scan on ${qrLabel} was blocked`;
+}
+
 export default function RaceHub() {
   // RaceHub owns scanner lifecycle, scan submission, and feedback mapping for gameplay.
   const { gameState, hydrateScanIdentity, applyScanOutcome } = useGame();
@@ -84,12 +158,17 @@ export default function RaceHub() {
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
   const scannerEpochRef = useRef<number>(0);
+  const teamActivityRequestSeqRef = useRef(0);
+  const isRaceHubMountedRef = useRef(true);
 
   const [scannerState, setScannerState] = useState<ScannerState>('idle');
   const [feedback, setFeedback] = useState<ScanFeedback>(defaultFeedback());
   const [scanIdentity, setScanIdentity] = useState<ScanIdentity | null>(null);
   const [isHydratingIdentity, setIsHydratingIdentity] = useState(true);
   const [showGuidance, setShowGuidance] = useState(false);
+  const [teamActivity, setTeamActivity] = useState<readonly TeamActivityFeedItem[]>([]);
+  const [isLoadingTeamActivity, setIsLoadingTeamActivity] = useState(true);
+  const [teamActivityLoadError, setTeamActivityLoadError] = useState<string | null>(null);
 
   const trustedRedirectOrigin = useMemo(() => getTrustedQrRedirectOrigin(), []);
   const scannerActive =
@@ -102,6 +181,12 @@ export default function RaceHub() {
     isSubmittingRef.current = false;
     scannerEpochRef.current += 1;
     setScannerState(nextState);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      isRaceHubMountedRef.current = false;
+    };
   }, []);
 
   const applyIdentityResolution = (
@@ -134,6 +219,21 @@ export default function RaceHub() {
       showGuidance: true,
     });
   };
+
+  const fetchTeamActivity = useCallback(async (identity: ScanIdentity) => {
+    const response = await apiClient.get<ListTeamActivityFeedResponse>(
+      eventEndpoints.listTeamActivityFeed(identity.eventId, identity.teamId),
+      {
+        limit: TEAM_ACTIVITY_LIMIT,
+      }
+    );
+
+    if (!response.ok || !response.data) {
+      throw new Error(`activity feed fetch failed (${response.status})`);
+    }
+
+    return response.data.items;
+  }, []);
 
   const refreshIdentity = async () => {
     setIsHydratingIdentity(true);
@@ -172,6 +272,68 @@ export default function RaceHub() {
     };
   }, [gameState.currentUser?.email, stopScanner]);
 
+  useEffect(() => {
+    if (!scanIdentity) {
+      teamActivityRequestSeqRef.current += 1;
+      setTeamActivity([]);
+      setIsLoadingTeamActivity(false);
+      setTeamActivityLoadError(null);
+      return;
+    }
+
+    let isMounted = true;
+    let pollTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+
+    const refreshTeamActivity = async () => {
+      const requestSeq = ++teamActivityRequestSeqRef.current;
+
+      try {
+        const items = await fetchTeamActivity(scanIdentity);
+        if (!isMounted || requestSeq !== teamActivityRequestSeqRef.current) {
+          return;
+        }
+
+        setTeamActivity(items);
+        setTeamActivityLoadError(null);
+      } catch {
+        if (!isMounted || requestSeq !== teamActivityRequestSeqRef.current) {
+          return;
+        }
+
+        setTeamActivityLoadError('Unable to load team activity right now.');
+      } finally {
+        if (isMounted && requestSeq === teamActivityRequestSeqRef.current) {
+          setIsLoadingTeamActivity(false);
+        }
+      }
+    };
+
+    const runPollCycle = async () => {
+      await refreshTeamActivity();
+      if (!isMounted) {
+        return;
+      }
+
+      pollTimeout = globalThis.setTimeout(() => {
+        void runPollCycle();
+      }, TEAM_ACTIVITY_POLL_INTERVAL_MS);
+    };
+
+    // Reset feed state when identity/team context changes to avoid cross-team stale entries.
+    teamActivityRequestSeqRef.current += 1;
+    setTeamActivity([]);
+    setTeamActivityLoadError(null);
+    setIsLoadingTeamActivity(true);
+    void runPollCycle();
+
+    return () => {
+      isMounted = false;
+      if (pollTimeout !== null) {
+        globalThis.clearTimeout(pollTimeout);
+      }
+    };
+  }, [fetchTeamActivity, scanIdentity]);
+
   const submitPayload = useCallback(
     async (payload: string) => {
       const activeScanIdentity = scanIdentityRef.current ?? scanIdentity;
@@ -205,6 +367,38 @@ export default function RaceHub() {
         }
 
         applyScanOutcome(response.data);
+        const activityRefreshRequestSeq = ++teamActivityRequestSeqRef.current;
+        const activityRefreshEpoch = scannerEpochRef.current;
+        const canApplyActivityRefresh = () => {
+          const currentIdentity = scanIdentityRef.current;
+          return (
+            isRaceHubMountedRef.current &&
+            activityRefreshRequestSeq === teamActivityRequestSeqRef.current &&
+            scannerEpochRef.current === activityRefreshEpoch &&
+            currentIdentity?.eventId === activeScanIdentity.eventId &&
+            currentIdentity?.teamId === activeScanIdentity.teamId &&
+            currentIdentity?.playerId === activeScanIdentity.playerId
+          );
+        };
+
+        void fetchTeamActivity(activeScanIdentity)
+          .then((items) => {
+            if (!canApplyActivityRefresh()) {
+              return;
+            }
+
+            setTeamActivity(items);
+            setTeamActivityLoadError(null);
+            setIsLoadingTeamActivity(false);
+          })
+          .catch(() => {
+            if (!canApplyActivityRefresh()) {
+              return;
+            }
+
+            setTeamActivityLoadError('Unable to refresh team activity feed after scan.');
+            setIsLoadingTeamActivity(false);
+          });
 
         if (scannerEpochRef.current !== submitEpoch) {
           return;
@@ -262,7 +456,7 @@ export default function RaceHub() {
 
       setScannerState('ready');
     },
-    [applyScanOutcome, navigate, scanIdentity, stopScanner]
+    [applyScanOutcome, fetchTeamActivity, navigate, scanIdentity, stopScanner]
   );
 
   const handleDetectedCodes = useCallback(
@@ -561,39 +755,58 @@ export default function RaceHub() {
           Recent Activity
         </h3>
 
-        {gameState.scans.length === 0 ? (
+        {isLoadingTeamActivity ? (
+          <div className="text-center py-8">
+            <Loader2 className="w-12 h-12 text-gray-700 mx-auto mb-3 animate-spin" />
+            <p className="text-gray-500 text-sm">Loading team activity...</p>
+          </div>
+        ) : teamActivity.length === 0 ? (
           <div className="text-center py-8">
             <Scan className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm">No scans yet. Start scanning QR codes!</p>
+            <p className="text-gray-500 text-sm">No team activity yet. Start scanning QR codes!</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {gameState.scans.map((scan) => (
+            {teamActivity.map((item) => (
               <div
-                key={scan.id}
+                key={item.id}
                 className="flex justify-between items-center p-4 bg-black/50 border border-gray-800 rounded-xl"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center justify-center">
-                    <Plus className="w-5 h-5 text-green-400" />
+                  <div
+                    className={`w-10 h-10 border rounded-lg flex items-center justify-center ${getActivityIconContainerClasses(
+                      item
+                    )}`}
+                  >
+                    {getActivityIcon(item)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-green-400 font-bold text-lg">
-                      {scan.points >= 0 ? '+' : ''}
-                      {scan.points}
+                    <p className="text-white font-semibold text-sm truncate">
+                      {formatActivityHeadline(item)}
                     </p>
                     <p className="text-gray-500 text-xs truncate">
-                      {scan.outcome} • {scan.message}
+                      {item.type === 'PLAYER_QR_SCAN'
+                        ? `${item.scanOutcome}${
+                            item.scanOutcome === 'SAFE'
+                              ? ` • +${item.pointsAwarded} points`
+                              : item.errorCode
+                                ? ` • ${item.errorCode}`
+                                : ''
+                          }`
+                        : item.summary}
                     </p>
                   </div>
                 </div>
                 <span className="text-xs text-gray-500 pl-3">
-                  {formatTimestamp(scan.timestamp)}
+                  {formatTimestamp(new Date(item.occurredAt))}
                 </span>
               </div>
             ))}
           </div>
         )}
+        {teamActivityLoadError ? (
+          <p className="text-xs text-yellow-300 mt-3">{teamActivityLoadError}</p>
+        ) : null}
       </div>
     </div>
   );

@@ -12,6 +12,10 @@ import { prisma } from '../db/client.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError } from '../utils/appError.js';
+import {
+  buildScanActivitySummary,
+  recordScanActivityInTransaction,
+} from './teamActivityFeedService.js';
 
 /**
  * QR scan processing service.
@@ -195,6 +199,7 @@ async function processScanInTransaction(
     },
     select: {
       id: true,
+      label: true,
       status: true,
       value: true,
       hazardRatioOverride: true,
@@ -221,6 +226,7 @@ async function processScanInTransaction(
         message,
       },
       select: {
+        id: true,
         createdAt: true,
       },
     });
@@ -232,6 +238,26 @@ async function processScanInTransaction(
       data: {
         isFlaggedForReview: true,
       },
+    });
+
+    await recordScanActivityInTransaction(tx, {
+      sourceKey: `scan:${scanRecord.id}`,
+      eventId: input.eventId,
+      teamId: team.id,
+      playerId: playerWithTeam.id,
+      occurredAt: scanRecord.createdAt,
+      scanOutcome: 'INVALID',
+      pointsAwarded,
+      errorCode: 'QR_NOT_FOUND',
+      qrCodeId: null,
+      qrCodeLabel: null,
+      qrPayload,
+      summary: buildScanActivitySummary({
+        scanOutcome: 'INVALID',
+        qrCodeLabel: null,
+        pointsAwarded,
+        errorCode: 'QR_NOT_FOUND',
+      }),
     });
 
     return {
@@ -260,6 +286,7 @@ async function processScanInTransaction(
       playerId: playerWithTeam.id,
       teamId: team.id,
       qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
       qrPayload,
       message: 'Race control is paused.',
       errorCode: 'RACE_PAUSED',
@@ -274,6 +301,7 @@ async function processScanInTransaction(
       playerId: playerWithTeam.id,
       teamId: team.id,
       qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
       qrPayload,
       message: 'Team is currently in pit stop lockout.',
       errorCode: 'TEAM_IN_PIT',
@@ -288,6 +316,7 @@ async function processScanInTransaction(
       playerId: playerWithTeam.id,
       teamId: team.id,
       qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
       qrPayload,
       message: 'QR code is disabled by admin control.',
       errorCode: 'QR_DISABLED',
@@ -330,8 +359,29 @@ async function processScanInTransaction(
         message,
       },
       select: {
+        id: true,
         createdAt: true,
       },
+    });
+
+    await recordScanActivityInTransaction(tx, {
+      sourceKey: `scan:${scanRecord.id}`,
+      eventId: input.eventId,
+      teamId: team.id,
+      playerId: playerWithTeam.id,
+      occurredAt: scanRecord.createdAt,
+      scanOutcome: 'DUPLICATE',
+      pointsAwarded: 0,
+      errorCode: 'ALREADY_CLAIMED',
+      qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
+      qrPayload,
+      summary: buildScanActivitySummary({
+        scanOutcome: 'DUPLICATE',
+        qrCodeLabel: qrCode.label,
+        pointsAwarded: 0,
+        errorCode: 'ALREADY_CLAIMED',
+      }),
     });
 
     return {
@@ -396,6 +446,7 @@ async function processScanInTransaction(
           message: 'Hazard trigger reached. Team moved to pit stop.',
         },
         select: {
+          id: true,
           createdAt: true,
         },
       }),
@@ -422,6 +473,26 @@ async function processScanInTransaction(
         },
       }),
     ]);
+
+    await recordScanActivityInTransaction(tx, {
+      sourceKey: `scan:${scanRecord.id}`,
+      eventId: input.eventId,
+      teamId: team.id,
+      playerId: playerWithTeam.id,
+      occurredAt: scanRecord.createdAt,
+      scanOutcome: 'HAZARD_PIT',
+      pointsAwarded: 0,
+      errorCode: null,
+      qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
+      qrPayload,
+      summary: buildScanActivitySummary({
+        scanOutcome: 'HAZARD_PIT',
+        qrCodeLabel: qrCode.label,
+        pointsAwarded: 0,
+        errorCode: null,
+      }),
+    });
 
     return {
       outcome: 'HAZARD_PIT',
@@ -468,6 +539,7 @@ async function processScanInTransaction(
         message: 'Safe scan awarded points.',
       },
       select: {
+        id: true,
         createdAt: true,
       },
     }),
@@ -483,6 +555,26 @@ async function processScanInTransaction(
       },
       status: 'RACING',
     },
+  });
+
+  await recordScanActivityInTransaction(tx, {
+    sourceKey: `scan:${scanRecord.id}`,
+    eventId: input.eventId,
+    teamId: team.id,
+    playerId: playerWithTeam.id,
+    occurredAt: scanRecord.createdAt,
+    scanOutcome: 'SAFE',
+    pointsAwarded: qrCode.value,
+    errorCode: null,
+    qrCodeId: qrCode.id,
+    qrCodeLabel: qrCode.label,
+    qrPayload,
+    summary: buildScanActivitySummary({
+      scanOutcome: 'SAFE',
+      qrCodeLabel: qrCode.label,
+      pointsAwarded: qrCode.value,
+      errorCode: null,
+    }),
   });
 
   return {
@@ -506,6 +598,7 @@ interface CreateBlockedScanResponseInput {
   readonly playerId: string;
   readonly teamId: string;
   readonly qrCodeId: string;
+  readonly qrCodeLabel: string | null;
   readonly qrPayload: string;
   readonly message: string;
   readonly errorCode: Extract<StableErrorCode, 'QR_DISABLED' | 'RACE_PAUSED' | 'TEAM_IN_PIT'>;
@@ -535,8 +628,29 @@ async function createBlockedScanResponse(
       message: input.message,
     },
     select: {
+      id: true,
       createdAt: true,
     },
+  });
+
+  await recordScanActivityInTransaction(tx, {
+    sourceKey: `scan:${scanRecord.id}`,
+    eventId: input.eventId,
+    teamId: input.teamId,
+    playerId: input.playerId,
+    occurredAt: scanRecord.createdAt,
+    scanOutcome: 'BLOCKED',
+    pointsAwarded: 0,
+    errorCode: input.errorCode,
+    qrCodeId: input.qrCodeId,
+    qrCodeLabel: input.qrCodeLabel,
+    qrPayload: input.qrPayload,
+    summary: buildScanActivitySummary({
+      scanOutcome: 'BLOCKED',
+      qrCodeLabel: input.qrCodeLabel,
+      pointsAwarded: 0,
+      errorCode: input.errorCode,
+    }),
   });
 
   return {

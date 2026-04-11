@@ -14,3 +14,4 @@ export * from './raceState.js';
 export * from './realtime.js';
 export * from './roster.js';
 export * from './scans.js';
+export * from './teamActivity.js';

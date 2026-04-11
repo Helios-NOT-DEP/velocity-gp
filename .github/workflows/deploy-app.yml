@@ -71,7 +71,14 @@ jobs:
           SPACE_SECRET_ACCESS_KEY: ${{ secrets.SPACE_SECRET_ACCESS_KEY }}
           SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
-        run: npm run db:deploy
+        run: |
+          if [ "${{ inputs.environment }}" = "dev" ]; then
+            npm run db:deploy
+            echo "Running seed script for dev environment"
+            npm run db:seed
+          else
+            npm run db:deploy
+          fi
 
       # - if: vars.DO_APP_ID == ' '
       #   name: Deploy App

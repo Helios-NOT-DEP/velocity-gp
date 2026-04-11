@@ -183,6 +183,11 @@ describe('velocity gp backend', () => {
         eventId: fixtureIds.eventId,
       },
     });
+    await prisma.teamActivityEvent.deleteMany({
+      where: {
+        eventId: fixtureIds.eventId,
+      },
+    });
     await prisma.qRCodeClaim.deleteMany({
       where: {
         eventId: fixtureIds.eventId,
@@ -269,6 +274,146 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.outcome).toBe('INVALID');
     expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
+  });
+
+  it('records onboarding and scan events in the team activity feed endpoint', async () => {
+    const playerEmail = `player-${token}@velocitygp.dev`;
+    const onboardingMagicLinkToken = createMagicLinkToken({
+      userId: fixtureIds.playerUserId,
+      playerId: fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      email: playerEmail,
+    });
+
+    const verifyResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/verify`)
+      .send({ token: onboardingMagicLinkToken });
+
+    expect(verifyResponse.status).toBe(200);
+    expect(verifyResponse.body.success).toBe(true);
+    const sessionToken = String(verifyResponse.body.data.sessionToken);
+
+    const onboardingFeedResponse = await request(app)
+      .get(`${apiPrefix}/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/activity-feed`)
+      .set('authorization', `Bearer ${sessionToken}`)
+      .query({ limit: 25 });
+
+    expect(onboardingFeedResponse.status).toBe(200);
+    expect(onboardingFeedResponse.body.success).toBe(true);
+    const onboardingItem = onboardingFeedResponse.body.data.items.find(
+      (item: { type: string; playerId: string }) =>
+        item.type === 'PLAYER_ONBOARDING_COMPLETED' && item.playerId === fixtureIds.playerId
+    );
+    expect(onboardingItem).toBeDefined();
+
+    const feedQrCodeId = `qr-feed-${token}`;
+    const feedQrPayload = `VG-FEED-${token.toUpperCase()}`;
+    await prisma.qRCode.create({
+      data: {
+        id: feedQrCodeId,
+        eventId: fixtureIds.eventId,
+        label: `Feed QR ${token}`,
+        value: 55,
+        zone: 'Feed Zone',
+        payload: feedQrPayload,
+        status: 'ACTIVE',
+      },
+    });
+
+    const scanResponse = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .send({
+        playerId: fixtureIds.playerId,
+        qrPayload: feedQrPayload,
+      });
+
+    expect(scanResponse.status).toBe(200);
+    expect(scanResponse.body.success).toBe(true);
+    expect(scanResponse.body.data.outcome).toBe('SAFE');
+
+    const postScanFeedResponse = await request(app)
+      .get(`${apiPrefix}/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/activity-feed`)
+      .set('authorization', `Bearer ${sessionToken}`)
+      .query({ limit: 25 });
+
+    expect(postScanFeedResponse.status).toBe(200);
+    expect(postScanFeedResponse.body.success).toBe(true);
+    expect(postScanFeedResponse.body.data.items[0].type).toBe('PLAYER_QR_SCAN');
+    expect(postScanFeedResponse.body.data.items[0].qrPayload).toBe(feedQrPayload);
+    expect(postScanFeedResponse.body.data.items[0].scanOutcome).toBe('SAFE');
+    expect(postScanFeedResponse.body.data.items[0].pointsAwarded).toBe(55);
+  });
+
+  it('normalizes unexpected activity feed errorCode values to null', async () => {
+    const playerEmail = `player-${token}@velocitygp.dev`;
+    const sessionToken = createSessionToken({
+      userId: fixtureIds.playerUserId,
+      playerId: fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      teamId: fixtureIds.teamId,
+      teamStatus: 'ACTIVE',
+      role: 'player',
+      email: playerEmail,
+      displayName: 'Player Fixture',
+    });
+
+    const unexpectedPayload = `VG-UNEXPECTED-${token.toUpperCase()}`;
+    await prisma.teamActivityEvent.create({
+      data: {
+        eventId: fixtureIds.eventId,
+        teamId: fixtureIds.teamId,
+        playerId: fixtureIds.playerId,
+        type: 'PLAYER_QR_SCAN',
+        sourceKey: `unexpected-error:${fixtureIds.playerId}:${token}`,
+        scanOutcome: 'BLOCKED',
+        pointsAwarded: 0,
+        errorCode: 'UNMAPPED_ERROR_CODE',
+        qrCodeLabel: 'Unexpected Error QR',
+        qrPayload: unexpectedPayload,
+        summary: 'Unexpected error code persisted in historical feed row.',
+        occurredAt: new Date(Date.now() + 1_000),
+      },
+    });
+
+    const response = await request(app)
+      .get(`${apiPrefix}/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/activity-feed`)
+      .set('authorization', `Bearer ${sessionToken}`)
+      .query({ limit: 25 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+
+    const insertedItem = response.body.data.items.find(
+      (item: { type: string; qrPayload?: string }) =>
+        item.type === 'PLAYER_QR_SCAN' && item.qrPayload === unexpectedPayload
+    );
+    expect(insertedItem).toBeDefined();
+    expect(insertedItem.errorCode).toBeNull();
+  });
+
+  it('rejects team activity feed requests outside the authenticated team context', async () => {
+    const playerEmail = `player-${token}@velocitygp.dev`;
+    const sessionToken = createSessionToken({
+      userId: fixtureIds.playerUserId,
+      playerId: fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      teamId: fixtureIds.teamId,
+      teamStatus: 'ACTIVE',
+      role: 'player',
+      email: playerEmail,
+      displayName: 'Player Fixture',
+    });
+
+    const response = await request(app)
+      .get(
+        `${apiPrefix}/events/${fixtureIds.eventId}/teams/${fixtureIds.secondTeamId}/activity-feed`
+      )
+      .set('authorization', `Bearer ${sessionToken}`)
+      .query({ limit: 25 });
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('AUTH_TEAM_CONTEXT_MISMATCH');
   });
 
   it('validates request bodies', async () => {

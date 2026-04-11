@@ -47,6 +47,11 @@ async function cleanupEventData(eventId: string, userIds: string[]): Promise<voi
       eventId,
     },
   });
+  await prisma.teamActivityEvent.deleteMany({
+    where: {
+      eventId,
+    },
+  });
   await prisma.qRCodeClaim.deleteMany({
     where: {
       eventId,

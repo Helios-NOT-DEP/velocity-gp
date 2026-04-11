@@ -81,6 +81,9 @@ export const eventEndpoints = {
   getCurrentEvent: '/events/current',
   /** Leverages the user's active session token to look up their player identity and event. */
   getCurrentEventPlayer: '/events/current/players/me',
+  /** Lists the running activity feed for a single team in an event. */
+  listTeamActivityFeed: (eventId: string, teamId: string) =>
+    `/events/${eventId}/teams/${teamId}/activity-feed`,
 };
 
 /**

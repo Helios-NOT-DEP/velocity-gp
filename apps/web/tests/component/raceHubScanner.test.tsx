@@ -14,12 +14,14 @@ const {
   resolveScanIdentityForEmailMock,
   trackAnalyticsEventMock,
   submitScanMock,
+  getTeamActivityFeedMock,
   redirectToTrustedQrUrlMock,
 } = vi.hoisted(() => ({
   getSessionMock: vi.fn(),
   resolveScanIdentityForEmailMock: vi.fn(),
   trackAnalyticsEventMock: vi.fn(),
   submitScanMock: vi.fn(),
+  getTeamActivityFeedMock: vi.fn(),
   redirectToTrustedQrUrlMock: vi.fn(),
 }));
 
@@ -47,7 +49,12 @@ vi.mock('@/services/auth', () => ({
 
 vi.mock('@/services/api', () => ({
   apiClient: {
+    get: getTeamActivityFeedMock,
     post: submitScanMock,
+  },
+  eventEndpoints: {
+    listTeamActivityFeed: (eventId: string, teamId: string) =>
+      `/events/${eventId}/teams/${teamId}/activity-feed`,
   },
   scanEndpoints: {
     submitScan: (eventId: string) => `/events/${eventId}/scans`,
@@ -85,6 +92,17 @@ function createDetectedCode(rawValue: string) {
     boundingBox: { x: 0, y: 0, width: 100, height: 100 },
     cornerPoints: [],
   };
+}
+
+function createDeferred<T>() {
+  let resolve: (value: T | PromiseLike<T>) => void = () => {};
+  let reject: (reason?: unknown) => void = () => {};
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
 }
 
 const SCANNER_TEST_TIMEOUT_MS = 15_000;
@@ -161,6 +179,13 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       email: 'lina@velocitygp.dev',
     });
     resolveScanIdentityForEmailMock.mockResolvedValue(resolvedIdentity);
+    getTeamActivityFeedMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        items: [],
+      },
+    });
     submitScanMock.mockResolvedValue({
       ok: true,
       status: 200,
@@ -188,6 +213,220 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       value: originalMediaDevices,
     });
   });
+
+  it(
+    'renders team activity feed entries from the backend feed endpoint',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      getTeamActivityFeedMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        data: {
+          items: [
+            {
+              id: 'activity-1',
+              eventId: 'event-velocity-active',
+              teamId: 'team-apex-comets',
+              playerId: 'player-lina-active',
+              playerName: 'Lina',
+              type: 'PLAYER_ONBOARDING_COMPLETED',
+              occurredAt: new Date().toISOString(),
+              summary: 'Lina completed onboarding and is now race-ready.',
+            },
+            {
+              id: 'activity-2',
+              eventId: 'event-velocity-active',
+              teamId: 'team-apex-comets',
+              playerId: 'player-lina-active',
+              playerName: 'Lina',
+              type: 'PLAYER_QR_SCAN',
+              occurredAt: new Date().toISOString(),
+              qrCodeId: 'qr-1',
+              qrCodeLabel: 'Bridge Marker',
+              qrPayload: 'VG-001',
+              scanOutcome: 'SAFE',
+              pointsAwarded: 120,
+              errorCode: null,
+              summary: 'Bridge Marker scanned for +120 points.',
+            },
+          ],
+        },
+      });
+
+      renderRaceHub();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Lina completed onboarding and is now race-ready.')
+        ).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Lina scanned Bridge Marker for +120')).toBeInTheDocument();
+      expect(screen.getByText('SAFE • +120 points')).toBeInTheDocument();
+    }
+  );
+
+  it(
+    'clears stale activity entries when identity changes and the new feed fetch fails',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      const nextIdentity = {
+        status: 'resolved' as const,
+        identity: {
+          ...resolvedIdentity.identity,
+          teamId: 'team-drift-runners',
+          teamName: 'Drift Runners',
+        },
+      };
+
+      let identityResolutionCount = 0;
+      resolveScanIdentityForEmailMock.mockImplementation(async () => {
+        identityResolutionCount += 1;
+        return identityResolutionCount <= 2 ? resolvedIdentity : nextIdentity;
+      });
+
+      getTeamActivityFeedMock
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          data: {
+            items: [
+              {
+                id: 'activity-stale',
+                eventId: 'event-velocity-active',
+                teamId: 'team-apex-comets',
+                playerId: 'player-lina-active',
+                playerName: 'Lina',
+                type: 'PLAYER_ONBOARDING_COMPLETED',
+                occurredAt: new Date().toISOString(),
+                summary: 'Lina completed onboarding and is now race-ready.',
+              },
+            ],
+          },
+        })
+        .mockRejectedValueOnce(new Error('feed unavailable for new team'));
+
+      renderRaceHub();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Lina completed onboarding and is now race-ready.')
+        ).toBeInTheDocument();
+      });
+
+      const refreshButton = screen
+        .getAllByRole('button')
+        .find((button) => button.textContent?.trim() === '');
+      expect(refreshButton).toBeDefined();
+      fireEvent.click(refreshButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Unable to load team activity right now.')).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByText('Lina completed onboarding and is now race-ready.')
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it(
+    'ignores stale poll responses that resolve after a newer post-scan refresh',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      const stalePollResponse = createDeferred<{
+        ok: boolean;
+        status: number;
+        data: {
+          items: Array<{
+            id: string;
+            eventId: string;
+            teamId: string;
+            playerId: string;
+            playerName: string;
+            type: 'PLAYER_QR_SCAN';
+            occurredAt: string;
+            qrCodeId: string | null;
+            qrCodeLabel: string | null;
+            qrPayload: string;
+            scanOutcome: 'SAFE';
+            pointsAwarded: number;
+            errorCode: null;
+            summary: string;
+          }>;
+        };
+      }>();
+
+      getTeamActivityFeedMock
+        .mockImplementationOnce(() => stalePollResponse.promise)
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          data: {
+            items: [
+              {
+                id: 'activity-latest',
+                eventId: 'event-velocity-active',
+                teamId: 'team-apex-comets',
+                playerId: 'player-lina-active',
+                playerName: 'Lina',
+                type: 'PLAYER_QR_SCAN',
+                occurredAt: new Date().toISOString(),
+                qrCodeId: 'qr-latest',
+                qrCodeLabel: 'Latest Marker',
+                qrPayload: 'VG-LATEST',
+                scanOutcome: 'SAFE',
+                pointsAwarded: 77,
+                errorCode: null,
+                summary: 'Latest Marker scanned for +77 points.',
+              },
+            ],
+          },
+        });
+
+      renderRaceHub();
+      await startScanner();
+
+      await act(async () => {
+        latestScannerProps?.onScan([createDetectedCode('VG-001')]);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Lina scanned Latest Marker for +77')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        stalePollResponse.resolve({
+          ok: true,
+          status: 200,
+          data: {
+            items: [
+              {
+                id: 'activity-stale-poll',
+                eventId: 'event-velocity-active',
+                teamId: 'team-apex-comets',
+                playerId: 'player-lina-active',
+                playerName: 'Lina',
+                type: 'PLAYER_QR_SCAN',
+                occurredAt: new Date(Date.now() - 10_000).toISOString(),
+                qrCodeId: 'qr-stale',
+                qrCodeLabel: 'Old Marker',
+                qrPayload: 'VG-OLD',
+                scanOutcome: 'SAFE',
+                pointsAwarded: 5,
+                errorCode: null,
+                summary: 'Old Marker scanned for +5 points.',
+              },
+            ],
+          },
+        });
+        await Promise.resolve();
+      });
+
+      expect(screen.queryByText('Lina scanned Old Marker for +5')).not.toBeInTheDocument();
+      expect(screen.getByText('Lina scanned Latest Marker for +77')).toBeInTheDocument();
+    }
+  );
 
   it(
     'redirects when the scanned QR URL matches the trusted frontend origin',
