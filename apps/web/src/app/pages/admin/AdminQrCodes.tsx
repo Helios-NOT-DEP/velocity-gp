@@ -356,7 +356,7 @@ export default function AdminQrCodes() {
           <Plus className="w-6 h-6 text-[#00D4FF]" />
           Create New QR Code
         </h3>
-        {isDemoMode && (
+        {!isHydrating && isDemoMode && (
           <p className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
             Live QR creation is disabled in demo mode.
           </p>

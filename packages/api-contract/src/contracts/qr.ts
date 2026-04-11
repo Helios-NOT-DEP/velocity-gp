@@ -38,8 +38,6 @@ export interface CreateQRCodeRequest {
   readonly zone?: string;
   readonly activationStartsAt?: string;
   readonly activationEndsAt?: string;
-  readonly hazardRatioOverride?: number;
-  readonly hazardWeightOverride?: number | null;
 }
 
 /**
