@@ -56,9 +56,10 @@ export const appRoutes: RouteObject[] = [
       </ProtectedRouteGuard>
     ),
   },
-  // TODO(figma-sync): Add /team route parity for post-Garage handoff; Figma flow routes Garage -> TeamPage before Race Hub. | Figma source: src/app/routes.ts (/team -> TeamPage) | Impact: user flow
+  // Pathless layout wrapper: ProtectedRouteGuard + RootLayout applied to all in-race routes.
+  // Using a pathless route (no `path` key) avoids the duplicate '/' that would otherwise
+  // shadow the Login route above and cause ambiguous route matching.
   {
-    path: '/',
     element: (
       <ProtectedRouteGuard>
         <RootLayout />

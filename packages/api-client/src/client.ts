@@ -18,9 +18,12 @@ export interface ApiRequestOptions {
 /**
  * Standardized resolved wrapper returned by every async method on the ApiClient.
  * Flattens the HTTP status alongside the strictly-typed Data payload or bounded Error.
+ *
+ * `data` is typed as `T | undefined` — always check `response.ok` before accessing it,
+ * as it will be `undefined` when `ok` is false or the response carries no body.
  */
 export interface ApiResponse<T> {
-  data: T;
+  data: T | undefined;
   status: number;
   ok: boolean;
   error?: {
@@ -31,7 +34,7 @@ export interface ApiResponse<T> {
 }
 
 interface ParsedApiBody<T> {
-  data: T;
+  data: T | undefined;
   error?: ApiResponse<T>['error'];
 }
 
@@ -87,15 +90,18 @@ export class ApiClient {
     }
 
     const authorizationHeader = readAuthorizationHeaderFromStorage();
+    const hasBody = options.body !== undefined;
     const response = await fetch(url.toString(), {
       method: options.method || 'GET',
       credentials: 'include',
       headers: {
-        'Content-Type': 'application/json',
+        // Only set Content-Type when a body is present — GET and DELETE requests
+        // should not advertise a JSON content type with no payload.
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         ...(authorizationHeader ? { Authorization: authorizationHeader } : {}),
         ...options.headers,
       },
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body: hasBody ? JSON.stringify(options.body) : undefined,
     });
 
     const parsedBody = await this.parseResponseBody<T>(response);
@@ -144,7 +150,7 @@ export class ApiClient {
 
     if (!contentType.includes('application/json')) {
       // Non-JSON endpoints are treated as data-less responses by this client abstraction.
-      return { data: undefined as T };
+      return { data: undefined };
     }
 
     const payload = (await response.json()) as T | ApiEnvelope<T>;
@@ -153,7 +159,7 @@ export class ApiClient {
       // Preferred contract: `{ success, data|error }` envelope from api-contract/http helpers.
       if (payload.success === false) {
         return {
-          data: undefined as T,
+          data: undefined,
           error: payload.error,
         };
       }

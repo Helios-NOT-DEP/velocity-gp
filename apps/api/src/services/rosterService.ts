@@ -17,14 +17,13 @@ import type { Prisma } from '../../prisma/generated/client.js';
 import { prisma } from '../db/client.js';
 import { withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
+import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.js';
+import { normalizeWorkEmail } from '../utils/normalizeEmail.js';
 
 /**
  * Admin roster service for listing, assignment updates, and CSV-style import
  * preview/apply flows.
  */
-interface AdminActionContext {
-  readonly actorUserId?: string;
-}
 
 interface RosterPlayerRecord {
   readonly id: string;
@@ -63,13 +62,6 @@ interface ResolvedImportRow {
 }
 
 const PHONE_E164_REGEX = /^\+[1-9]\d{7,14}$/;
-
-/**
- * Canonical work-email normalization used across roster matching.
- */
-function normalizeWorkEmail(value: string): string {
-  return value.trim().toLowerCase();
-}
 
 function normalizeOptionalName(value: string | null | undefined): string | null {
   if (typeof value !== 'string') {
@@ -130,46 +122,6 @@ function mapRosterRow(player: RosterPlayerRecord): AdminRosterRow {
     joinedAt: player.joinedAt.toISOString(),
     updatedAt: player.updatedAt.toISOString(),
   };
-}
-
-/**
- * Resolves admin actor for audit logging, with ADMIN fallback.
- */
-async function resolveActorUserId(
-  tx: Prisma.TransactionClient,
-  actorUserId: string | undefined
-): Promise<string> {
-  if (actorUserId) {
-    const actor = await tx.user.findUnique({
-      where: {
-        id: actorUserId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (actor) {
-      return actor.id;
-    }
-  }
-
-  const fallbackAdmin = await tx.user.findFirst({
-    where: {
-      role: 'ADMIN',
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!fallbackAdmin) {
-    throw new ValidationError('Unable to resolve admin actor for this operation.', {
-      actorUserId,
-    });
-  }
-
-  return fallbackAdmin.id;
 }
 
 function resolvePlayerStatusFromTeamStatus(teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null) {

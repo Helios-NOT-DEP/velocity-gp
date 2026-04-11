@@ -11,6 +11,7 @@ import {
   adminEventQrCodeParamsSchema,
   adminEventTeamParamsSchema,
   adminUserParamsSchema,
+  adminAuditListQuerySchema,
   adminRosterListQuerySchema,
   createAdminQRCodeSchema,
   manualPitControlSchema,
@@ -314,11 +315,15 @@ adminRouter.post(
 adminRouter.get(
   '/admin/events/:eventId/audits',
   validate(adminEventParamsSchema, 'params'),
+  validate(adminAuditListQuerySchema, 'query'),
   asyncHandler(async (request, response) => {
     const eventId = String(request.params.eventId);
+    const { cursor, limit } = request.query as { cursor?: string; limit?: number };
 
     response.json(
-      successResponse(await listAdminAudits(eventId), { requestId: response.locals.requestId })
+      successResponse(await listAdminAudits(eventId, { cursor, limit }), {
+        requestId: response.locals.requestId,
+      })
     );
   })
 );

@@ -106,6 +106,14 @@ function assertSafeMagicLinkOriginInProduction(origin: string): void {
   }
 }
 
+function assertRequiredSecretsInProduction(parsedEnv: { AUTH_SECRET?: string }): void {
+  if (!parsedEnv.AUTH_SECRET || parsedEnv.AUTH_SECRET.trim().length === 0) {
+    throw new Error(
+      'AUTH_SECRET must be set in production. Sessions cannot be signed securely without it.'
+    );
+  }
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
@@ -158,11 +166,12 @@ const frontendMagicLinkOrigin = parsedEnv.FRONTEND_MAGIC_LINK_ORIGIN ?? frontend
 
 if (parsedEnv.NODE_ENV === 'production') {
   assertSafeMagicLinkOriginInProduction(frontendMagicLinkOrigin);
+  assertRequiredSecretsInProduction(parsedEnv);
 }
 
 export const env = {
   ...parsedEnv,
-  FRONTEND_ORIGIN: frontendOrigin,
-  FRONTEND_ORIGINS: frontendOriginsFromEnv,
+  FRONTEND_PRIMARY_ORIGIN: frontendOrigin,
+  FRONTEND_ALLOWED_ORIGINS: frontendOriginsFromEnv,
   FRONTEND_MAGIC_LINK_ORIGIN: frontendMagicLinkOrigin,
 };

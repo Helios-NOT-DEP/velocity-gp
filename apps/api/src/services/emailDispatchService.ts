@@ -1,9 +1,9 @@
-import { Buffer } from 'node:buffer';
-import { createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
+import { createHs512Jwt } from '../lib/n8nAuth.js';
 
 /**
  * Outbound email dispatch layer.
@@ -36,39 +36,11 @@ function sanitizeWebhookUrlForLogs(url: string): string {
   return `${parsed.origin}${parsed.pathname}`;
 }
 
-function encodeBase64UrlJson(payload: Record<string, unknown>): string {
-  return Buffer.from(JSON.stringify(payload)).toString('base64url');
-}
-
 function redactTokenLikeValues(message: string, token: string): string {
   return message
     .replaceAll(token, '[REDACTED]')
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
     .replace(/\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED]');
-}
-
-/**
- * Builds a short-lived HS512 JWT for authenticated webhook dispatch.
- */
-function createHs512Jwt(secret: string, correlationId: string): string {
-  const issuedAtEpochSeconds = Math.floor(Date.now() / 1000);
-  const expiryEpochSeconds = issuedAtEpochSeconds + 60;
-  const header = encodeBase64UrlJson({
-    alg: 'HS512',
-    typ: 'JWT',
-  });
-  const payload = encodeBase64UrlJson({
-    iat: issuedAtEpochSeconds,
-    exp: expiryEpochSeconds,
-    iss: 'velocity-gp-api',
-    aud: 'n8n',
-    jti: randomUUID(),
-    correlationId,
-  });
-  const unsignedToken = `${header}.${payload}`;
-  const signature = createHmac('sha512', secret).update(unsignedToken).digest('base64url');
-
-  return `${unsignedToken}.${signature}`;
 }
 
 /**

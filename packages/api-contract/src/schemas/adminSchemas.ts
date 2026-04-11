@@ -108,3 +108,12 @@ export const setAdminQRCodeStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
   reason: z.string().trim().min(2).optional(),
 });
+
+/**
+ * Validates query parameters for listing admin audit entries.
+ * Supports cursor-based pagination with a configurable page size.
+ */
+export const adminAuditListQuerySchema = z.object({
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});

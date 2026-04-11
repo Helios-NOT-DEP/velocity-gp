@@ -27,10 +27,16 @@ export interface RequestMagicLinkRequest {
 
 /**
  * Standard confirmation response denoting that an authentication email flow has started.
+ *
+ * `accepted` is always `true` when this response is returned (an error response is used otherwise).
+ * `deliveryStatus` can optionally indicate whether the email was actually dispatched. When `dispatch_failed`,
+ * the magic link was generated but email delivery failed \u2014 the user will not receive the link.
  */
 export interface RequestMagicLinkResponse {
   readonly accepted: true;
   readonly message: string;
+  /** Optional delivery status. Only present when the server can determine dispatch outcome. */
+  readonly deliveryStatus?: 'dispatched' | 'dispatch_failed';
 }
 
 /**

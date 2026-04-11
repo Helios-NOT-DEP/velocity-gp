@@ -1,5 +1,4 @@
-import { Buffer } from 'node:buffer';
-import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 import type {
   CreateQRCodeRequest,
@@ -16,11 +15,10 @@ import { prisma } from '../db/client.js';
 import { logger } from '../lib/logger.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { DependencyError, ValidationError } from '../utils/appError.js';
+import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.js';
+import { createHs512Jwt } from '../lib/n8nAuth.js';
 
-interface AdminActionContext {
-  readonly actorUserId?: string;
-}
-
+// Private helper types for n8n integration.
 interface QrGenerationRequest {
   readonly id: string;
   readonly url: string;
@@ -72,57 +70,6 @@ function toQRCodeSummary(qrCode: {
   };
 }
 
-async function resolveActorUserId(
-  tx: Prisma.TransactionClient,
-  actorUserId: string | undefined
-): Promise<string> {
-  if (actorUserId) {
-    const actor = await tx.user.findUnique({
-      where: { id: actorUserId },
-      select: { id: true },
-    });
-    if (actor) {
-      return actor.id;
-    }
-  }
-
-  const fallbackAdmin = await tx.user.findFirst({
-    where: { role: 'ADMIN' },
-    select: { id: true },
-  });
-
-  if (!fallbackAdmin) {
-    throw new ValidationError('Unable to resolve admin actor for this operation.', {
-      actorUserId,
-    });
-  }
-
-  return fallbackAdmin.id;
-}
-
-function encodeBase64UrlJson(payload: Record<string, unknown>): string {
-  return Buffer.from(JSON.stringify(payload)).toString('base64url');
-}
-
-function createHs512Jwt(secret: string, correlationId: string): string {
-  const issuedAtEpochSeconds = Math.floor(Date.now() / 1000);
-  const expiryEpochSeconds = issuedAtEpochSeconds + 60;
-  const header = encodeBase64UrlJson({ alg: 'HS512', typ: 'JWT' });
-  const payload = encodeBase64UrlJson({
-    iat: issuedAtEpochSeconds,
-    exp: expiryEpochSeconds,
-    iss: 'velocity-gp-api',
-    aud: 'n8n',
-    jti: randomUUID(),
-    correlationId,
-  });
-
-  const unsignedToken = `${header}.${payload}`;
-  const signature = createHmac('sha512', secret).update(unsignedToken).digest('base64url');
-
-  return `${unsignedToken}.${signature}`;
-}
-
 function getN8nWebhookUrl(): string {
   if (!env.N8N_HOST) {
     throw new ValidationError('N8N_HOST must be configured for QR asset generation.');
@@ -146,6 +93,10 @@ function getN8nWebhookToken(): string {
     throw new ValidationError('N8N_WEBHOOK_TOKEN must be configured in production.');
   }
 
+  logger.warn(
+    'N8N_WEBHOOK_TOKEN is not set — using hardcoded dev fallback. ' +
+      'Do not expose this environment to untrusted networks.'
+  );
   return 'velocity-gp-dev-webhook-token';
 }
 
