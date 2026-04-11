@@ -9,7 +9,7 @@ export default function BottomNav() {
     // Fixed navigation shell for race routes; route-level pages own the main content area.
     <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 p-4 flex gap-3">
       <button
-        onClick={() => navigate('/race-hub')}
+        onClick={() => navigate('/race')}
         className="flex-1 py-3 rounded-xl font-semibold bg-blue-500 text-white flex items-center justify-center gap-2"
       >
         <Scan className="w-5 h-5" />

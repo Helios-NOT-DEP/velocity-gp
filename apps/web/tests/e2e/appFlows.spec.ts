@@ -97,7 +97,7 @@ test.describe('Velocity GP web flows', () => {
   });
 
   test('redirects anonymous users away from protected non-admin routes', async ({ page }) => {
-    await page.goto('/garage');
+    await page.goto('/team-setup');
 
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('button', { name: 'Email Me a Sign-In Link' })).toBeVisible();
@@ -137,7 +137,7 @@ test.describe('Velocity GP web flows', () => {
       email: 'player@example.com',
     });
 
-    await page.goto('/garage');
+    await page.goto('/team-setup');
 
     await expect(page.getByRole('heading', { name: 'Create Your Team' })).toBeVisible();
   });
@@ -152,7 +152,22 @@ test.describe('Velocity GP web flows', () => {
 
     await page.goto('/');
 
-    await expect(page).toHaveURL(/\/race-hub$/);
+    await expect(page).toHaveURL(/\/race$/);
+  });
+
+  test('redirects legacy aliases to canonical player paths', async ({ page }) => {
+    await seedAuthSession(page, {
+      userId: 'player-1',
+      role: 'player',
+      isAuthenticated: true,
+      email: 'player@example.com',
+    });
+
+    await page.goto('/garage');
+    await expect(page).toHaveURL(/\/team-setup$/);
+
+    await page.goto('/race-hub');
+    await expect(page).toHaveURL(/\/race$/);
   });
 
   test('requests camera access and scans a QR code in Race Hub', async ({ page, context }) => {
@@ -231,7 +246,7 @@ test.describe('Velocity GP web flows', () => {
       });
     });
 
-    await page.goto('/race-hub');
+    await page.goto('/race');
 
     await page.getByRole('button', { name: 'Start Camera Scan' }).click();
     await expect(page.getByText('Scanner Active')).toBeVisible();

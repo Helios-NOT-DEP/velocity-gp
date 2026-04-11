@@ -32,11 +32,13 @@ export default function Login() {
       }
 
       if (session.assignmentStatus === 'ASSIGNED_PENDING') {
-        navigate('/garage', { replace: true });
+        // Canonical pending-assignment destination after route alignment.
+        navigate('/team-setup', { replace: true });
         return;
       }
 
-      navigate('/race-hub', { replace: true });
+      // Canonical active-team destination after route alignment.
+      navigate('/race', { replace: true });
     }
 
     void redirectIfAuthenticated();
@@ -57,7 +59,7 @@ export default function Login() {
     setError(null);
 
     try {
-      // TODO(figma-sync): Align submit transition with Figma's immediate Garage navigation flow, while preserving magic-link security requirements. | Figma source: src/app/pages/Login.tsx handleSubmit (navigate('/garage')) | Impact: user flow
+      // TODO(figma-sync): Align submit transition with Figma's immediate Garage navigation flow, while preserving magic-link security requirements. | Figma source: src/app/pages/Login.tsx handleSubmit (navigate('/team-setup')) | Impact: user flow
       // Current behavior intentionally stays on this screen and shows server response
       // because auth requires external email-link verification.
       const response = await requestMagicLink(workEmail.trim());

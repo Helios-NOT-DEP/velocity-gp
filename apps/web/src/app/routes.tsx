@@ -33,13 +33,23 @@ export const appRoutes: RouteObject[] = [
     path: '/signup',
     element: <Navigate to="/" replace />,
   },
+  // Legacy alias: preserve older /garage links while canonical path is /team-setup.
+  {
+    path: '/garage',
+    element: <Navigate to="/team-setup" replace />,
+  },
+  // Legacy alias: preserve older /race-hub links while canonical path is /race.
+  {
+    path: '/race-hub',
+    element: <Navigate to="/race" replace />,
+  },
   {
     path: '/waiting-assignment',
     Component: WaitingAssignment,
   },
-  // Garage remains a standalone pre-race screen outside the bottom-nav layout shell.
+  // Team setup remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
-    path: '/garage',
+    path: '/team-setup',
     element: (
       <ProtectedRouteGuard>
         <Garage />
@@ -56,7 +66,7 @@ export const appRoutes: RouteObject[] = [
     ),
     children: [
       // In-race player navigation rendered with persistent bottom navigation.
-      { path: 'race-hub', Component: RaceHub },
+      { path: 'race', Component: RaceHub },
       { path: 'pit-stop', Component: PitStop },
       { path: 'helios', Component: HeliosProfile },
       { path: 'leaderboard', Component: Leaderboard },

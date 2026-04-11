@@ -66,7 +66,8 @@ export interface PlayerAuthSession {
 export interface VerifyMagicLinkResponse {
   readonly sessionToken: string;
   readonly session: PlayerAuthSession;
-  readonly redirectPath: '/garage' | '/race-hub' | '/waiting-assignment';
+  // Canonical player routes after story #55 route alignment.
+  readonly redirectPath: '/team-setup' | '/race' | '/waiting-assignment';
 }
 
 /**
@@ -82,7 +83,8 @@ export interface SessionResponse {
  */
 export interface RoutingDecisionResponse {
   readonly assignmentStatus: PlayerAssignmentStatus;
-  readonly redirectPath: '/garage' | '/race-hub' | '/waiting-assignment';
+  // Canonical player routes after story #55 route alignment.
+  readonly redirectPath: '/team-setup' | '/race' | '/waiting-assignment';
   readonly eventId: string;
   readonly playerId: string;
   readonly teamId: string | null;

@@ -20,8 +20,8 @@ sequenceDiagram
   participant BFF as Velocity GP BFF/API
   participant AuthProvider as Magic-Link Provider
   participant Store as Player + Team Store
-  participant GarageUI as Garage<br/>Current route '/garage'
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant GarageUI as Garage<br/>Current route '/team-setup'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   Player->>LoginUI: Enter work email, personal contact, and full name
   Player->>LoginUI: Submit login/sign-up form
@@ -50,7 +50,7 @@ sequenceDiagram
   else Current local demo flow in React
     LoginUI->>LoginUI: Call GameContext.login(name, email)
     LoginUI->>AuthClient: Track auth_login_submitted analytics event
-    LoginUI-->>GarageUI: Navigate directly to '/garage'
+    LoginUI-->>GarageUI: Navigate directly to '/team-setup'
     GarageUI-->>Player: Show AI Design Studio immediately
   end
 ```
@@ -62,12 +62,12 @@ sequenceDiagram
   autonumber
   actor Player
   actor Teammates
-  participant GarageUI as Garage / AI Design Studio<br/>Current route '/garage'
+  participant GarageUI as Garage / AI Design Studio<br/>Current route '/team-setup'
   participant Policy as Policy Safety Filter
   participant GenAI as GenAI Design Service
   participant BFF as Velocity GP BFF/API
   participant Store as Team + Player Store
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   Player->>GarageUI: Enter words describing themselves
   Player->>GarageUI: Submit self-description for team logo generation
@@ -104,7 +104,7 @@ sequenceDiagram
     GarageUI->>GarageUI: Wait 2.5s, compose team name from local keywords, use static Unsplash car image
     Player->>GarageUI: Click "Continue to Race"
     GarageUI->>GarageUI: Call GameContext.createTeam(teamName, carImage, keywords)
-    GarageUI-->>RaceHubUI: Navigate to '/race-hub'
+    GarageUI-->>RaceHubUI: Navigate to '/race'
   end
 ```
 
@@ -114,8 +114,8 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
-  participant Identity as Scan Identity Resolver
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
+  participant Identity as Scan Identity Resolver<br/>Session email + seeded mapping
   participant Browser as Browser Camera APIs
   participant Scanner as QR Scanner
   participant BFF as Velocity GP BFF/API
@@ -162,7 +162,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
   participant Scanner as QR Scanner
   participant BFF as Velocity GP BFF/API
   participant Rules as Hazard Rule Engine
@@ -207,7 +207,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
   participant Scanner as QR Scanner
   participant BFF as Velocity GP BFF/API
   participant Rules as Scan Validation Rules
@@ -263,7 +263,7 @@ sequenceDiagram
   participant Rules as Rescue Validation Rules
   participant Store as Team + Rescue Store
   participant Teammates as Penalized Team Devices
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   PitStopUI-->>Player: Show timer and instruct player to find a Helios member
   Player->>HeliosQR: Scan Superpower QR from another player
@@ -302,7 +302,7 @@ sequenceDiagram
   else Current local demo rescue flow
     PitStopUI->>PitStopUI: Click "Scan Helios QR (Demo)"
     PitStopUI->>PitStopUI: Call GameContext.clearPitStop(currentTeam.id)
-    PitStopUI-->>RaceHubUI: Navigate to '/race-hub'
+    PitStopUI-->>RaceHubUI: Navigate to '/race'
   end
 ```
 
@@ -316,7 +316,7 @@ sequenceDiagram
   participant Store as Team Store
   participant PlayerApp as Penalized Player App<br/>Pit Stop route '/pit-stop'
   participant Teammates as Other Penalized Team Devices
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   Scheduler->>Rules: Check teams with status IN_PIT and pitStopExpiresAt
   Rules->>Store: Query teams where server time >= pitStopExpiresAt
@@ -341,7 +341,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
   participant BottomNav as Bottom Nav
   participant LeaderboardUI as Leaderboard<br/>Current route '/leaderboard'
   participant VictoryLaneUI as Victory Lane<br/>Current route '/victory-lane'
@@ -377,12 +377,12 @@ sequenceDiagram
   end
 
   Player->>LeaderboardUI: Back to Race Hub if event is still active
-  LeaderboardUI-->>RaceHubUI: Navigate to '/race-hub'
+  LeaderboardUI-->>RaceHubUI: Navigate to '/race'
 ```
 
 ## Current Implementation Gaps
 
-- `Login` currently jumps straight to `/garage`; the BDD flow expects magic-link authentication and team-state-based routing.
+- `Login` currently requests magic links using work email only; the broader BDD identity capture requirements still include additional personal contact fields and full name.
 - `Garage` currently lets one player locally generate/finalize a team identity; the updated target flow collects every teammate's self-description first, then generates one team logo from all descriptions plus the preassigned team name.
 - Camera fallback in `RaceHub` is guidance + retry only; manual payload entry and image-upload fallback are intentionally not implemented in v1.
 - `PitStop` currently clears penalties with a local demo button; the BDD flow expects backend Helios rescue validation, self-rescue rejection, and cooldown handling.
@@ -393,4 +393,6 @@ sequenceDiagram
 
 - Every section is a Mermaid `sequenceDiagram` focused on one player action or one system reaction.
 - `alt` branches separate intended BDD behavior from current local demo behavior where the implementation is still mocked.
-- Route names and API paths are written exactly as they currently appear in the React router and BFF route contracts when available.
+- Canonical player routes are `/team-setup` and `/race`; legacy aliases `/garage` and `/race-hub` redirect to canonical paths.
+- Login entry remains `/`, and `/signup` is a supported legacy alias that redirects to `/`.
+- API path references are written exactly as they currently appear in the BFF route contracts.

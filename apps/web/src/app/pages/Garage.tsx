@@ -34,10 +34,11 @@ export default function Garage() {
   };
 
   const handleFinalize = () => {
-    // TODO(figma-sync): Route finalized onboarding to /team parity path (TeamPage) instead of direct /race-hub jump. | Figma source: src/app/pages/Garage.tsx handleContinue -> navigate('/team') | Impact: user flow
+    // TODO(figma-sync): Route finalized onboarding to /team parity path (TeamPage) instead of direct /race jump. | Figma source: src/app/pages/Garage.tsx handleContinue -> navigate('/team') | Impact: user flow
     // Persist generated identity in shared context so race/pit/leaderboard pages can consume it.
     createTeam(generatedTeamName, generatedCarImage, [keyword1, keyword2, keyword3]);
-    navigate('/race-hub');
+    // Canonical post-garage destination after route alignment.
+    navigate('/race');
   };
 
   return (
