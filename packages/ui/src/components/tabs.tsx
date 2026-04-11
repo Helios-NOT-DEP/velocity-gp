@@ -1,3 +1,7 @@
+/**
+ * @file tabs.tsx
+ * @description A set of layered sections of content—known as tab panels.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,6 +9,7 @@ import * as TabsPrimitive from '@radix-ui/react-tabs';
 
 import { cn } from './utils';
 
+/** Switches visibility between different UI perspectives in the same layout boundary. */
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
     <TabsPrimitive.Root
@@ -15,6 +20,7 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
   );
 }
 
+/** Standardized sub-component or utility serving TabsList. */
 function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
@@ -28,6 +34,7 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
   );
 }
 
+/** Standardized sub-component or utility serving TabsTrigger. */
 function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
@@ -41,6 +48,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
   );
 }
 
+/** Standardized sub-component or utility serving TabsContent. */
 function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content

@@ -1,7 +1,12 @@
+/**
+ * @file textarea.tsx
+ * @description Displays a form textarea or a component that looks like a textarea.
+ */
 import * as React from 'react';
 
 import { cn } from './utils';
 
+/** Captures lengthy string input like administrative audit reasons. */
 function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
   return (
     <textarea

@@ -1,4 +1,11 @@
-// Shared domain contracts consumed by API routes/services and web clients.
+/**
+ * @file index.ts
+ * @description Central barrel export file for all Domain Contracts.
+ * Consolidates the individual sub-modules covering authentication,
+ * participants, game scans, and administrative controls into a single
+ * importable surface for the main package structure.
+ */
+
 export * from './auth.js';
 export * from './adminControls.js';
 export * from './participants.js';

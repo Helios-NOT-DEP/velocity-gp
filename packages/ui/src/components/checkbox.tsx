@@ -1,3 +1,7 @@
+/**
+ * @file checkbox.tsx
+ * @description A control that allows the user to toggle between checked and not checked.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,6 +10,7 @@ import { CheckIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Captures boolean input choices from users. */
 function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
   return (
     <CheckboxPrimitive.Root

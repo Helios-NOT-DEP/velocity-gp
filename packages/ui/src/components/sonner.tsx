@@ -1,8 +1,13 @@
+/**
+ * @file sonner.tsx
+ * @description An opinionated toast component.
+ */
 'use client';
 
 import { useTheme } from 'next-themes';
 import { Toaster as Sonner, ToasterProps } from 'sonner';
 
+/** Standardized sub-component or utility serving Toaster. */
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = 'system' } = useTheme();
 

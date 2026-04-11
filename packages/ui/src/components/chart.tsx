@@ -1,3 +1,7 @@
+/**
+ * @file chart.tsx
+ * @description Beautiful charts built using Recharts.
+ */
 'use client';
 
 import * as React from 'react';
@@ -8,6 +12,7 @@ import { cn } from './utils';
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const;
 
+/** Standardized sub-component or utility serving ChartConfig. */
 export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode;
@@ -24,6 +29,7 @@ type ChartContextProps = {
 
 const ChartContext = React.createContext<ChartContextProps | null>(null);
 
+/** Use Chart */
 function useChart() {
   const context = React.useContext(ChartContext);
 
@@ -34,6 +40,7 @@ function useChart() {
   return context;
 }
 
+/** Standardized sub-component or utility serving ChartContainer. */
 function ChartContainer({
   id,
   className,
@@ -65,6 +72,7 @@ function ChartContainer({
   );
 }
 
+/** Standardized sub-component or utility serving ChartStyle. */
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(([, config]) => config.theme || config.color);
 
@@ -94,8 +102,10 @@ ${colorConfig
   );
 };
 
+/** Standardized sub-component or utility serving ChartTooltip. */
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
+/** Standardized sub-component or utility serving ChartTooltipContent. */
 function ChartTooltipContent({
   active,
   payload,
@@ -230,8 +240,10 @@ function ChartTooltipContent({
   );
 }
 
+/** Standardized sub-component or utility serving ChartLegend. */
 const ChartLegend = RechartsPrimitive.Legend;
 
+/** Standardized sub-component or utility serving ChartLegendContent. */
 function ChartLegendContent({
   className,
   hideIcon = false,
@@ -287,6 +299,7 @@ function ChartLegendContent({
 }
 
 // Helper to extract item config from a payload.
+/** Get Payload Config From Payload */
 function getPayloadConfigFromPayload(config: ChartConfig, payload: unknown, key: string) {
   if (typeof payload !== 'object' || payload === null) {
     return undefined;

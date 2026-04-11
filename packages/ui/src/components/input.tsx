@@ -1,7 +1,12 @@
+/**
+ * @file input.tsx
+ * @description Displays a form input field or a component that looks like an input field.
+ */
 import * as React from 'react';
 
 import { cn } from './utils';
 
+/** Standard text input collection element. */
 function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
   return (
     <input

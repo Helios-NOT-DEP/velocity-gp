@@ -1,3 +1,7 @@
+/**
+ * @file toggle-group.tsx
+ * @description A set of two-state buttons that can be toggled on or off.
+ */
 'use client';
 
 import * as React from 'react';
@@ -12,6 +16,7 @@ const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariant
   variant: 'default',
 });
 
+/** Groups related toggle inputs together visually. */
 function ToggleGroup({
   className,
   variant,
@@ -37,6 +42,7 @@ function ToggleGroup({
   );
 }
 
+/** Standardized sub-component or utility serving ToggleGroupItem. */
 function ToggleGroupItem({
   className,
   children,

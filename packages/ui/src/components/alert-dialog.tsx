@@ -1,3 +1,7 @@
+/**
+ * @file alert-dialog.tsx
+ * @description A modal dialog that interrupts the user with important content and expects a response.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,20 +10,24 @@ import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { cn } from './utils';
 import { buttonVariants } from './button';
 
+/** Renders a high-priority modal overlay to compel user decisions. */
 function AlertDialog({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
 }
 
+/** Standardized sub-component or utility serving AlertDialogTrigger. */
 function AlertDialogTrigger({
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Trigger>) {
   return <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving AlertDialogPortal. */
 function AlertDialogPortal({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Portal>) {
   return <AlertDialogPrimitive.Portal data-slot="alert-dialog-portal" {...props} />;
 }
 
+/** Standardized sub-component or utility serving AlertDialogOverlay. */
 function AlertDialogOverlay({
   className,
   ...props
@@ -36,6 +44,7 @@ function AlertDialogOverlay({
   );
 }
 
+/** Standardized sub-component or utility serving AlertDialogContent. */
 function AlertDialogContent({
   className,
   ...props
@@ -55,6 +64,7 @@ function AlertDialogContent({
   );
 }
 
+/** Standardized sub-component or utility serving AlertDialogHeader. */
 function AlertDialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -65,6 +75,7 @@ function AlertDialogHeader({ className, ...props }: React.ComponentProps<'div'>)
   );
 }
 
+/** Standardized sub-component or utility serving AlertDialogFooter. */
 function AlertDialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -75,6 +86,7 @@ function AlertDialogFooter({ className, ...props }: React.ComponentProps<'div'>)
   );
 }
 
+/** Standardized sub-component or utility serving AlertDialogTitle. */
 function AlertDialogTitle({
   className,
   ...props
@@ -88,6 +100,7 @@ function AlertDialogTitle({
   );
 }
 
+/** Standardized sub-component or utility serving AlertDialogDescription. */
 function AlertDialogDescription({
   className,
   ...props
@@ -101,6 +114,7 @@ function AlertDialogDescription({
   );
 }
 
+/** Standardized sub-component or utility serving AlertDialogAction. */
 function AlertDialogAction({
   className,
   ...props
@@ -108,6 +122,7 @@ function AlertDialogAction({
   return <AlertDialogPrimitive.Action className={cn(buttonVariants(), className)} {...props} />;
 }
 
+/** Standardized sub-component or utility serving AlertDialogCancel. */
 function AlertDialogCancel({
   className,
   ...props

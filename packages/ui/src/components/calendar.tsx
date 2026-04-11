@@ -1,3 +1,7 @@
+/**
+ * @file calendar.tsx
+ * @description A date field component that allows users to enter and edit date.
+ */
 'use client';
 
 import * as React from 'react';
@@ -7,6 +11,7 @@ import { DayPicker } from 'react-day-picker';
 import { cn } from './utils';
 import { buttonVariants } from './button';
 
+/** Interactive date-picker utilized for event scheduling. */
 function Calendar({
   className,
   classNames,

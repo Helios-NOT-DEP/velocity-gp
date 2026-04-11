@@ -1,3 +1,7 @@
+/**
+ * @file separator.tsx
+ * @description Visually or semantically separates content.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,6 +9,7 @@ import * as SeparatorPrimitive from '@radix-ui/react-separator';
 
 import { cn } from './utils';
 
+/** Creates dividing lines conforming to the central design system. */
 function Separator({
   className,
   orientation = 'horizontal',

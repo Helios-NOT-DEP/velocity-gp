@@ -1,3 +1,7 @@
+/**
+ * @file sheet.tsx
+ * @description Extends the Dialog component to display content that complements the main viewport.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,22 +10,27 @@ import { XIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Modal that enters from screen edges. */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
 
+/** Standardized sub-component or utility serving SheetTrigger. */
 function SheetTrigger({ ...props }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving SheetClose. */
 function SheetClose({ ...props }: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
+/** Sheet Portal */
 function SheetPortal({ ...props }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
 }
 
+/** Sheet Overlay */
 function SheetOverlay({
   className,
   ...props
@@ -38,6 +47,7 @@ function SheetOverlay({
   );
 }
 
+/** Standardized sub-component or utility serving SheetContent. */
 function SheetContent({
   className,
   children,
@@ -75,6 +85,7 @@ function SheetContent({
   );
 }
 
+/** Standardized sub-component or utility serving SheetHeader. */
 function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -85,6 +96,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SheetFooter. */
 function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -95,6 +107,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SheetTitle. */
 function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Title>) {
   return (
     <SheetPrimitive.Title
@@ -105,6 +118,7 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
   );
 }
 
+/** Standardized sub-component or utility serving SheetDescription. */
 function SheetDescription({
   className,
   ...props

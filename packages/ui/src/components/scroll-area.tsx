@@ -1,3 +1,7 @@
+/**
+ * @file scroll-area.tsx
+ * @description Augments native scroll functionality for custom, cross-browser styling.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,6 +9,7 @@ import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 
 import { cn } from './utils';
 
+/** Container with styled custom scrollbars wrapping huge content. */
 function ScrollArea({
   className,
   children,
@@ -28,6 +33,7 @@ function ScrollArea({
   );
 }
 
+/** Standardized sub-component or utility serving ScrollBar. */
 function ScrollBar({
   className,
   orientation = 'vertical',

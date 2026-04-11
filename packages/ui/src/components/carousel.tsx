@@ -1,3 +1,7 @@
+/**
+ * @file carousel.tsx
+ * @description A carousel with motion and swipe built using Embla.
+ */
 'use client';
 
 import * as React from 'react';
@@ -7,6 +11,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from './utils';
 import { Button } from './button';
 
+/** Standardized sub-component or utility serving CarouselApi. */
 type CarouselApi = UseEmblaCarouselType[1];
 type UseCarouselParameters = Parameters<typeof useEmblaCarousel>;
 type CarouselOptions = UseCarouselParameters[0];
@@ -30,6 +35,7 @@ type CarouselContextProps = {
 
 const CarouselContext = React.createContext<CarouselContextProps | null>(null);
 
+/** Use Carousel */
 function useCarousel() {
   const context = React.useContext(CarouselContext);
 
@@ -40,6 +46,7 @@ function useCarousel() {
   return context;
 }
 
+/** Scrollable container displaying sets of items sequentially. */
 function Carousel({
   orientation = 'horizontal',
   opts,
@@ -129,6 +136,7 @@ function Carousel({
   );
 }
 
+/** Standardized sub-component or utility serving CarouselContent. */
 function CarouselContent({ className, ...props }: React.ComponentProps<'div'>) {
   const { carouselRef, orientation } = useCarousel();
 
@@ -142,6 +150,7 @@ function CarouselContent({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving CarouselItem. */
 function CarouselItem({ className, ...props }: React.ComponentProps<'div'>) {
   const { orientation } = useCarousel();
 
@@ -160,6 +169,7 @@ function CarouselItem({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving CarouselPrevious. */
 function CarouselPrevious({
   className,
   variant = 'outline',
@@ -190,6 +200,7 @@ function CarouselPrevious({
   );
 }
 
+/** Standardized sub-component or utility serving CarouselNext. */
 function CarouselNext({
   className,
   variant = 'outline',

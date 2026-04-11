@@ -1,7 +1,12 @@
+/**
+ * @file use-mobile.ts
+ * @description React Hook detecting mobile screen sizes dynamically.
+ */
 import * as React from 'react';
 
 const MOBILE_BREAKPOINT = 768;
 
+/** Standardized sub-component or utility serving useIsMobile. */
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined);
 

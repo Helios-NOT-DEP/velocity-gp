@@ -1,3 +1,7 @@
+/**
+ * @file command.tsx
+ * @description Fast, composable, unstyled command menu.
+ */
 'use client';
 
 import * as React from 'react';
@@ -7,6 +11,7 @@ import { SearchIcon } from 'lucide-react';
 import { cn } from './utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './dialog';
 
+/** Renders complex search/command palettes used heavily in Admin contexts. */
 function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
@@ -20,6 +25,7 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
   );
 }
 
+/** Standardized sub-component or utility serving CommandDialog. */
 function CommandDialog({
   title = 'Command Palette',
   description = 'Search for a command to run...',
@@ -44,6 +50,7 @@ function CommandDialog({
   );
 }
 
+/** Standardized sub-component or utility serving CommandInput. */
 function CommandInput({
   className,
   ...props
@@ -63,6 +70,7 @@ function CommandInput({
   );
 }
 
+/** Standardized sub-component or utility serving CommandList. */
 function CommandList({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.List>) {
   return (
     <CommandPrimitive.List
@@ -73,6 +81,7 @@ function CommandList({ className, ...props }: React.ComponentProps<typeof Comman
   );
 }
 
+/** Standardized sub-component or utility serving CommandEmpty. */
 function CommandEmpty({ ...props }: React.ComponentProps<typeof CommandPrimitive.Empty>) {
   return (
     <CommandPrimitive.Empty
@@ -83,6 +92,7 @@ function CommandEmpty({ ...props }: React.ComponentProps<typeof CommandPrimitive
   );
 }
 
+/** Standardized sub-component or utility serving CommandGroup. */
 function CommandGroup({
   className,
   ...props
@@ -99,6 +109,7 @@ function CommandGroup({
   );
 }
 
+/** Standardized sub-component or utility serving CommandSeparator. */
 function CommandSeparator({
   className,
   ...props
@@ -112,6 +123,7 @@ function CommandSeparator({
   );
 }
 
+/** Standardized sub-component or utility serving CommandItem. */
 function CommandItem({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Item>) {
   return (
     <CommandPrimitive.Item
@@ -125,6 +137,7 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
   );
 }
 
+/** Standardized sub-component or utility serving CommandShortcut. */
 function CommandShortcut({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span

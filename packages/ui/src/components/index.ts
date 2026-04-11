@@ -1,14 +1,54 @@
-﻿/**
- * Barrel file for UI primitives.
- * Use named or namespace imports to avoid default-export assumptions.
+/**
+ * @file components/index.ts
+ * @description Internal aggregate barrel exporting each Shadcn/UI React component.
+ * Forms the root module structure for the shared UI package.
  */
-export * as Accordion from './accordion';
-export * as Alert from './alert';
-export * as Avatar from './avatar';
-export * as Badge from './badge';
-export * as Button from './button';
-export * as Card from './card';
-export * as Input from './input';
-export * as Label from './label';
-export * as Tooltip from './tooltip';
-export * as Utils from './utils';
+
+export * from './accordion.js';
+export * from './alert-dialog.js';
+export * from './alert.js';
+export * from './aspect-ratio.js';
+export * from './avatar.js';
+export * from './badge.js';
+export * from './breadcrumb.js';
+export * from './button.js';
+export * from './calendar.js';
+export * from './card.js';
+export * from './carousel.js';
+export * from './chart.js';
+export * from './checkbox.js';
+export * from './collapsible.js';
+export * from './command.js';
+export * from './context-menu.js';
+export * from './dialog.js';
+export * from './drawer.js';
+export * from './dropdown-menu.js';
+export * from './form.js';
+export * from './hover-card.js';
+export * from './input-otp.js';
+export * from './input.js';
+export * from './label.js';
+export * from './menubar.js';
+export * from './navigation-menu.js';
+export * from './pagination.js';
+export * from './popover.js';
+export * from './progress.js';
+export * from './radio-group.js';
+export * from './resizable.js';
+export * from './scroll-area.js';
+export * from './select.js';
+export * from './separator.js';
+export * from './sheet.js';
+export * from './sidebar.js';
+export * from './skeleton.js';
+export * from './slider.js';
+export * from './sonner.js';
+export * from './switch.js';
+export * from './table.js';
+export * from './tabs.js';
+export * from './textarea.js';
+export * from './toggle-group.js';
+export * from './toggle.js';
+export * from './tooltip.js';
+export * from './use-mobile.js';
+export * from './utils.js';

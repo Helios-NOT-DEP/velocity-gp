@@ -1,7 +1,12 @@
+/**
+ * @file card.tsx
+ * @description Displays a card with header, content, and footer.
+ */
 import * as React from 'react';
 
 import { cn } from './utils';
 
+/** Structural container grouping related information (like race stats). */
 function Card({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -15,6 +20,7 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving CardHeader. */
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -28,16 +34,19 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving CardTitle. */
 function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return <h4 data-slot="card-title" className={cn('leading-none', className)} {...props} />;
 }
 
+/** Standardized sub-component or utility serving CardDescription. */
 function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <p data-slot="card-description" className={cn('text-muted-foreground', className)} {...props} />
   );
 }
 
+/** Standardized sub-component or utility serving CardAction. */
 function CardAction({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -48,6 +57,7 @@ function CardAction({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving CardContent. */
 function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -58,6 +68,7 @@ function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving CardFooter. */
 function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
