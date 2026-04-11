@@ -1162,7 +1162,9 @@ describe('velocity gp backend', () => {
       expect(response.body.data.eventId).toBe(fixtureIds.eventId);
       expect(response.body.data.qrCode.status).toBe('ACTIVE');
       expect(response.body.data.qrCode.zone).toBe('North Ramp');
-      expect(response.body.data.qrCode.qrImageUrl).toBe('https://cdn.velocitygp.app/qr/new-code.png');
+      expect(response.body.data.qrCode.qrImageUrl).toBe(
+        'https://cdn.velocitygp.app/qr/new-code.png'
+      );
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [calledUrl, calledInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
