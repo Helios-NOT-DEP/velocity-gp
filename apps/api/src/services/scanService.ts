@@ -196,6 +196,7 @@ async function processScanInTransaction(
     where: {
       eventId: input.eventId,
       payload: qrPayload,
+      deletedAt: null,
     },
     select: {
       id: true,

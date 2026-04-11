@@ -1,25 +1,46 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, Plus, QrCode, RefreshCcw, Save, Trash2, X } from 'lucide-react';
+import {
+  Check,
+  Download,
+  Loader2,
+  Plus,
+  QrCode,
+  RefreshCcw,
+  Save,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   adminEndpoints,
   apiClient,
   eventEndpoints,
-  hazardEndpoints,
+  type CreateQRCodeRequest,
   type EventSummary,
-  type Hazard,
+  type QRCodeSummary,
   type UpdateQrHazardRandomizerResponse,
 } from '@/services/api';
+import {
+  createAdminQRCode,
+  deleteAdminQRCode,
+  listAdminQRCodes,
+  setAdminQRCodeStatus,
+} from '@/services/admin/qrCodes';
 import { adminDemoQrCodes, type AdminQrCode } from '../../admin/adminViewData';
 
-function toAdminQrCode(hazard: Hazard): AdminQrCode {
+function toAdminQrCode(qrCode: QRCodeSummary): AdminQrCode {
   return {
-    id: hazard.id,
-    name: hazard.label,
-    points: hazard.value,
-    active: hazard.status === 'ACTIVE',
-    scanCount: hazard.scanCount,
-    hazardRatioOverride: hazard.hazardRatioOverride,
-    hazardWeightOverride: hazard.hazardWeightOverride,
+    id: qrCode.id,
+    name: qrCode.label,
+    points: qrCode.value,
+    zone: qrCode.zone,
+    payload: qrCode.payload,
+    qrImageUrl: qrCode.qrImageUrl,
+    active: qrCode.status === 'ACTIVE',
+    scanCount: qrCode.scanCount,
+    hazardRatioOverride: qrCode.hazardRatioOverride,
+    hazardWeightOverride: qrCode.hazardWeightOverride,
+    activationStartsAt: qrCode.activationStartsAt,
+    activationEndsAt: qrCode.activationEndsAt,
   };
 }
 
@@ -35,17 +56,46 @@ function clampHazardWeight(value: number): number {
   return Math.trunc(value);
 }
 
+function formatActivationWindow(start: string | null, end: string | null): string {
+  if (!start && !end) {
+    return 'Always active';
+  }
+
+  const startLabel = start ? new Date(start).toLocaleString() : 'Now';
+  const endLabel = end ? new Date(end).toLocaleString() : 'No end';
+
+  return `${startLabel} -> ${endLabel}`;
+}
+
+function downloadQrAsset(qrCode: AdminQrCode): void {
+  if (!qrCode.qrImageUrl) {
+    return;
+  }
+
+  // Use a temporary anchor so operators can quickly save generated CDN assets.
+  const link = document.createElement('a');
+  link.href = qrCode.qrImageUrl;
+  link.download = `${qrCode.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+  link.rel = 'noopener noreferrer';
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
 export default function AdminQrCodes() {
   const [qrCodes, setQrCodes] = useState<AdminQrCode[]>(adminDemoQrCodes);
   const [eventId, setEventId] = useState<string | null>(null);
   const [newQRName, setNewQRName] = useState('');
   const [newQRPoints, setNewQRPoints] = useState('100');
+  const [newQRZone, setNewQRZone] = useState('');
+  const [activationStartsAt, setActivationStartsAt] = useState('');
+  const [activationEndsAt, setActivationEndsAt] = useState('');
   const [isHydrating, setIsHydrating] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draftWeights, setDraftWeights] = useState<Record<string, number>>({});
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string | null>>({});
-  // TODO(figma-sync): Consolidate this split QR management experience with the monolithic Figma Admin QR panel behavior (create, enable/disable, delete, per-code controls from one shared state model). | Figma source: src/app/pages/Admin.tsx QR Codes tab | Impact: admin flow
 
   useEffect(() => {
     let isMounted = true;
@@ -55,23 +105,19 @@ export default function AdminQrCodes() {
       setLoadError(null);
 
       try {
-        // Resolve active event first, then fetch its QR inventory as hazard records.
         const eventResponse = await apiClient.get<EventSummary>(eventEndpoints.getCurrentEvent);
         if (!eventResponse.ok) {
           throw new Error(`Failed to load current event: ${eventResponse.status}`);
         }
 
         const nextEventId = eventResponse.data.id;
-        const qrResponse = await apiClient.get<Hazard[]>(hazardEndpoints.listHazards(nextEventId));
-        if (!qrResponse.ok) {
-          throw new Error(`Failed to load QR inventory: ${qrResponse.status}`);
-        }
+        const qrResponse = await listAdminQRCodes(nextEventId);
 
         if (!isMounted) {
           return;
         }
 
-        const nextQrCodes = qrResponse.data.map(toAdminQrCode);
+        const nextQrCodes = qrResponse.qrCodes.map(toAdminQrCode);
         setEventId(nextEventId);
         setQrCodes(nextQrCodes);
         setDraftWeights(
@@ -85,9 +131,7 @@ export default function AdminQrCodes() {
         setEventId(null);
         setQrCodes(adminDemoQrCodes);
         setDraftWeights(
-          Object.fromEntries(
-            adminDemoQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0])
-          )
+          Object.fromEntries(adminDemoQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0]))
         );
         setLoadError('Live QR inventory unavailable. Showing local demo data.');
       } finally {
@@ -105,57 +149,122 @@ export default function AdminQrCodes() {
   }, []);
 
   const isDemoMode = eventId === null;
-  const canCreateLocalQrCodes = isDemoMode && !isHydrating;
   const activeCount = useMemo(() => qrCodes.filter((code) => code.active).length, [qrCodes]);
 
-  function handleCreateQRCode() {
-    if (!canCreateLocalQrCodes) {
+  async function handleCreateQRCode() {
+    if (isDemoMode || !eventId || isCreating) {
       return;
     }
 
     if (!newQRName.trim()) {
+      setLoadError('QR code name is required.');
       return;
     }
 
     const points = Number.parseInt(newQRPoints, 10);
     if (!Number.isFinite(points) || points <= 0) {
+      setLoadError('Point value must be a positive integer.');
       return;
     }
 
-    const createdId = `qr-${Date.now()}`;
-    setQrCodes((existing) => [
-      {
-        id: createdId,
-        name: newQRName.trim(),
-        points,
-        active: true,
-        scanCount: 0,
-        hazardRatioOverride: null,
-        hazardWeightOverride: null,
-      },
-      ...existing,
-    ]);
+    if (activationStartsAt && activationEndsAt && activationStartsAt >= activationEndsAt) {
+      setLoadError('Activation end must be later than activation start.');
+      return;
+    }
 
-    setDraftWeights((existing) => ({ ...existing, [createdId]: 0 }));
-    setNewQRName('');
-    setNewQRPoints('100');
+    setIsCreating(true);
+    setLoadError(null);
+
+    try {
+      const request: CreateQRCodeRequest = {
+        label: newQRName.trim(),
+        value: points,
+        zone: newQRZone.trim() || undefined,
+        activationStartsAt: activationStartsAt || undefined,
+        activationEndsAt: activationEndsAt || undefined,
+      };
+
+      const created = await createAdminQRCode(eventId, request);
+      const createdCode = toAdminQrCode(created.qrCode);
+
+      setQrCodes((existing) => [createdCode, ...existing]);
+      setDraftWeights((existing) => ({ ...existing, [createdCode.id]: 0 }));
+      setNewQRName('');
+      setNewQRPoints('100');
+      setNewQRZone('');
+      setActivationStartsAt('');
+      setActivationEndsAt('');
+    } catch {
+      setLoadError('Unable to create QR code. Verify n8n QR generation is available.');
+    } finally {
+      setIsCreating(false);
+    }
   }
 
-  function toggleStatus(id: string) {
-    // TODO(figma-sync): Persist enable/disable mutations through live admin APIs to match Figma's operational QR control behavior. | Figma source: src/app/pages/Admin.tsx toggleQRCode action | Impact: admin flow
-    setQrCodes((existing) =>
-      existing.map((code) => (code.id === id ? { ...code, active: !code.active } : code))
-    );
+  async function toggleStatus(id: string) {
+    if (!eventId) {
+      setRowErrors((existing) => ({
+        ...existing,
+        [id]: 'Status updates are unavailable in demo mode.',
+      }));
+      return;
+    }
+
+    const target = qrCodes.find((code) => code.id === id);
+    if (!target) {
+      return;
+    }
+
+    const nextStatus = target.active ? 'DISABLED' : 'ACTIVE';
+    setSavingById((existing) => ({ ...existing, [id]: true }));
+    setRowErrors((existing) => ({ ...existing, [id]: null }));
+
+    try {
+      await setAdminQRCodeStatus(eventId, id, {
+        status: nextStatus,
+      });
+
+      setQrCodes((existing) =>
+        existing.map((code) => (code.id === id ? { ...code, active: !code.active } : code))
+      );
+    } catch {
+      setRowErrors((existing) => ({
+        ...existing,
+        [id]: 'Unable to update QR status. Try again.',
+      }));
+    } finally {
+      setSavingById((existing) => ({ ...existing, [id]: false }));
+    }
   }
 
-  function removeCode(id: string) {
-    // TODO(figma-sync): Persist QR deletion to backend instead of local-only removal so the admin screen remains consistent across sessions. | Figma source: src/app/pages/Admin.tsx deleteQRCode action | Impact: admin flow
-    setQrCodes((existing) => existing.filter((code) => code.id !== id));
-    setDraftWeights((existing) => {
-      const next = { ...existing };
-      delete next[id];
-      return next;
-    });
+  async function removeCode(id: string) {
+    if (!eventId) {
+      setRowErrors((existing) => ({
+        ...existing,
+        [id]: 'Delete is unavailable in demo mode.',
+      }));
+      return;
+    }
+
+    setSavingById((existing) => ({ ...existing, [id]: true }));
+    setRowErrors((existing) => ({ ...existing, [id]: null }));
+
+    try {
+      await deleteAdminQRCode(eventId, id);
+      setQrCodes((existing) => existing.filter((code) => code.id !== id));
+      setDraftWeights((existing) => {
+        const next = { ...existing };
+        delete next[id];
+        return next;
+      });
+    } catch {
+      setRowErrors((existing) => ({
+        ...existing,
+        [id]: 'Unable to delete QR code. Try again.',
+      }));
+    } finally {
+      setSavingById((existing) => ({ ...existing, [id]: false }));
+    }
   }
 
   function updateDraftWeight(id: string, value: number) {
@@ -240,10 +349,9 @@ export default function AdminQrCodes() {
           <Plus className="w-6 h-6 text-[#00D4FF]" />
           Create New QR Code
         </h3>
-        {!isDemoMode && (
+        {isDemoMode && (
           <p className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
-            Live QR creation is disabled because create requests are not persisted by the backend
-            yet.
+            Live QR creation is disabled in demo mode.
           </p>
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -266,14 +374,45 @@ export default function AdminQrCodes() {
               className="w-full px-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]"
             />
           </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Zone (Optional)</label>
+            <input
+              type="text"
+              value={newQRZone}
+              onChange={(event) => setNewQRZone(event.target.value)}
+              placeholder="e.g., Atrium"
+              className="w-full px-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Activation Start (Optional)</label>
+            <input
+              type="datetime-local"
+              value={activationStartsAt}
+              onChange={(event) => setActivationStartsAt(event.target.value)}
+              className="w-full px-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Activation End (Optional)</label>
+            <input
+              type="datetime-local"
+              value={activationEndsAt}
+              onChange={(event) => setActivationEndsAt(event.target.value)}
+              className="w-full px-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+            />
+          </div>
           <div className="flex items-end">
             <button
               type="button"
-              onClick={handleCreateQRCode}
-              disabled={!canCreateLocalQrCodes}
-              className="w-full py-3 px-6 bg-gradient-to-r from-[#00D4FF] to-[#00A3CC] text-black font-['DM_Sans'] font-bold rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => {
+                void handleCreateQRCode();
+              }}
+              disabled={isDemoMode || isCreating}
+              className="w-full py-3 px-6 bg-gradient-to-r from-[#00D4FF] to-[#00A3CC] text-black font-['DM_Sans'] font-bold rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
-              {isDemoMode ? 'Generate QR Code' : 'Creation Disabled In Live Mode'}
+              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Generate QR Code
             </button>
           </div>
         </div>
@@ -311,13 +450,24 @@ export default function AdminQrCodes() {
               </div>
 
               <div className="bg-white p-4 rounded-lg mb-4">
-                {/* TODO(figma-sync): Replace static QR icon placeholder with generated/real QR output parity used in Figma Admin cards. | Figma source: src/app/pages/Admin.tsx QRCodeSVG preview | Impact: admin flow */}
-                <div className="aspect-square w-full rounded-md border border-gray-200 grid place-items-center bg-[linear-gradient(135deg,#f8fafc,#e2e8f0)]">
-                  <QrCode className="w-20 h-20 text-gray-800" />
-                </div>
+                {qrCode.qrImageUrl ? (
+                  <img
+                    src={qrCode.qrImageUrl}
+                    alt={`QR code for ${qrCode.name}`}
+                    className="aspect-square w-full rounded-md border border-gray-200 object-contain"
+                  />
+                ) : (
+                  <div className="aspect-square w-full rounded-md border border-gray-200 grid place-items-center bg-[linear-gradient(135deg,#f8fafc,#e2e8f0)]">
+                    <QrCode className="w-20 h-20 text-gray-800" />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Zone:</span>
+                  <span className="font-mono text-gray-200">{qrCode.zone ?? 'Unassigned'}</span>
+                </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Points:</span>
                   <span className="font-mono text-[#39FF14]">+{qrCode.points}</span>
@@ -326,6 +476,7 @@ export default function AdminQrCodes() {
                   <span className="text-gray-400">Scans:</span>
                   <span className="font-mono text-[#00D4FF]">{qrCode.scanCount}</span>
                 </div>
+                <div className="text-xs text-gray-400">{formatActivationWindow(qrCode.activationStartsAt, qrCode.activationEndsAt)}</div>
               </div>
 
               <div className="mb-4 rounded-lg border border-gray-700/80 bg-black/30 p-3 space-y-3">
@@ -334,9 +485,7 @@ export default function AdminQrCodes() {
                     Hazard Randomizer
                   </p>
                   <span className="text-xs font-mono text-[#00D4FF]">
-                    {qrCode.hazardWeightOverride === null
-                      ? 'Fallback'
-                      : `${qrCode.hazardWeightOverride}%`}
+                    {qrCode.hazardWeightOverride === null ? 'Fallback' : `${qrCode.hazardWeightOverride}%`}
                   </span>
                 </div>
 
@@ -362,20 +511,20 @@ export default function AdminQrCodes() {
                   />
                   <button
                     type="button"
-                    onClick={() => persistHazardWeight(qrCode.id, clampHazardWeight(draftWeight))}
+                    onClick={() => {
+                      void persistHazardWeight(qrCode.id, clampHazardWeight(draftWeight));
+                    }}
                     disabled={isSaving}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#00D4FF]/15 border border-[#00D4FF]/30 text-[#00D4FF] text-xs font-semibold disabled:opacity-60"
                   >
-                    {isSaving ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Save className="w-3 h-3" />
-                    )}
+                    {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                     Save
                   </button>
                   <button
                     type="button"
-                    onClick={() => persistHazardWeight(qrCode.id, null)}
+                    onClick={() => {
+                      void persistHazardWeight(qrCode.id, null);
+                    }}
                     disabled={isSaving}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs font-semibold disabled:opacity-60"
                   >
@@ -397,11 +546,14 @@ export default function AdminQrCodes() {
                 {rowError && <p className="text-xs text-red-300">{rowError}</p>}
               </div>
 
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
                   type="button"
-                  onClick={() => toggleStatus(qrCode.id)}
-                  className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm flex items-center justify-center gap-1 ${
+                  onClick={() => {
+                    void toggleStatus(qrCode.id);
+                  }}
+                  disabled={isSaving}
+                  className={`py-2 px-3 rounded-lg font-medium text-sm flex items-center justify-center gap-1 disabled:opacity-60 ${
                     qrCode.active
                       ? 'bg-[#FF3939]/20 text-[#FF3939] border border-[#FF3939]/30 hover:bg-[#FF3939]/30'
                       : 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30 hover:bg-[#39FF14]/30'
@@ -412,12 +564,26 @@ export default function AdminQrCodes() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => removeCode(qrCode.id)}
-                  className="py-2 px-3 bg-gray-800 text-gray-400 rounded-lg hover:bg-gray-700 hover:text-white transition-all"
+                  onClick={() => downloadQrAsset(qrCode)}
+                  disabled={!qrCode.qrImageUrl}
+                  className="py-2 px-3 bg-[#00D4FF]/20 text-[#00D4FF] rounded-lg hover:bg-[#00D4FF]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Download className="w-4 h-4" />
+                  Download
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void removeCode(qrCode.id);
+                }}
+                disabled={isSaving}
+                className="w-full py-2 px-3 bg-gray-800 text-gray-400 rounded-lg hover:bg-gray-700 hover:text-white transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
             </article>
           );
         })}

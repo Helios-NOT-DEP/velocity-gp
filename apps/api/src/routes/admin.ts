@@ -12,9 +12,11 @@ import {
   adminEventTeamParamsSchema,
   adminUserParamsSchema,
   adminRosterListQuerySchema,
+  createAdminQRCodeSchema,
   manualPitControlSchema,
   rosterImportApplySchema,
   rosterImportPreviewSchema,
+  setAdminQRCodeStatusSchema,
   updateRosterAssignmentSchema,
   updateQrHazardRandomizerSchema,
   updateHeliosRoleSchema,
@@ -27,6 +29,12 @@ import {
   updateHeliosRole,
   updateRaceControl,
 } from '../services/adminControlService.js';
+import {
+  createAdminQRCode,
+  listAdminQRCodes,
+  setAdminQRCodeStatus,
+  softDeleteAdminQRCode,
+} from '../services/adminQrCodeService.js';
 import {
   applyRosterImport,
   listAdminRoster,
@@ -131,6 +139,80 @@ adminRouter.post(
     response.json(
       successResponse(
         await applyRosterImport(eventId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
+      )
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/qr-codes',
+  validate(adminEventParamsSchema, 'params'),
+  validate(createAdminQRCodeSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await createAdminQRCode(eventId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
+      )
+    );
+  })
+);
+
+adminRouter.get(
+  '/admin/events/:eventId/qr-codes',
+  validate(adminEventParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+
+    response.json(successResponse(await listAdminQRCodes(eventId), { requestId: response.locals.requestId }));
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/qr-codes/:qrCodeId/status',
+  validate(adminEventQrCodeParamsSchema, 'params'),
+  validate(setAdminQRCodeStatusSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const qrCodeId = String(request.params.qrCodeId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await setAdminQRCodeStatus(eventId, qrCodeId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
+      )
+    );
+  })
+);
+
+adminRouter.delete(
+  '/admin/events/:eventId/qr-codes/:qrCodeId',
+  validate(adminEventQrCodeParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const qrCodeId = String(request.params.qrCodeId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await softDeleteAdminQRCode(eventId, qrCodeId, {
           actorUserId: authContext?.userId,
         }),
         {

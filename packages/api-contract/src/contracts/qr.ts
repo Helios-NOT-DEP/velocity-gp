@@ -20,6 +20,7 @@ export interface QRCodeSummary {
   readonly value: number;
   readonly zone: string | null;
   readonly payload: string;
+  readonly qrImageUrl: string | null;
   readonly status: QRCodeStatus;
   readonly scanCount: number;
   readonly hazardRatioOverride: number | null;
@@ -32,15 +33,22 @@ export interface QRCodeSummary {
  * Payload to bootstrap a new QR Code into an active Event's lookup pool.
  */
 export interface CreateQRCodeRequest {
-  readonly eventId: string;
   readonly label: string;
   readonly value: number;
-  readonly payload: string;
   readonly zone?: string;
   readonly activationStartsAt?: string;
   readonly activationEndsAt?: string;
   readonly hazardRatioOverride?: number;
   readonly hazardWeightOverride?: number | null;
+}
+
+/**
+ * Response payload returned after creating a new QR code in an event inventory.
+ */
+export interface CreateQRCodeResponse {
+  readonly eventId: string;
+  readonly qrCode: QRCodeSummary;
+  readonly auditId: string;
 }
 
 /**
@@ -59,6 +67,17 @@ export interface SetQRCodeStatusResponse {
   readonly qrCodeId: string;
   readonly status: QRCodeStatus;
   readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+/**
+ * Response payload for soft-deleting a QR code from active inventory.
+ */
+export interface DeleteQRCodeResponse {
+  readonly eventId: string;
+  readonly qrCodeId: string;
+  readonly deletedAt: string;
+  readonly auditId: string;
 }
 
 /**

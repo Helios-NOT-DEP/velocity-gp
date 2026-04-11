@@ -4,10 +4,15 @@ export interface AdminQrCode {
   id: string;
   name: string;
   points: number;
+  zone: string | null;
+  payload: string;
+  qrImageUrl: string | null;
   active: boolean;
   scanCount: number;
   hazardRatioOverride: number | null;
   hazardWeightOverride: number | null;
+  activationStartsAt: string | null;
+  activationEndsAt: string | null;
 }
 
 export interface AdminPlayerRow {
@@ -22,37 +27,57 @@ export const adminDemoQrCodes: AdminQrCode[] = [
     id: 'qr-alpha',
     name: 'Checkpoint Alpha',
     points: 100,
+    zone: 'Atrium',
+    payload: 'VG-ALPHA-01',
+    qrImageUrl: null,
     active: true,
     scanCount: 17,
     hazardRatioOverride: null,
     hazardWeightOverride: null,
+    activationStartsAt: null,
+    activationEndsAt: null,
   },
   {
     id: 'qr-bridge',
     name: 'Bridge Sprint',
     points: 150,
+    zone: 'Bridge',
+    payload: 'VG-BRIDGE-02',
+    qrImageUrl: null,
     active: true,
     scanCount: 13,
     hazardRatioOverride: 5,
     hazardWeightOverride: 30,
+    activationStartsAt: null,
+    activationEndsAt: null,
   },
   {
     id: 'qr-pitwall',
     name: 'Pit Wall Bonus',
     points: 80,
+    zone: 'Pit Wall',
+    payload: 'VG-PITWALL-03',
+    qrImageUrl: null,
     active: false,
     scanCount: 9,
     hazardRatioOverride: null,
     hazardWeightOverride: null,
+    activationStartsAt: null,
+    activationEndsAt: null,
   },
   {
     id: 'qr-grid',
     name: 'Grid Launch',
     points: 120,
+    zone: 'Starting Grid',
+    payload: 'VG-GRID-04',
+    qrImageUrl: null,
     active: true,
     scanCount: 11,
     hazardRatioOverride: null,
     hazardWeightOverride: null,
+    activationStartsAt: null,
+    activationEndsAt: null,
   },
 ];
 

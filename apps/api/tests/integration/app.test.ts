@@ -1,7 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app/createApp.js';
 import { env } from '../../src/config/env.js';
@@ -1103,6 +1103,62 @@ describe('velocity gp backend', () => {
     expect(response.body.data.state).toBe('PAUSED');
   });
 
+  it('creates QR inventory entries and generates downloadable assets via n8n webhook', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          qrImageURL: 'https://cdn.velocitygp.app/qr/new-code.png',
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        }
+      )
+    );
+
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        label: `Generated QR ${token}`,
+        value: 160,
+        zone: 'North Ramp',
+        activationStartsAt: '2026-04-06T10:15:00.000Z',
+        activationEndsAt: '2026-04-06T17:15:00.000Z',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.eventId).toBe(fixtureIds.eventId);
+    expect(response.body.data.qrCode.status).toBe('ACTIVE');
+    expect(response.body.data.qrCode.zone).toBe('North Ramp');
+    expect(response.body.data.qrCode.qrImageUrl).toBe('https://cdn.velocitygp.app/qr/new-code.png');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [calledUrl, calledInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(calledUrl).toContain('/webhook/dev/QRCodeGen');
+    const generationBody = JSON.parse(String(calledInit.body)) as { id: string; url: string };
+    expect(generationBody.id).toBe(response.body.data.qrCode.id);
+    expect(generationBody.url).toContain('/scan/');
+
+    const persisted = await prisma.qRCode.findUnique({
+      where: {
+        id: response.body.data.qrCode.id,
+      },
+      select: {
+        qrImageUrl: true,
+        deletedAt: true,
+      },
+    });
+    expect(persisted?.qrImageUrl).toBe('https://cdn.velocitygp.app/qr/new-code.png');
+    expect(persisted?.deletedAt).toBeNull();
+
+    fetchSpy.mockRestore();
+  });
+
   it('updates per-QR hazard randomizer weight through admin endpoints', async () => {
     const response = await request(app)
       .patch(
@@ -1154,6 +1210,52 @@ describe('velocity gp backend', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
     }
+  });
+
+  it('updates QR status through admin endpoints', async () => {
+    const response = await request(app)
+      .patch(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}/status`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ status: 'DISABLED', reason: 'leaked code' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.status).toBe('DISABLED');
+
+    const persisted = await prisma.qRCode.findUnique({
+      where: { id: fixtureIds.qrCodeId },
+      select: { status: true },
+    });
+    expect(persisted?.status).toBe('DISABLED');
+  });
+
+  it('soft-deletes QR codes from admin inventory without removing historical rows', async () => {
+    const response = await request(app)
+      .delete(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.qrCodeId).toBe(fixtureIds.qrCodeId);
+
+    const [persisted, inventory] = await Promise.all([
+      prisma.qRCode.findUnique({
+        where: { id: fixtureIds.qrCodeId },
+        select: { deletedAt: true, status: true },
+      }),
+      request(app)
+        .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin'),
+    ]);
+
+    expect(persisted?.deletedAt).not.toBeNull();
+    expect(persisted?.status).toBe('DISABLED');
+    expect(inventory.status).toBe(200);
+    const inventoryIds = (inventory.body.data.qrCodes as Array<{ id: string }>).map((item) => item.id);
+    expect(inventoryIds).not.toContain(fixtureIds.qrCodeId);
   });
 
   it('validates admin payloads for manual pit control', async () => {

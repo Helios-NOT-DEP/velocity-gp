@@ -481,6 +481,7 @@ export async function updateQrHazardRandomizer(
           where: {
             id: qrCodeId,
             eventId,
+            deletedAt: null,
           },
           select: {
             id: true,

@@ -101,6 +101,18 @@ describe('QR payload classifier', () => {
     });
   });
 
+  it('treats trusted /scan/:payload URLs as gameplay payloads', () => {
+    expect(
+      classifyQrPayload(
+        'https://dev.velocitygp.app/scan/VG-r4Nd0m_Ab12',
+        'https://dev.velocitygp.app'
+      )
+    ).toEqual({
+      kind: 'gameplay',
+      payload: 'VG-r4Nd0m_Ab12',
+    });
+  });
+
   it('rejects URL payloads with a different domain', () => {
     const result = classifyQrPayload(
       'https://evil.example/login/callback?token=abc123',
