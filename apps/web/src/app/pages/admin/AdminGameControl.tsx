@@ -155,9 +155,15 @@ export default function AdminGameControl() {
         state: nextState,
       });
       setRaceControlState(response.state);
-      await hydrateAudits(eventId);
     } catch {
       setSettingsError('Unable to update race control state.');
+      return;
+    }
+
+    try {
+      await hydrateAudits(eventId);
+    } catch {
+      setSettingsError('Race control updated, but audit feed could not be refreshed.');
     } finally {
       setIsUpdatingRaceControl(false);
     }
@@ -174,9 +180,15 @@ export default function AdminGameControl() {
       await updateEventHazardSettings(eventId, {
         globalHazardRatio,
       });
-      await hydrateAudits(eventId);
     } catch {
       setSettingsError('Unable to save global hazard ratio.');
+      return;
+    }
+
+    try {
+      await hydrateAudits(eventId);
+    } catch {
+      setSettingsError('Global hazard ratio saved, but audit feed could not be refreshed.');
     } finally {
       setIsSavingSettings(false);
     }

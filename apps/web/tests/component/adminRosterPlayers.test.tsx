@@ -338,7 +338,7 @@ describe('AdminPlayers roster workflows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(9);
+      expect(fetchMock).toHaveBeenCalledTimes(8);
       expect(screen.getByRole('button', { name: 'Revoke' })).toBeTruthy();
     });
 

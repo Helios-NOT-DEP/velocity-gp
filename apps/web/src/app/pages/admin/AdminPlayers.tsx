@@ -177,7 +177,7 @@ export default function AdminPlayers() {
       await updateHeliosRole(userId, {
         isHelios: !isHelios,
       });
-      await Promise.all([loadRoster(eventId), refreshAuditSummary(eventId)]);
+      await loadRoster(eventId);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to update Helios role.');
     } finally {
