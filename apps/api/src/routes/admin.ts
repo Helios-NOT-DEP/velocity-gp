@@ -35,6 +35,7 @@ import {
   createHazardMultiplierRule,
   deleteHazardMultiplierRule,
   getEventHazardSettings,
+  getRaceControl,
   listHazardMultiplierRules,
   listAdminAudits,
   manualPitControl,
@@ -261,6 +262,19 @@ adminRouter.post(
           requestId: response.locals.requestId,
         }
       )
+    );
+  })
+);
+
+adminRouter.get(
+  '/admin/events/:eventId/race-control',
+  validate(adminEventParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    response.json(
+      successResponse(await getRaceControl(eventId), {
+        requestId: response.locals.requestId,
+      })
     );
   })
 );

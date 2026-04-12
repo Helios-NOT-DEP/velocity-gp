@@ -1306,6 +1306,116 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.eventId).toBe(fixtureIds.eventId);
     expect(response.body.data.state).toBe('PAUSED');
+    expect(response.body.data.auditId).toBeTruthy();
+  });
+
+  it('reads race control state through admin endpoints', async () => {
+    const response = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/race-control`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.eventId).toBe(fixtureIds.eventId);
+    expect(response.body.data.state).toBe('PAUSED');
+  });
+
+  it('blocks scans with RACE_PAUSED while race control is paused', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
+      .send({ playerId: fixtureIds.playerId, qrPayload: fixtureIds.qrPayload });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.outcome).toBe('BLOCKED');
+    expect(response.body.data.errorCode).toBe('RACE_PAUSED');
+  });
+
+  it('updates helios role and records HELIOS audit entries', async () => {
+    const assignResponse = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/helios-role`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ isHelios: true, reason: 'staffing shift' });
+
+    expect(assignResponse.status).toBe(200);
+    expect(assignResponse.body.success).toBe(true);
+    expect(assignResponse.body.data.userId).toBe(fixtureIds.playerUserId);
+    expect(assignResponse.body.data.isHelios).toBe(true);
+    expect(assignResponse.body.data.auditId).toBeTruthy();
+
+    const revokeResponse = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/helios-role`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ isHelios: false, reason: 'shift complete' });
+
+    expect(revokeResponse.status).toBe(200);
+    expect(revokeResponse.body.success).toBe(true);
+    expect(revokeResponse.body.data.isHelios).toBe(false);
+
+    const [updatedUser, assignedAudit, revokedAudit] = await Promise.all([
+      prisma.user.findUnique({
+        where: {
+          id: fixtureIds.playerUserId,
+        },
+        select: {
+          isHelios: true,
+          role: true,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          actionType: 'HELIOS_ASSIGNED',
+          targetId: fixtureIds.playerUserId,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          actionType: 'HELIOS_REVOKED',
+          targetId: fixtureIds.playerUserId,
+        },
+      }),
+    ]);
+
+    expect(updatedUser?.isHelios).toBe(false);
+    expect(updatedUser?.role).toBe('PLAYER');
+    expect(assignedAudit).not.toBeNull();
+    expect(revokedAudit).not.toBeNull();
+  });
+
+  it('lists race-control and helios actions in admin audit feed', async () => {
+    const response = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/audits`)
+      .query({ limit: 100 })
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+
+    const actionTypes = (response.body.data.items as Array<{ actionType: string }>).map(
+      (item) => item.actionType
+    );
+
+    expect(actionTypes).toContain('RACE_PAUSED');
+    expect(actionTypes).toContain('HELIOS_ASSIGNED');
+    expect(actionTypes).toContain('HELIOS_REVOKED');
+
+    // Restore ACTIVE state so downstream scan tests in this suite stay unblocked.
+    const resumeResponse = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/race-control`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ state: 'ACTIVE', reason: 'test suite resume' });
+
+    expect(resumeResponse.status).toBe(200);
+    expect(resumeResponse.body.success).toBe(true);
+    expect(resumeResponse.body.data.state).toBe('ACTIVE');
   });
 
   it('creates QR inventory entries and generates downloadable assets via n8n webhook', async () => {

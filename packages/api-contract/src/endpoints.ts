@@ -121,6 +121,8 @@ export const rescueEndpoints = {
 export const adminEndpoints = {
   /** Returns admin-specific session metadata. */
   getSession: '/admin/session',
+  /** Reads the active race-control state for an event. */
+  getRaceControl: (eventId: string) => `/admin/events/${eventId}/race-control`,
   /** Pauses/resumes the active race or impacts global race mechanics. */
   updateRaceControl: (eventId: string) => `/admin/events/${eventId}/race-control`,
   /** Forcibly places or clears a team from a PIT penalty sequence. */

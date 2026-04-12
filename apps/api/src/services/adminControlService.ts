@@ -2,6 +2,7 @@ import type {
   CreateHazardMultiplierRuleRequest,
   CreateHazardMultiplierRuleResponse,
   DeleteHazardMultiplierRuleResponse,
+  GetRaceControlResponse,
   GetEventHazardSettingsResponse,
   HazardMultiplierRule,
   ListAdminAuditsResponse,
@@ -152,6 +153,32 @@ function deriveLegacyRoleFromCapabilities(input: {
   }
 
   return 'ADMIN';
+}
+
+/**
+ * Reads race control state for one event.
+ */
+export async function getRaceControl(eventId: string): Promise<GetRaceControlResponse> {
+  const config = await prisma.eventConfig.findUnique({
+    where: {
+      eventId,
+    },
+    select: {
+      eventId: true,
+      raceControlState: true,
+      updatedAt: true,
+    },
+  });
+
+  if (!config) {
+    throw new ValidationError('Event configuration does not exist.', { eventId });
+  }
+
+  return {
+    eventId: config.eventId,
+    state: config.raceControlState,
+    updatedAt: config.updatedAt.toISOString(),
+  };
 }
 
 /**
@@ -852,7 +879,10 @@ export async function updateUserCapabilities(
           },
         });
 
-        const latestEvent = await tx.event.findFirst({
+        const activeEvent = await tx.event.findFirst({
+          where: {
+            status: 'ACTIVE',
+          },
           orderBy: {
             updatedAt: 'desc',
           },
@@ -861,7 +891,7 @@ export async function updateUserCapabilities(
           },
         });
 
-        if (!latestEvent) {
+        if (!activeEvent) {
           throw new ValidationError('Cannot create audit entry without an event context.', {
             userId,
           });
@@ -881,7 +911,7 @@ export async function updateUserCapabilities(
 
         const audit = await tx.adminActionAudit.create({
           data: {
-            eventId: latestEvent.id,
+            eventId: activeEvent.id,
             actorUserId: actorId,
             actionType,
             targetType: 'USER',
