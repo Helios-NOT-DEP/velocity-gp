@@ -240,6 +240,13 @@ async function processScanInTransaction(
       },
     });
 
+    // Apply the penalty to the team's live score so the leaderboard reflects it.
+    const updatedTeam = await tx.team.update({
+      where: { id: team.id },
+      data: { score: { decrement: Math.abs(eventConfig.invalidScanPenalty) } },
+      select: { score: true },
+    });
+
     await tx.player.update({
       where: {
         id: playerWithTeam.id,
@@ -279,6 +286,7 @@ async function processScanInTransaction(
       scannedAt: scanRecord.createdAt.toISOString(),
       message,
       pointsAwarded,
+      teamScore: updatedTeam.score,
       errorCode: 'QR_NOT_FOUND',
       flaggedForReview: true,
     };

@@ -40,10 +40,21 @@ export interface SessionTokenClaims {
 type AuthTokenClaims = MagicLinkTokenClaims | SessionTokenClaims;
 
 /**
- * Resolves signing secret with a local-development fallback.
+ * Resolves signing secret. Throws in production if not configured.
+ * In non-production environments falls back to a local dev placeholder.
  */
 function getTokenSecret(): string {
-  return env.AUTH_SECRET ?? 'velocity-gp-dev-auth-secret';
+  if (env.AUTH_SECRET && env.AUTH_SECRET.trim().length > 0) {
+    return env.AUTH_SECRET;
+  }
+
+  if (env.NODE_ENV === 'production') {
+    // env.ts assertRequiredSecretsInProduction() should have already caught this at
+    // startup, but we guard here as a belt-and-suspenders safety net.
+    throw new Error('AUTH_SECRET is required in production and must not be empty.');
+  }
+
+  return 'velocity-gp-dev-auth-secret';
 }
 
 function base64UrlEncode(value: string): string {

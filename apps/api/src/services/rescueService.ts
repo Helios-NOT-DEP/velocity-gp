@@ -7,8 +7,7 @@ import type {
 import type { Prisma } from '../../prisma/generated/client.js';
 import { prisma } from '../db/client.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
-import { AppError, ValidationError } from '../utils/appError.js';
-import { placeholderEvent, placeholderRescue } from './placeholderData.js';
+import { AppError, NotFoundError, ValidationError } from '../utils/appError.js';
 import { publishTeamReleaseEvent, releaseTeamFromPitInTransaction } from './pitReleaseService.js';
 
 /**
@@ -294,12 +293,7 @@ export async function getRescueStatus(playerId: string): Promise<HeliosRescueFlo
     };
   }
 
-  return {
-    ...placeholderRescue,
-    playerId,
-    eventId: placeholderEvent.id,
-    status: playerId === placeholderRescue.playerId ? 'COMPLETED' : 'IN_PROGRESS',
-  };
+  throw new NotFoundError('No rescue record found for this player.', { playerId });
 }
 
 /**

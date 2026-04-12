@@ -1,5 +1,5 @@
 import type {
-  AdminAuditEntry,
+  ListAdminAuditsResponse,
   ManualPitControlRequest,
   ManualPitControlResponse,
   UpdateHeliosRoleRequest,
@@ -14,57 +14,13 @@ import type { Prisma } from '../../prisma/generated/client.js';
 import { prisma } from '../db/client.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
+import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.js';
 import { publishTeamReleaseEvent, releaseTeamFromPitInTransaction } from './pitReleaseService.js';
 
 /**
  * Admin control service for race state, manual pit operations, Helios role
  * management, hazard randomizer configuration, and admin audit retrieval.
  */
-interface AdminActionContext {
-  readonly actorUserId?: string;
-}
-
-/**
- * Resolves the effective actor for admin actions.
- *
- * Falls back to any ADMIN user when an explicit actor is missing or invalid.
- */
-async function resolveActorUserId(
-  tx: Prisma.TransactionClient,
-  actorUserId: string | undefined
-): Promise<string> {
-  if (actorUserId) {
-    const actor = await tx.user.findUnique({
-      where: {
-        id: actorUserId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (actor) {
-      return actor.id;
-    }
-  }
-
-  const fallbackAdmin = await tx.user.findFirst({
-    where: {
-      role: 'ADMIN',
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!fallbackAdmin) {
-    throw new ValidationError('Unable to resolve admin actor for this operation.', {
-      actorUserId,
-    });
-  }
-
-  return fallbackAdmin.id;
-}
 
 /**
  * Parses an optional pit-stop expiry timestamp from admin requests.
@@ -548,15 +504,25 @@ export async function updateQrHazardRandomizer(
 
 /**
  * Lists admin audit records for an event in reverse chronological order.
+ * Supports cursor-based pagination to prevent unbounded query sizes.
  */
-export async function listAdminAudits(eventId: string): Promise<AdminAuditEntry[]> {
+export async function listAdminAudits(
+  eventId: string,
+  options: { cursor?: string; limit?: number } = {}
+): Promise<ListAdminAuditsResponse> {
+  const limit = options.limit ?? 50;
+
   const audits = await prisma.adminActionAudit.findMany({
-    where: {
-      eventId,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
+    where: { eventId },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    // Fetch one extra to determine if there is a next page.
+    take: limit + 1,
+    ...(options.cursor
+      ? {
+          cursor: { id: options.cursor },
+          skip: 1,
+        }
+      : {}),
     select: {
       id: true,
       eventId: true,
@@ -569,14 +535,21 @@ export async function listAdminAudits(eventId: string): Promise<AdminAuditEntry[
     },
   });
 
-  return audits.map((audit) => ({
-    id: audit.id,
-    eventId: audit.eventId,
-    actorUserId: audit.actorUserId,
-    actionType: audit.actionType,
-    targetType: audit.targetType,
-    targetId: audit.targetId,
-    details: jsonDetailsToRecord(audit.details),
-    createdAt: audit.createdAt.toISOString(),
-  }));
+  const hasNextPage = audits.length > limit;
+  const page = hasNextPage ? audits.slice(0, limit) : audits;
+  const nextCursor = hasNextPage ? (page[page.length - 1]?.id ?? null) : null;
+
+  return {
+    items: page.map((audit) => ({
+      id: audit.id,
+      eventId: audit.eventId,
+      actorUserId: audit.actorUserId,
+      actionType: audit.actionType,
+      targetType: audit.targetType,
+      targetId: audit.targetId,
+      details: jsonDetailsToRecord(audit.details),
+      createdAt: audit.createdAt.toISOString(),
+    })),
+    nextCursor,
+  };
 }

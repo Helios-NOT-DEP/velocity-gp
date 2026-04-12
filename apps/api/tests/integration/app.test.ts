@@ -43,6 +43,23 @@ describe('velocity gp backend', () => {
     };
   }
 
+  function createPlayerSessionAuthHeader(
+    overrides?: Partial<{ playerId: string; userId: string; teamId: string }>
+  ): string {
+    const sessionToken = createSessionToken({
+      userId: overrides?.userId ?? fixtureIds.playerUserId,
+      playerId: overrides?.playerId ?? fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      teamId: overrides?.teamId ?? fixtureIds.teamId,
+      teamStatus: 'ACTIVE',
+      role: 'player',
+      email: `player-${token}@velocitygp.dev`,
+      displayName: 'Player Fixture',
+    });
+
+    return `Bearer ${sessionToken}`;
+  }
+
   beforeAll(async () => {
     const now = new Date();
 
@@ -255,12 +272,38 @@ describe('velocity gp backend', () => {
   it('accepts canonical scan submissions and returns typed outcomes', async () => {
     const safeResponse = await request(app)
       .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
       .send({ playerId: fixtureIds.playerId, qrPayload: fixtureIds.qrPayload });
 
     expect(safeResponse.status).toBe(200);
     expect(safeResponse.body.success).toBe(true);
     expect(safeResponse.body.data.outcome).toBe('SAFE');
     expect(safeResponse.body.data.pointsAwarded).toBeGreaterThan(0);
+  });
+
+  it('accepts scan submissions for legacy header-auth players', async () => {
+    const legacyPayload = `VG-LEGACY-${token.toUpperCase()}`;
+    await prisma.qRCode.create({
+      data: {
+        id: `qr-legacy-${token}`,
+        eventId: fixtureIds.eventId,
+        label: `Legacy QR ${token}`,
+        value: 20,
+        zone: 'Legacy Zone',
+        payload: legacyPayload,
+        status: 'ACTIVE',
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('x-user-id', fixtureIds.playerId)
+      .set('x-user-role', 'player')
+      .send({ playerId: fixtureIds.playerId, qrPayload: legacyPayload });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.outcome).toBe('SAFE');
   });
 
   it('supports legacy /hazards/scan alias with matching contract shape', async () => {
@@ -322,6 +365,7 @@ describe('velocity gp backend', () => {
 
     const scanResponse = await request(app)
       .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
       .send({
         playerId: fixtureIds.playerId,
         qrPayload: feedQrPayload,
@@ -434,12 +478,59 @@ describe('velocity gp backend', () => {
 
     const response = await request(app)
       .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
       .send({ playerId: fixtureIds.playerId, qrPayload: futurePayload });
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.outcome).toBe('INVALID');
     expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
+  });
+
+  it('returns duplicate scan outcomes with HTTP 200 for successful processing', async () => {
+    const authorization = createPlayerSessionAuthHeader();
+    const duplicatePayload = `VG-DUPLICATE-${token.toUpperCase()}`;
+
+    await prisma.qRCode.create({
+      data: {
+        id: `qr-duplicate-${token}`,
+        eventId: fixtureIds.eventId,
+        label: `Duplicate QR ${token}`,
+        value: 10,
+        zone: 'Duplicate Zone',
+        payload: duplicatePayload,
+        status: 'ACTIVE',
+      },
+    });
+
+    const firstResponse = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', authorization)
+      .send({ playerId: fixtureIds.playerId, qrPayload: duplicatePayload });
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.body.data.outcome).toBe('SAFE');
+
+    const duplicateResponse = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', authorization)
+      .send({ playerId: fixtureIds.playerId, qrPayload: duplicatePayload });
+    expect(duplicateResponse.status).toBe(200);
+    expect(duplicateResponse.body.success).toBe(true);
+    expect(duplicateResponse.body.data.outcome).toBe('DUPLICATE');
+  });
+
+  it('rejects player sessions that submit scans for a different playerId', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
+      .send({
+        playerId: fixtureIds.unassignedPlayerId,
+        qrPayload: fixtureIds.qrPayload,
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('FORBIDDEN');
   });
 
   it('validates request bodies', async () => {

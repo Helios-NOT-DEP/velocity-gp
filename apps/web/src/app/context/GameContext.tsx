@@ -69,21 +69,6 @@ export const useGame = () => {
   return context;
 };
 
-const MOCK_TEAMS: Team[] = [
-  { id: 'team-apex-comets', name: 'Apex Comets', score: 1260, rank: 1, inPitStop: false },
-  { id: 'team-drift-runners', name: 'Drift Runners', score: 1110, rank: 2, inPitStop: false },
-  {
-    id: 'team-nova-thunder',
-    name: 'Nova Thunder',
-    score: 920,
-    rank: 3,
-    inPitStop: true,
-    pitStopExpiresAt: new Date(Date.now() + 660 * 1000).toISOString(),
-  },
-  { id: 'team-turbo-tigers', name: 'Turbo Tigers', score: 880, rank: 4, inPitStop: false },
-  { id: 'team-neon-ninjas', name: 'Neon Ninjas', score: 820, rank: 5, inPitStop: false },
-];
-
 function withUpdatedRanks(teams: Team[]): Team[] {
   const sorted = [...teams].sort((a, b) => b.score - a.score);
   const rankById = new Map(sorted.map((team, index) => [team.id, index + 1]));
@@ -106,7 +91,7 @@ function resolvePitStopSeconds(pitStopExpiresAt: string): number {
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [gameState, setGameState] = useState<GameState>({
     currentUser: null,
-    teams: MOCK_TEAMS,
+    teams: [],
     currentTeam: null,
     scans: [],
   });
@@ -141,6 +126,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = (name: string, email: string) => {
+    // @deprecated — use the magic-link auth flow. This local mutation does not
+    // create a real session and will be removed when Garage is API-backed.
+    globalThis.console.warn(
+      '[GameContext] login() is deprecated. Use the magic-link auth flow instead.'
+    );
     identifyAnalyticsUser(email, {
       name,
       team_id: '',
@@ -173,6 +163,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createTeam = (teamName: string, carImage: string, keywords: string[]) => {
+    // @deprecated — team IDs generated here are local only and won't match the database.
+    // Replace with an API-backed flow that returns a real team ID from the backend.
+    globalThis.console.warn(
+      '[GameContext] createTeam() is deprecated. Team IDs are not database-persisted.'
+    );
     const newTeam: Team = {
       id: `team-${Date.now()}`,
       name: teamName,
@@ -203,6 +198,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addScan = (points: number) => {
+    // @deprecated — use applyScanOutcome() with a server response instead.
+    globalThis.console.warn(
+      '[GameContext] addScan() is deprecated. Use applyScanOutcome() for server-driven scan updates.'
+    );
     const newScan: Scan = {
       id: Date.now().toString(),
       points,
