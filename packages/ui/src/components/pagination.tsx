@@ -1,9 +1,14 @@
+/**
+ * @file pagination.tsx
+ * @description Pagination with page navigation, next and previous links.
+ */
 import * as React from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from 'lucide-react';
 
 import { cn } from './utils';
 import { Button, buttonVariants } from './button';
 
+/** Splits large datasets like Audit logs across index pages. */
 function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
   return (
     <nav
@@ -16,6 +21,7 @@ function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
   );
 }
 
+/** Standardized sub-component or utility serving PaginationContent. */
 function PaginationContent({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
@@ -26,6 +32,7 @@ function PaginationContent({ className, ...props }: React.ComponentProps<'ul'>) 
   );
 }
 
+/** Standardized sub-component or utility serving PaginationItem. */
 function PaginationItem({ ...props }: React.ComponentProps<'li'>) {
   return <li data-slot="pagination-item" {...props} />;
 }
@@ -35,6 +42,7 @@ type PaginationLinkProps = {
 } & Pick<React.ComponentProps<typeof Button>, 'size'> &
   React.ComponentProps<'a'>;
 
+/** Standardized sub-component or utility serving PaginationLink. */
 function PaginationLink({ className, isActive, size = 'icon', ...props }: PaginationLinkProps) {
   return (
     <a
@@ -53,6 +61,7 @@ function PaginationLink({ className, isActive, size = 'icon', ...props }: Pagina
   );
 }
 
+/** Standardized sub-component or utility serving PaginationPrevious. */
 function PaginationPrevious({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
   return (
     <PaginationLink
@@ -67,6 +76,7 @@ function PaginationPrevious({ className, ...props }: React.ComponentProps<typeof
   );
 }
 
+/** Standardized sub-component or utility serving PaginationNext. */
 function PaginationNext({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
   return (
     <PaginationLink
@@ -81,6 +91,7 @@ function PaginationNext({ className, ...props }: React.ComponentProps<typeof Pag
   );
 }
 
+/** Standardized sub-component or utility serving PaginationEllipsis. */
 function PaginationEllipsis({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span

@@ -1,3 +1,7 @@
+/**
+ * @file context-menu.tsx
+ * @description Displays a menu to the user — such as a set of actions or functions — triggered by a button.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,34 +10,41 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Provides right-click context commands. */
 function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
   return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />;
 }
 
+/** Standardized sub-component or utility serving ContextMenuTrigger. */
 function ContextMenuTrigger({
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Trigger>) {
   return <ContextMenuPrimitive.Trigger data-slot="context-menu-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving ContextMenuGroup. */
 function ContextMenuGroup({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Group>) {
   return <ContextMenuPrimitive.Group data-slot="context-menu-group" {...props} />;
 }
 
+/** Standardized sub-component or utility serving ContextMenuPortal. */
 function ContextMenuPortal({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Portal>) {
   return <ContextMenuPrimitive.Portal data-slot="context-menu-portal" {...props} />;
 }
 
+/** Standardized sub-component or utility serving ContextMenuSub. */
 function ContextMenuSub({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Sub>) {
   return <ContextMenuPrimitive.Sub data-slot="context-menu-sub" {...props} />;
 }
 
+/** Standardized sub-component or utility serving ContextMenuRadioGroup. */
 function ContextMenuRadioGroup({
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.RadioGroup>) {
   return <ContextMenuPrimitive.RadioGroup data-slot="context-menu-radio-group" {...props} />;
 }
 
+/** Standardized sub-component or utility serving ContextMenuSubTrigger. */
 function ContextMenuSubTrigger({
   className,
   inset,
@@ -58,6 +69,7 @@ function ContextMenuSubTrigger({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuSubContent. */
 function ContextMenuSubContent({
   className,
   ...props
@@ -74,6 +86,7 @@ function ContextMenuSubContent({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuContent. */
 function ContextMenuContent({
   className,
   ...props
@@ -92,6 +105,7 @@ function ContextMenuContent({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuItem. */
 function ContextMenuItem({
   className,
   inset,
@@ -115,6 +129,7 @@ function ContextMenuItem({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuCheckboxItem. */
 function ContextMenuCheckboxItem({
   className,
   children,
@@ -141,6 +156,7 @@ function ContextMenuCheckboxItem({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuRadioItem. */
 function ContextMenuRadioItem({
   className,
   children,
@@ -165,6 +181,7 @@ function ContextMenuRadioItem({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuLabel. */
 function ContextMenuLabel({
   className,
   inset,
@@ -182,6 +199,7 @@ function ContextMenuLabel({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuSeparator. */
 function ContextMenuSeparator({
   className,
   ...props
@@ -195,6 +213,7 @@ function ContextMenuSeparator({
   );
 }
 
+/** Standardized sub-component or utility serving ContextMenuShortcut. */
 function ContextMenuShortcut({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span

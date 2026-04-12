@@ -56,6 +56,11 @@ enum RescueStatus {
     REJECTED
 }
 
+enum TeamActivityType {
+    PLAYER_ONBOARDING_COMPLETED
+    PLAYER_QR_SCAN
+}
+
 enum TeamTransitionReason {
     HAZARD_TRIGGER
     RESCUE_CLEARED
@@ -71,7 +76,13 @@ enum AdminActionType {
     HELIOS_REVOKED
     PIT_MANUAL_ENTER
     PIT_MANUAL_CLEAR
+    QR_HAZARD_RANDOMIZER_UPDATED
     SCORE_RESET
+    ROSTER_IMPORTED
+    ROSTER_ASSIGNED
+    ROSTER_REASSIGNED
+    ROSTER_UNASSIGNED
+    EMAIL_RETURN_FLAGGED
 }
 
 // ── Garage workflow enums ────────────────────────────────────────────────────
@@ -94,18 +105,21 @@ enum TeamLogoStatus {
 }
 
 model User {
-    id          String             @id @default(cuid())
-    email       String             @unique
-    displayName String
-    role        UserRole           @default(PLAYER)
-    isHelios    Boolean            @default(false)
-    createdAt   DateTime           @default(now())
-    updatedAt   DateTime           @updatedAt
+    id                  String   @id @default(cuid())
+    email               String   @unique
+    displayName         String
+    phoneE164           String?
+    role                UserRole @default(PLAYER)
+    isHelios            Boolean  @default(false)
+    hasReturnEmailIssue Boolean  @default(false)
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
 
     players           Player[]
-    adminActionAudits AdminActionAudit[] @relation("AdminActionActor")
-    rescuesGiven      Rescue[]           @relation("RescueScannedBy")
+    adminActionAudits AdminActionAudit[]    @relation("AdminActionActor")
+    rescuesGiven      Rescue[]              @relation("RescueScannedBy")
     teamTransitions   TeamStateTransition[] @relation("TeamTransitionTriggeredByUser")
+    emailEvents       EmailEvent[]
 }
 
 model Event {
@@ -128,9 +142,11 @@ model Event {
     qrCodes           QRCode[]
     qrCodeClaims      QRCodeClaim[]
     scanRecords       ScanRecord[]
+    teamActivityEvents TeamActivityEvent[]
     rescues           Rescue[]
     teamTransitions   TeamStateTransition[]
     adminActionAudits AdminActionAudit[]
+    emailEvents       EmailEvent[]
     garageSubmissions GarageSubmission[]
 }
 
@@ -174,7 +190,8 @@ model Team {
     event                Event                 @relation(fields: [eventId], references: [id])
     players              Player[]
     scanRecords          ScanRecord[]
-    rescuesRequested     Rescue[]              @relation("RescueRequestingTeam")
+    teamActivityEvents TeamActivityEvent[]
+    rescuesRequested     Rescue[]               @relation("RescueRequestingTeam")
     teamTransitions      TeamStateTransition[]
     // Each player's garage submission for this team
     garageSubmissions    GarageSubmission[]
@@ -185,26 +202,29 @@ model Team {
 }
 
 model Player {
-    id                String       @id @default(cuid())
-    userId            String
-    eventId           String
-    teamId            String?
-    status            PlayerStatus @default(RACING)
-    individualScore   Int          @default(0)
-    isFlaggedForReview Boolean     @default(false)
-    joinedAt          DateTime     @default(now())
-    createdAt         DateTime     @default(now())
-    updatedAt         DateTime     @updatedAt
+    id                  String       @id @default(cuid())
+    userId              String
+    eventId             String
+    teamId              String?
+    status              PlayerStatus @default(RACING)
+    individualScore     Int          @default(0)
+    isFlaggedForReview  Boolean      @default(false)
+    hasReturnEmailIssue Boolean      @default(false)
+    joinedAt            DateTime     @default(now())
+    createdAt           DateTime     @default(now())
+    updatedAt           DateTime     @updatedAt
 
-    user            User                  @relation(fields: [userId], references: [id])
-    event           Event                 @relation(fields: [eventId], references: [id])
-    team            Team?                 @relation(fields: [teamId], references: [id])
-    qrClaims           QRCodeClaim[]
-    scanRecords        ScanRecord[]
-    rescuesRequested   Rescue[]             @relation("RescueRequestingPlayer")
-    teamTransitions    TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
+    user             User                  @relation(fields: [userId], references: [id])
+    event            Event                 @relation(fields: [eventId], references: [id])
+    team             Team?                 @relation(fields: [teamId], references: [id])
+    qrClaims            QRCodeClaim[]
+    scanRecords         ScanRecord[]
+    teamActivityEvents TeamActivityEvent[]
+    rescuesRequested   Rescue[]              @relation("RescueRequestingPlayer")
+    teamTransitions     TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
     // A player may have one garage submission per team they belong to
     garageSubmissions  GarageSubmission[]
+    emailEvents      EmailEvent[]
 
     @@unique([eventId, userId])
     @@index([eventId])
@@ -212,23 +232,25 @@ model Player {
 }
 
 model QRCode {
-    id                String       @id @default(cuid())
-    eventId           String
-    label             String
-    value             Int
-    zone              String?
-    payload           String       @unique
-    status            QRCodeStatus @default(ACTIVE)
-    activationStartsAt DateTime?
-    activationEndsAt  DateTime?
-    hazardRatioOverride Int?
-    scanCount         Int          @default(0)
-    createdAt         DateTime     @default(now())
-    updatedAt         DateTime     @updatedAt
+    id                   String       @id @default(cuid())
+    eventId              String
+    label                String
+    value                Int
+    zone                 String?
+    payload              String       @unique
+    status               QRCodeStatus @default(ACTIVE)
+    activationStartsAt   DateTime?
+    activationEndsAt     DateTime?
+    hazardRatioOverride  Int?
+    hazardWeightOverride Int?
+    scanCount            Int          @default(0)
+    createdAt            DateTime     @default(now())
+    updatedAt            DateTime     @updatedAt
 
-    event       Event        @relation(fields: [eventId], references: [id])
+    event       Event         @relation(fields: [eventId], references: [id])
     claims      QRCodeClaim[]
     scanRecords ScanRecord[]
+    teamActivityEvents TeamActivityEvent[]
 
     @@unique([eventId, label])
     @@index([eventId])
@@ -251,19 +273,19 @@ model QRCodeClaim {
 }
 
 model ScanRecord {
-    id                   String      @id @default(cuid())
-    eventId              String
-    qrCodeId             String?
-    playerId             String
-    teamId               String?
-    outcome              ScanOutcome
-    pointsAwarded        Int         @default(0)
-    hazardRatioUsed      Int?
+    id                    String      @id @default(cuid())
+    eventId               String
+    qrCodeId              String?
+    playerId              String
+    teamId                String?
+    outcome               ScanOutcome
+    pointsAwarded         Int         @default(0)
+    hazardRatioUsed       Int?
     globalScanCountBefore Int?
-    globalScanCountAfter Int?
-    scannedPayload       String
-    message              String?
-    createdAt            DateTime    @default(now())
+    globalScanCountAfter  Int?
+    scannedPayload        String
+    message               String?
+    createdAt             DateTime    @default(now())
 
     event  Event   @relation(fields: [eventId], references: [id])
     qrCode QRCode? @relation(fields: [qrCodeId], references: [id])
@@ -287,10 +309,10 @@ model TeamStateTransition {
     notes               String?
     createdAt           DateTime             @default(now())
 
-    event              Event   @relation(fields: [eventId], references: [id])
-    team               Team    @relation(fields: [teamId], references: [id])
-    triggeredByUser    User?   @relation("TeamTransitionTriggeredByUser", fields: [triggeredByUserId], references: [id])
-    triggeredByPlayer  Player? @relation("TeamTransitionTriggeredByPlayer", fields: [triggeredByPlayerId], references: [id])
+    event             Event   @relation(fields: [eventId], references: [id])
+    team              Team    @relation(fields: [teamId], references: [id])
+    triggeredByUser   User?   @relation("TeamTransitionTriggeredByUser", fields: [triggeredByUserId], references: [id])
+    triggeredByPlayer Player? @relation("TeamTransitionTriggeredByPlayer", fields: [triggeredByPlayerId], references: [id])
 
     @@index([eventId, createdAt])
     @@index([teamId, createdAt])
@@ -311,6 +333,38 @@ model AdminActionAudit {
 
     @@index([eventId, createdAt])
     @@index([actorUserId, createdAt])
+}
+
+model EmailEvent {
+    id                       String        @id @default(cuid())
+    provider                 EmailProvider
+    providerEventId          String?
+    eventType                String
+    occurredAt               DateTime
+    recipientEmailRaw        String
+    recipientEmailNormalized String
+    messageId                String?
+    sendingStream            String?
+    inboxId                  String?
+    isReturnSignal           Boolean       @default(false)
+    payload                  Json
+    eventId                  String?
+    userId                   String?
+    playerId                 String?
+    createdAt                DateTime      @default(now())
+    updatedAt                DateTime      @updatedAt
+
+    event  Event?  @relation(fields: [eventId], references: [id])
+    user   User?   @relation(fields: [userId], references: [id])
+    player Player? @relation(fields: [playerId], references: [id])
+
+    @@unique([provider, providerEventId])
+    @@index([recipientEmailNormalized, occurredAt])
+    @@index([isReturnSignal, occurredAt])
+    @@index([eventType, occurredAt])
+    @@index([eventId, createdAt])
+    @@index([userId, createdAt])
+    @@index([playerId, createdAt])
 }
 
 model Rescue {
@@ -335,6 +389,34 @@ model Rescue {
     @@index([eventId, initiatedAt])
     @@index([requestingPlayerId])
     @@index([requestingTeamId])
+}
+
+model TeamActivityEvent {
+    id           String           @id @default(cuid())
+    eventId      String
+    teamId       String
+    playerId     String
+    qrCodeId     String?
+    type         TeamActivityType
+    sourceKey    String
+    scanOutcome  ScanOutcome?
+    pointsAwarded Int?
+    errorCode    String?
+    qrCodeLabel  String?
+    qrPayload    String?
+    summary      String
+    occurredAt   DateTime
+    createdAt    DateTime         @default(now())
+
+    event  Event   @relation(fields: [eventId], references: [id])
+    team   Team    @relation(fields: [teamId], references: [id])
+    player Player  @relation(fields: [playerId], references: [id])
+    qrCode QRCode? @relation(fields: [qrCodeId], references: [id])
+
+    @@unique([eventId, sourceKey])
+    @@index([eventId, teamId, occurredAt])
+    @@index([teamId, occurredAt])
+    @@index([playerId, occurredAt])
 }
 
 // ── Garage workflow model ───────────────────────────────────────────────────

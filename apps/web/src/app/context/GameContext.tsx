@@ -1,6 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { identifyAnalyticsUser, trackAnalyticsEvent } from '@/services/observability';
+import type { SubmitScanResponse } from '@velocity-gp/api-contract';
 
+import type { ScanIdentity } from '@/services/scan';
+import { identifyAnalyticsUser, trackAnalyticsEvent } from '@/services/observability';
+import {
+  AUTH_SESSION_UPDATED_EVENT,
+  getSession as getAuthSession,
+  type AuthSession,
+} from '@/services/auth';
+
+// TODO(figma-sync): Add TeamMember-backed roster fields on Team for TeamPage/Admin parity (member list, contact metadata, per-member scoring). | Figma source: src/app/context/GameContext.tsx (Team.members, TeamMember) | Impact: user/admin flow
 export interface Team {
   id: string;
   name: string;
@@ -12,22 +21,29 @@ export interface Team {
   keywords?: string[];
 }
 
+// TODO(figma-sync): Expand scan model with member/team/qr identifiers required by Figma Admin player/team detail and scan-history views. | Figma source: src/app/context/GameContext.tsx (Scan.memberId/teamId/qrCodeId) | Impact: user/admin flow
 export interface Scan {
   id: string;
   points: number;
   timestamp: Date;
+  outcome: SubmitScanResponse['outcome'];
+  payload: string;
+  message: string;
 }
 
 export interface GameState {
   currentUser: {
     name: string;
     email: string;
-    teamId: string;
+    teamId: string | null;
     isHelios: boolean;
+    eventId?: string;
+    playerId?: string;
   } | null;
   teams: Team[];
   currentTeam: Team | null;
   scans: Scan[];
+  // TODO(figma-sync): Introduce qrCodes and gameActive state branches expected by Figma Admin control and QR inventory screens. | Figma source: src/app/context/GameContext.tsx (GameState.qrCodes/gameActive) | Impact: admin flow
 }
 
 interface GameContextType {
@@ -38,6 +54,9 @@ interface GameContextType {
   addScan: (points: number) => void;
   triggerPitStop: (teamId: string, duration: number) => void;
   clearPitStop: (teamId: string) => void;
+  // TODO(figma-sync): Add admin command surface (score adjustments, QR CRUD/toggles, game active toggle, member updates) once Figma Admin parity work begins. | Figma source: src/app/context/GameContext.tsx admin actions | Impact: admin flow
+  hydrateScanIdentity: (identity: ScanIdentity) => void;
+  applyScanOutcome: (response: SubmitScanResponse) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -51,22 +70,38 @@ export const useGame = () => {
 };
 
 const MOCK_TEAMS: Team[] = [
-  { id: '1', name: 'Turbo Tigers', score: 24500, rank: 1, inPitStop: false },
-  { id: '2', name: 'The Ultras', score: 23800, rank: 2, inPitStop: false },
-  { id: '3', name: 'Risk Racers', score: 21200, rank: 3, inPitStop: false },
-  { id: '4', name: 'Team Alpha', score: 19400, rank: 4, inPitStop: true, pitStopTimeLeft: 720 },
-  { id: '5', name: 'Speed Demons', score: 18900, rank: 5, inPitStop: false },
-  { id: '6', name: 'Neon Ninjas', score: 17600, rank: 6, inPitStop: false },
-  { id: '7', name: 'Cyber Cyclones', score: 16800, rank: 7, inPitStop: false },
-  { id: '8', name: 'Velocity Vipers', score: 15200, rank: 8, inPitStop: false },
-  { id: '9', name: 'Apex Predators', score: 14700, rank: 9, inPitStop: false },
-  { id: '10', name: 'Thunder Bolts', score: 13500, rank: 10, inPitStop: false },
-  { id: '11', name: 'Phoenix Force', score: 12900, rank: 11, inPitStop: false },
-  { id: '12', name: 'Grid Warriors', score: 11800, rank: 12, inPitStop: false },
-  { id: '13', name: 'Nitro Knights', score: 10500, rank: 13, inPitStop: false },
-  { id: '14', name: 'Sonic Surge', score: 9200, rank: 14, inPitStop: false },
-  { id: '15', name: 'Flash Runners', score: 8100, rank: 15, inPitStop: false },
+  { id: 'team-apex-comets', name: 'Apex Comets', score: 1260, rank: 1, inPitStop: false },
+  { id: 'team-drift-runners', name: 'Drift Runners', score: 1110, rank: 2, inPitStop: false },
+  {
+    id: 'team-nova-thunder',
+    name: 'Nova Thunder',
+    score: 920,
+    rank: 3,
+    inPitStop: true,
+    pitStopTimeLeft: 660,
+  },
+  { id: 'team-turbo-tigers', name: 'Turbo Tigers', score: 880, rank: 4, inPitStop: false },
+  { id: 'team-neon-ninjas', name: 'Neon Ninjas', score: 820, rank: 5, inPitStop: false },
 ];
+
+function withUpdatedRanks(teams: Team[]): Team[] {
+  const sorted = [...teams].sort((a, b) => b.score - a.score);
+  const rankById = new Map(sorted.map((team, index) => [team.id, index + 1]));
+
+  return teams.map((team) => ({
+    ...team,
+    rank: rankById.get(team.id) ?? team.rank,
+  }));
+}
+
+function resolvePitStopSeconds(pitStopExpiresAt: string): number {
+  const expiresAtMs = Date.parse(pitStopExpiresAt);
+  if (Number.isNaN(expiresAtMs)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+}
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [gameState, setGameState] = useState<GameState>({
@@ -76,19 +111,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     scans: [],
   });
 
-  // Countdown pit stop timers
   useEffect(() => {
+    // Local countdown ticker used for optimistic pit-stop UX before realtime is wired in.
     const interval = setInterval(() => {
       setGameState((prev) => ({
         ...prev,
         teams: prev.teams.map((team) => {
           if (team.inPitStop && team.pitStopTimeLeft) {
-            const newTime = team.pitStopTimeLeft - 1;
-            if (newTime <= 0) {
+            const nextTime = team.pitStopTimeLeft - 1;
+            if (nextTime <= 0) {
               return { ...team, inPitStop: false, pitStopTimeLeft: undefined };
             }
-            return { ...team, pitStopTimeLeft: newTime };
+
+            return { ...team, pitStopTimeLeft: nextTime };
           }
+
           return team;
         }),
         currentTeam:
@@ -103,6 +140,35 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 1000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const syncCurrentUserFromSession = async () => {
+      // Auth session is the source of truth for current user identity across route reloads.
+      const session = await getAuthSession();
+      if (!active) {
+        return;
+      }
+
+      setGameState((previousState) => ({
+        ...previousState,
+        currentUser: resolveCurrentUserFromSession(session),
+      }));
+    };
+
+    void syncCurrentUserFromSession();
+
+    const handleSessionChange = () => {
+      void syncCurrentUserFromSession();
+    };
+
+    globalThis.addEventListener(AUTH_SESSION_UPDATED_EVENT, handleSessionChange);
+    return () => {
+      active = false;
+      globalThis.removeEventListener(AUTH_SESSION_UPDATED_EVENT, handleSessionChange);
+    };
   }, []);
 
   const login = (name: string, email: string) => {
@@ -120,7 +186,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentUser: {
         name,
         email,
-        teamId: '',
+        teamId: null,
         isHelios: false,
       },
     }));
@@ -139,7 +205,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createTeam = (teamName: string, carImage: string, keywords: string[]) => {
     const newTeam: Team = {
-      id: Date.now().toString(),
+      id: `team-${Date.now()}`,
       name: teamName,
       carImage,
       score: 0,
@@ -154,12 +220,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       keyword_count: keywords.length,
     });
 
-    setGameState((prev) => ({
-      ...prev,
-      teams: [...prev.teams, newTeam],
-      currentTeam: newTeam,
-      currentUser: prev.currentUser ? { ...prev.currentUser, teamId: newTeam.id } : null,
-    }));
+    setGameState((prev) => {
+      const teams = withUpdatedRanks([...prev.teams, newTeam]);
+      const currentTeam = teams.find((team) => team.id === newTeam.id) ?? newTeam;
+
+      return {
+        ...prev,
+        teams,
+        currentTeam,
+        currentUser: prev.currentUser ? { ...prev.currentUser, teamId: newTeam.id } : null,
+      };
+    });
   };
 
   const addScan = (points: number) => {
@@ -167,6 +238,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: Date.now().toString(),
       points,
       timestamp: new Date(),
+      outcome: 'SAFE',
+      payload: 'manual',
+      message: 'Manual scan update applied.',
     };
 
     trackAnalyticsEvent('qr_scan_recorded', {
@@ -175,15 +249,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     setGameState((prev) => {
-      const updatedTeam = prev.currentTeam
+      const currentTeam = prev.currentTeam
         ? { ...prev.currentTeam, score: prev.currentTeam.score + points }
         : null;
+      const teams = withUpdatedRanks(
+        prev.teams.map((team) => (currentTeam && team.id === currentTeam.id ? currentTeam : team))
+      );
 
       return {
         ...prev,
         scans: [newScan, ...prev.scans].slice(0, 20),
-        currentTeam: updatedTeam,
-        teams: prev.teams.map((team) => (team.id === prev.currentTeam?.id ? updatedTeam! : team)),
+        currentTeam,
+        teams,
       };
     });
   };
@@ -223,6 +300,126 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
   };
 
+  const hydrateScanIdentity = (identity: ScanIdentity) => {
+    setGameState((prev) => {
+      // Seed team/current user context from scanner identity so downstream scan calls can
+      // execute even before full roster hydration is available.
+      const existingTeam = prev.teams.find((team) => team.id === identity.teamId);
+      const seedTeam: Team = existingTeam ?? {
+        id: identity.teamId,
+        name: identity.teamName,
+        score: 0,
+        rank: prev.teams.length + 1,
+        inPitStop: false,
+      };
+
+      const teams = withUpdatedRanks(
+        existingTeam
+          ? prev.teams.map((team) =>
+              team.id === seedTeam.id ? { ...team, name: identity.teamName } : team
+            )
+          : [...prev.teams, seedTeam]
+      );
+      const currentTeam = teams.find((team) => team.id === identity.teamId) ?? seedTeam;
+
+      return {
+        ...prev,
+        teams,
+        currentTeam,
+        currentUser: {
+          name: prev.currentUser?.name ?? identity.email,
+          email: identity.email,
+          teamId: identity.teamId,
+          isHelios: prev.currentUser?.isHelios ?? false,
+          eventId: identity.eventId,
+          playerId: identity.playerId,
+        },
+      };
+    });
+  };
+
+  const applyScanOutcome = (response: SubmitScanResponse) => {
+    setGameState((prev) => {
+      const fallbackTeamId = prev.currentTeam?.id ?? null;
+      // Backend teamId wins. Local team is fallback for older or partial response payloads.
+      const resolvedTeamId = response.teamId ?? fallbackTeamId;
+
+      const scanRecord: Scan = {
+        id: response.scannedAt,
+        points: response.pointsAwarded,
+        timestamp: new Date(response.scannedAt),
+        outcome: response.outcome,
+        payload: response.qrPayload,
+        message: response.message,
+      };
+
+      let teams = prev.teams;
+      let currentTeam = prev.currentTeam;
+
+      if (resolvedTeamId) {
+        const existingTeam = teams.find((team) => team.id === resolvedTeamId);
+        const createdTeam: Team = existingTeam ?? {
+          id: resolvedTeamId,
+          name: prev.currentTeam?.name ?? 'Race Team',
+          score: 0,
+          rank: teams.length + 1,
+          inPitStop: false,
+        };
+
+        teams = existingTeam ? teams : [...teams, createdTeam];
+
+        teams = teams.map((team) => {
+          if (team.id !== resolvedTeamId) {
+            return team;
+          }
+
+          const nextTeam: Team = { ...team };
+          if ('teamScore' in response) {
+            // Authoritative score from backend prevents drift from optimistic local mutations.
+            nextTeam.score = response.teamScore;
+          }
+
+          if (response.outcome === 'HAZARD_PIT') {
+            const pitStopDuration = resolvePitStopSeconds(response.pitStopExpiresAt);
+            if (pitStopDuration > 0) {
+              nextTeam.inPitStop = true;
+              nextTeam.pitStopTimeLeft = pitStopDuration;
+            } else {
+              nextTeam.inPitStop = false;
+              nextTeam.pitStopTimeLeft = undefined;
+            }
+          }
+
+          if (response.outcome === 'BLOCKED' && response.errorCode === 'TEAM_IN_PIT') {
+            // Preserve pit-stop lock in UI when server rejects scans during lockout.
+            nextTeam.inPitStop = true;
+            if (!nextTeam.pitStopTimeLeft) {
+              nextTeam.pitStopTimeLeft = 60;
+            }
+          }
+
+          if (response.outcome === 'SAFE') {
+            // Explicitly clear stale pit-stop state when a safe scan resumes team activity.
+            nextTeam.inPitStop = false;
+            nextTeam.pitStopTimeLeft = undefined;
+          }
+
+          return nextTeam;
+        });
+
+        teams = withUpdatedRanks(teams);
+        currentTeam = teams.find((team) => team.id === resolvedTeamId) ?? currentTeam;
+      }
+
+      return {
+        ...prev,
+        scans: [scanRecord, ...prev.scans].slice(0, 20),
+        teams,
+        currentTeam,
+      };
+    });
+  };
+
   return (
     <GameContext.Provider
       value={{
@@ -233,9 +430,27 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addScan,
         triggerPitStop,
         clearPitStop,
+        hydrateScanIdentity,
+        applyScanOutcome,
       }}
     >
       {children}
     </GameContext.Provider>
   );
 };
+
+function resolveCurrentUserFromSession(session: AuthSession): GameState['currentUser'] {
+  if (!session.isAuthenticated || !session.userId) {
+    return null;
+  }
+
+  // Keep context shape stable even when optional profile fields are absent.
+  return {
+    name: session.displayName ?? session.email ?? 'Player',
+    email: session.email ?? '',
+    teamId: session.teamId ?? null,
+    isHelios: session.role === 'helios',
+    eventId: session.eventId,
+    playerId: session.playerId,
+  };
+}

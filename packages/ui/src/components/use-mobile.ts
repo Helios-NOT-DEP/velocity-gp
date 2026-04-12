@@ -1,13 +1,19 @@
+/**
+ * @file use-mobile.ts
+ * @description React Hook detecting mobile screen sizes dynamically.
+ */
 import * as React from 'react';
 
 const MOBILE_BREAKPOINT = 768;
 
+/** Standardized sub-component or utility serving useIsMobile. */
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined);
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
     const onChange = () => {
+      // Use viewport width check to keep behavior consistent with Tailwind breakpoint usage.
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     };
     mql.addEventListener('change', onChange);

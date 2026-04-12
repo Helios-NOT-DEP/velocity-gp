@@ -1,3 +1,7 @@
+/**
+ * @file resizable.tsx
+ * @description Accessible resizable panel groups and layouts.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,6 +10,7 @@ import * as ResizablePrimitive from 'react-resizable-panels';
 
 import { cn } from './utils';
 
+/** Standardized sub-component or utility serving ResizablePanelGroup. */
 function ResizablePanelGroup({
   className,
   ...props
@@ -19,10 +24,12 @@ function ResizablePanelGroup({
   );
 }
 
+/** Standardized sub-component or utility serving ResizablePanel. */
 function ResizablePanel({ ...props }: React.ComponentProps<typeof ResizablePrimitive.Panel>) {
   return <ResizablePrimitive.Panel data-slot="resizable-panel" {...props} />;
 }
 
+/** Standardized sub-component or utility serving ResizableHandle. */
 function ResizableHandle({
   withHandle,
   className,

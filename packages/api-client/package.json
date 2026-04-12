@@ -16,6 +16,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "lint": "eslint src tests --ext .ts --config ../../eslint.config.js",
+    "lint:fix": "eslint src tests --ext .ts --fix --config ../../eslint.config.js",
     "test": "vitest run --config vitest.config.ts --passWithNoTests"
   },
   "devDependencies": {

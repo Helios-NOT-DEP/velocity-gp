@@ -16,6 +16,7 @@ export function initializeAnalytics() {
 
   posthog.init(observabilityConfig.posthogApiKey, {
     api_host: observabilityConfig.posthogHost,
+    // Route tracking is emitted manually from router observer for consistent screen names.
     capture_pageview: false,
     capture_pageleave: true,
     autocapture: false,
@@ -35,6 +36,7 @@ export function trackAnalyticsEvent(
   properties?: AnalyticsProperties
 ) {
   if (!analyticsInitialized) {
+    // Fail open in local/test environments where analytics is intentionally disabled.
     return;
   }
 

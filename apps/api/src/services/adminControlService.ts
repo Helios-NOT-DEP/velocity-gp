@@ -4,6 +4,8 @@ import type {
   ManualPitControlResponse,
   UpdateHeliosRoleRequest,
   UpdateHeliosRoleResponse,
+  UpdateQrHazardRandomizerRequest,
+  UpdateQrHazardRandomizerResponse,
   UpdateRaceControlRequest,
   UpdateRaceControlResponse,
 } from '@velocity-gp/api-contract';
@@ -14,10 +16,19 @@ import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
 import { publishTeamReleaseEvent, releaseTeamFromPitInTransaction } from './pitReleaseService.js';
 
+/**
+ * Admin control service for race state, manual pit operations, Helios role
+ * management, hazard randomizer configuration, and admin audit retrieval.
+ */
 interface AdminActionContext {
   readonly actorUserId?: string;
 }
 
+/**
+ * Resolves the effective actor for admin actions.
+ *
+ * Falls back to any ADMIN user when an explicit actor is missing or invalid.
+ */
 async function resolveActorUserId(
   tx: Prisma.TransactionClient,
   actorUserId: string | undefined
@@ -55,6 +66,9 @@ async function resolveActorUserId(
   return fallbackAdmin.id;
 }
 
+/**
+ * Parses an optional pit-stop expiry timestamp from admin requests.
+ */
 function parsePitStopExpiresAt(value: string | undefined): Date | null {
   if (!value) {
     return null;
@@ -70,6 +84,9 @@ function parsePitStopExpiresAt(value: string | undefined): Date | null {
   return parsed;
 }
 
+/**
+ * Safely narrows JSON audit details into a record shape for API responses.
+ */
 function jsonDetailsToRecord(value: Prisma.JsonValue | null): Record<string, unknown> | undefined {
   if (!value || Array.isArray(value) || typeof value !== 'object') {
     return undefined;
@@ -78,6 +95,9 @@ function jsonDetailsToRecord(value: Prisma.JsonValue | null): Record<string, unk
   return value as Record<string, unknown>;
 }
 
+/**
+ * Updates race control state for an event and records an admin audit entry.
+ */
 export async function updateRaceControl(
   eventId: string,
   request: UpdateRaceControlRequest,
@@ -144,6 +164,11 @@ export async function updateRaceControl(
   });
 }
 
+/**
+ * Performs admin-driven pit control actions (enter/clear) for a team.
+ *
+ * Clearing pit may emit a release event to downstream consumers.
+ */
 export async function manualPitControl(
   eventId: string,
   teamId: string,
@@ -342,6 +367,9 @@ export async function manualPitControl(
   );
 }
 
+/**
+ * Assigns or revokes Helios role for a user and records an admin audit entry.
+ */
 export async function updateHeliosRole(
   userId: string,
   request: UpdateHeliosRoleRequest,
@@ -433,6 +461,93 @@ export async function updateHeliosRole(
   );
 }
 
+/**
+ * Updates per-QR hazard randomizer override for an event-specific QR code.
+ */
+export async function updateQrHazardRandomizer(
+  eventId: string,
+  qrCodeId: string,
+  request: UpdateQrHazardRandomizerRequest,
+  context: AdminActionContext = {}
+): Promise<UpdateQrHazardRandomizerResponse> {
+  return withTraceSpan(
+    'admin.qr_hazard_randomizer.update',
+    { eventId, qrCodeId, hazardWeightOverride: request.hazardWeightOverride ?? -1 },
+    async () => {
+      const result = await prisma.$transaction(async (tx) => {
+        const actorId = await resolveActorUserId(tx, context.actorUserId);
+
+        const qrCode = await tx.qRCode.findFirst({
+          where: {
+            id: qrCodeId,
+            eventId,
+          },
+          select: {
+            id: true,
+            eventId: true,
+            hazardWeightOverride: true,
+          },
+        });
+
+        if (!qrCode) {
+          throw new ValidationError('QR code does not exist for this event.', {
+            eventId,
+            qrCodeId,
+          });
+        }
+
+        const updatedQrCode = await tx.qRCode.update({
+          where: {
+            id: qrCode.id,
+          },
+          data: {
+            hazardWeightOverride: request.hazardWeightOverride,
+          },
+          select: {
+            id: true,
+            eventId: true,
+            hazardWeightOverride: true,
+            updatedAt: true,
+          },
+        });
+
+        const audit = await tx.adminActionAudit.create({
+          data: {
+            eventId,
+            actorUserId: actorId,
+            actionType: 'QR_HAZARD_RANDOMIZER_UPDATED',
+            targetType: 'QR_CODE',
+            targetId: qrCode.id,
+            details: {
+              previousHazardWeightOverride: qrCode.hazardWeightOverride,
+              nextHazardWeightOverride: updatedQrCode.hazardWeightOverride,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        return {
+          eventId: updatedQrCode.eventId,
+          qrCodeId: updatedQrCode.id,
+          hazardWeightOverride: updatedQrCode.hazardWeightOverride,
+          updatedAt: updatedQrCode.updatedAt.toISOString(),
+          auditId: audit.id,
+        };
+      });
+
+      incrementCounter('admin.qr_hazard_randomizer.updated', {
+        overrideMode: result.hazardWeightOverride === null ? 'fallback' : 'weighted',
+      });
+      return result;
+    }
+  );
+}
+
+/**
+ * Lists admin audit records for an event in reverse chronological order.
+ */
 export async function listAdminAudits(eventId: string): Promise<AdminAuditEntry[]> {
   const audits = await prisma.adminActionAudit.findMany({
     where: {

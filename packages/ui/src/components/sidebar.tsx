@@ -1,3 +1,7 @@
+/**
+ * @file sidebar.tsx
+ * @description A composable, themeable and customizable sidebar component.
+ */
 'use client';
 
 import * as React from 'react';
@@ -33,6 +37,7 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
+/** Standardized sub-component or utility serving useSidebar. */
 function useSidebar() {
   const context = React.useContext(SidebarContext);
   if (!context) {
@@ -42,6 +47,7 @@ function useSidebar() {
   return context;
 }
 
+/** Standardized sub-component or utility serving SidebarProvider. */
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -137,6 +143,7 @@ function SidebarProvider({
   );
 }
 
+/** Main app shell structural element for admin navigation. */
 function Sidebar({
   side = 'left',
   variant = 'sidebar',
@@ -239,6 +246,7 @@ function Sidebar({
   );
 }
 
+/** Standardized sub-component or utility serving SidebarTrigger. */
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar();
 
@@ -261,6 +269,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
   );
 }
 
+/** Standardized sub-component or utility serving SidebarRail. */
 function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
   const { toggleSidebar } = useSidebar();
 
@@ -286,6 +295,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarInset. */
 function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
   return (
     <main
@@ -300,6 +310,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarInput. */
 function SidebarInput({ className, ...props }: React.ComponentProps<typeof Input>) {
   return (
     <Input
@@ -311,6 +322,7 @@ function SidebarInput({ className, ...props }: React.ComponentProps<typeof Input
   );
 }
 
+/** Standardized sub-component or utility serving SidebarHeader. */
 function SidebarHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -322,6 +334,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarFooter. */
 function SidebarFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -333,6 +346,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarSeparator. */
 function SidebarSeparator({ className, ...props }: React.ComponentProps<typeof Separator>) {
   return (
     <Separator
@@ -344,6 +358,7 @@ function SidebarSeparator({ className, ...props }: React.ComponentProps<typeof S
   );
 }
 
+/** Standardized sub-component or utility serving SidebarContent. */
 function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -358,6 +373,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarGroup. */
 function SidebarGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -369,6 +385,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarGroupLabel. */
 function SidebarGroupLabel({
   className,
   asChild = false,
@@ -390,6 +407,7 @@ function SidebarGroupLabel({
   );
 }
 
+/** Standardized sub-component or utility serving SidebarGroupAction. */
 function SidebarGroupAction({
   className,
   asChild = false,
@@ -413,6 +431,7 @@ function SidebarGroupAction({
   );
 }
 
+/** Standardized sub-component or utility serving SidebarGroupContent. */
 function SidebarGroupContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -424,6 +443,7 @@ function SidebarGroupContent({ className, ...props }: React.ComponentProps<'div'
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenu. */
 function SidebarMenu({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
@@ -435,6 +455,7 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<'ul'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenuItem. */
 function SidebarMenuItem({ className, ...props }: React.ComponentProps<'li'>) {
   return (
     <li
@@ -468,6 +489,7 @@ const sidebarMenuButtonVariants = cva(
   }
 );
 
+/** Standardized sub-component or utility serving SidebarMenuButton. */
 function SidebarMenuButton({
   asChild = false,
   isActive = false,
@@ -518,6 +540,7 @@ function SidebarMenuButton({
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenuAction. */
 function SidebarMenuAction({
   className,
   asChild = false,
@@ -550,6 +573,7 @@ function SidebarMenuAction({
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenuBadge. */
 function SidebarMenuBadge({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -569,6 +593,7 @@ function SidebarMenuBadge({ className, ...props }: React.ComponentProps<'div'>) 
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenuSkeleton. */
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
@@ -602,6 +627,7 @@ function SidebarMenuSkeleton({
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenuSub. */
 function SidebarMenuSub({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
@@ -617,6 +643,7 @@ function SidebarMenuSub({ className, ...props }: React.ComponentProps<'ul'>) {
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenuSubItem. */
 function SidebarMenuSubItem({ className, ...props }: React.ComponentProps<'li'>) {
   return (
     <li
@@ -628,6 +655,7 @@ function SidebarMenuSubItem({ className, ...props }: React.ComponentProps<'li'>)
   );
 }
 
+/** Standardized sub-component or utility serving SidebarMenuSubButton. */
 function SidebarMenuSubButton({
   asChild = false,
   size = 'md',

@@ -6,9 +6,11 @@ import { adminDemoQrCodes, rankBadgeClass, toSortedTeams } from '../../admin/adm
 export default function AdminStatistics() {
   const { gameState } = useGame();
   const sortedTeams = toSortedTeams(gameState.teams);
+  // Dashboard totals are derived from local state until dedicated admin metrics endpoints are used.
   const totalScans = gameState.scans.length;
   const totalPitStops = gameState.teams.filter((team) => team.inPitStop).length;
   const totalPoints = gameState.teams.reduce((sum, team) => sum + team.score, 0);
+  // TODO(figma-sync): Replace demo-derived aggregates with the same live admin data model used by Figma's integrated admin dashboard cards and tables. | Figma source: src/app/pages/Admin.tsx Statistics tab | Impact: admin flow
 
   return (
     <section className="space-y-6">
@@ -68,6 +70,7 @@ export default function AdminStatistics() {
 
       <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-6">
         <h3 className="font-['Space_Grotesk'] text-2xl mb-4">Active QR Codes</h3>
+        {/* TODO(figma-sync): Bind this section to live QR inventory state instead of static admin demo data to keep statistics parity with Figma Admin. | Figma source: src/app/pages/Admin.tsx Active QR Codes list | Impact: admin flow */}
         <div className="space-y-3">
           {adminDemoQrCodes
             .filter((code) => code.active)

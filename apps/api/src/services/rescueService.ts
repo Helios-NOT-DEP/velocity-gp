@@ -11,6 +11,12 @@ import { AppError, ValidationError } from '../utils/appError.js';
 import { placeholderEvent, placeholderRescue } from './placeholderData.js';
 import { publishTeamReleaseEvent, releaseTeamFromPitInTransaction } from './pitReleaseService.js';
 
+/**
+ * Helios rescue service.
+ *
+ * Handles rescue request lifecycle, self-rescue prevention, completion flows,
+ * and pit release integration when a rescue is successfully completed.
+ */
 interface InitiateRescueInput extends InitiateRescueRequest {
   readonly scannerUserId?: string;
 }
@@ -21,6 +27,10 @@ interface RescuerResolution {
   readonly scannerTeamId: string | null;
 }
 
+/**
+ * Resolves rescuer identity from scanner context, QR context, explicit IDs, or
+ * Helios fallback user.
+ */
 async function resolveRescuer(
   tx: Prisma.TransactionClient,
   request: InitiateRescueInput
@@ -131,6 +141,10 @@ async function resolveRescuer(
   };
 }
 
+/**
+ * Creates a rescue request after validating player/team membership and
+ * self-rescue constraints.
+ */
 export async function initiateRescue(request: InitiateRescueInput): Promise<HeliosRescueFlow> {
   return withTraceSpan(
     'rescue.initiate',
@@ -244,6 +258,11 @@ export async function initiateRescue(request: InitiateRescueInput): Promise<Heli
   );
 }
 
+/**
+ * Returns the most recent rescue state for a player.
+ *
+ * Falls back to deterministic placeholder data when no persisted rescue exists.
+ */
 export async function getRescueStatus(playerId: string): Promise<HeliosRescueFlow> {
   const latestRescue = await prisma.rescue.findFirst({
     where: {
@@ -283,6 +302,10 @@ export async function getRescueStatus(playerId: string): Promise<HeliosRescueFlo
   };
 }
 
+/**
+ * Completes the active rescue for a player and releases the associated team from
+ * pit when applicable.
+ */
 export async function completeRescue(playerId: string): Promise<RescueCompletionResponse> {
   return withTraceSpan('rescue.complete', { playerId }, async () => {
     let releaseEvent: Awaited<ReturnType<typeof releaseTeamFromPitInTransaction>> = null;

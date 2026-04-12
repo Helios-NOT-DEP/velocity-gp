@@ -1,3 +1,7 @@
+/**
+ * @file tooltip.tsx
+ * @description A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,6 +9,7 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 import { cn } from './utils';
 
+/** Standardized sub-component or utility serving TooltipProvider. */
 function TooltipProvider({
   delayDuration = 0,
   ...props
@@ -18,6 +23,7 @@ function TooltipProvider({
   );
 }
 
+/** Explains icon functions elegantly on hover. */
 function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
   return (
     <TooltipProvider>
@@ -26,10 +32,12 @@ function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root
   );
 }
 
+/** Standardized sub-component or utility serving TooltipTrigger. */
 function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving TooltipContent. */
 function TooltipContent({
   className,
   sideOffset = 0,

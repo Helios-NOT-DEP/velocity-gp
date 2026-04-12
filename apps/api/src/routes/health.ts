@@ -5,6 +5,7 @@ import { getDatabaseConfig } from '../db/client.js';
 
 export const healthRouter = Router();
 
+// Liveness probe: process is up and serving HTTP.
 healthRouter.get('/health', (_request, response) => {
   response.json(
     successResponse({
@@ -15,6 +16,7 @@ healthRouter.get('/health', (_request, response) => {
   );
 });
 
+// Readiness probe: API dependencies are configured for traffic.
 healthRouter.get('/ready', (_request, response) => {
   response.json(
     successResponse({

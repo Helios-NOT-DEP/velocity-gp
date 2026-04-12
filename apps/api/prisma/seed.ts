@@ -46,11 +46,14 @@ const ids = {
     admin: 'user-admin-ava',
     heliosOne: 'user-helios-hugo',
     heliosTwo: 'user-helios-iris',
+    heliosAdmin: 'user-helios-admin-hello',
     racerOne: 'user-player-lina',
     racerTwo: 'user-player-mason',
     racerThree: 'user-player-noah',
     racerFour: 'user-player-olivia',
     racerFive: 'user-player-parker',
+    ankit: 'user-player-ankit',
+    neerPatel: 'user-player-neer',
   },
   events: {
     active: 'event-velocity-active',
@@ -67,6 +70,8 @@ const ids = {
     noah: 'player-noah-active',
     olivia: 'player-olivia-active',
     parker: 'player-parker-active',
+    ankit: 'player-ankit-active',
+    neer: 'player-neer-active',
   },
   qrCodes: {
     alpha: 'qr-alpha-01',
@@ -84,6 +89,7 @@ const ids = {
 async function clearDatabase(): Promise<void> {
   await prisma.adminActionAudit.deleteMany();
   await prisma.teamStateTransition.deleteMany();
+  await prisma.teamActivityEvent.deleteMany();
   await prisma.rescue.deleteMany();
   await prisma.scanRecord.deleteMany();
   await prisma.qRCodeClaim.deleteMany();
@@ -122,6 +128,13 @@ async function seedUsers(): Promise<void> {
         isHelios: true,
       },
       {
+        id: ids.users.heliosAdmin,
+        email: 'hello@velocitygp.app',
+        displayName: 'Helios Admin',
+        role: 'ADMIN',
+        isHelios: false,
+      },
+      {
         id: ids.users.racerOne,
         email: 'lina@velocitygp.dev',
         displayName: 'Lina Lane',
@@ -153,6 +166,20 @@ async function seedUsers(): Promise<void> {
         id: ids.users.racerFive,
         email: 'parker@velocitygp.dev',
         displayName: 'Parker Pulse',
+        role: 'PLAYER',
+        isHelios: false,
+      },
+      {
+        id: ids.users.ankit,
+        email: 'jn.ankit@yahoo.com',
+        displayName: 'Ankit',
+        role: 'PLAYER',
+        isHelios: false,
+      },
+      {
+        id: ids.users.neerPatel,
+        email: 'neerpatel@gmail.com',
+        displayName: 'Neer Patel',
         role: 'PLAYER',
         isHelios: false,
       },
@@ -309,6 +336,26 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         isFlaggedForReview: false,
         joinedAt: new Date(now.getTime() - hours(2)),
       },
+      {
+        id: ids.players.ankit,
+        userId: ids.users.ankit,
+        eventId: ids.events.active,
+        teamId: ids.teams.drift,
+        status: 'RACING',
+        individualScore: 0,
+        isFlaggedForReview: false,
+        joinedAt: new Date(now.getTime() - minutes(5)),
+      },
+      {
+        id: ids.players.neer,
+        userId: ids.users.neerPatel,
+        eventId: ids.events.active,
+        teamId: ids.teams.apex,
+        status: 'RACING',
+        individualScore: 0,
+        isFlaggedForReview: false,
+        joinedAt: new Date(now.getTime() - minutes(5)),
+      },
     ],
   });
 
@@ -325,6 +372,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 14,
       },
       {
@@ -338,6 +386,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: 5,
+        hazardWeightOverride: 25,
         scanCount: 4,
       },
       {
@@ -351,6 +400,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 28,
       },
       {
@@ -364,6 +414,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(2)),
         activationEndsAt: null,
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 7,
       },
       {
@@ -377,6 +428,7 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         activationStartsAt: new Date(now.getTime() - hours(5)),
         activationEndsAt: new Date(now.getTime() - hours(1)),
         hazardRatioOverride: null,
+        hazardWeightOverride: null,
         scanCount: 45,
       },
     ],

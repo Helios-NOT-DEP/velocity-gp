@@ -1,3 +1,7 @@
+/**
+ * @file dialog.tsx
+ * @description A window overlaid on either the primary window or another dialog window.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,22 +10,27 @@ import { XIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Base modal architecture for pop-overs. */
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DialogTrigger. */
 function DialogTrigger({ ...props }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DialogPortal. */
 function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DialogClose. */
 function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
+/** Standardized sub-component or utility serving DialogOverlay. */
 function DialogOverlay({
   className,
   ...props
@@ -38,6 +47,7 @@ function DialogOverlay({
   );
 }
 
+/** Standardized sub-component or utility serving DialogContent. */
 function DialogContent({
   className,
   children,
@@ -64,6 +74,7 @@ function DialogContent({
   );
 }
 
+/** Standardized sub-component or utility serving DialogHeader. */
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -74,6 +85,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving DialogFooter. */
 function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -84,6 +96,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Standardized sub-component or utility serving DialogTitle. */
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
@@ -94,6 +107,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   );
 }
 
+/** Standardized sub-component or utility serving DialogDescription. */
 function DialogDescription({
   className,
   ...props

@@ -3,6 +3,8 @@ import path from 'path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
+const buildSourceMapEnabled = process.env.SOURCEMAP === 'true';
+
 export default defineConfig({
   plugins: [
     // The React and Tailwind plugins are both required for Make, even if
@@ -20,9 +22,9 @@ export default defineConfig({
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
-  // Disable source maps completely
+  // Enable production source maps only when explicitly requested.
   build: {
-    sourcemap: false,
+    sourcemap: buildSourceMapEnabled,
   },
 
   // Disable source maps in dev
@@ -36,7 +38,7 @@ export default defineConfig({
 
   // Ignore source maps for node_modules
   server: {
-    sourcemapIgnoreList: () => true, // Ignore all
+    sourcemapIgnoreList: (sourcePath) => sourcePath.includes('node_modules'),
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

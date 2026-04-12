@@ -51,6 +51,7 @@ const POLL_INTERVAL_MS = 4_000;
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Garage() {
+  // TODO(figma-sync): Replace keyword-based generation with description-driven onboarding to match the updated Team Onboarding design flow. | Figma source: src/app/pages/Garage.tsx description textarea + suggestion chips | Impact: user flow
   const navigate = useNavigate();
   // Read playerId / teamId / eventId from localStorage (written by savePlayerSession
   // after a successful magic-link login).  Falls back to seeded dev values so the

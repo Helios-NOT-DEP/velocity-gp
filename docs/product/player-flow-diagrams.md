@@ -11,7 +11,7 @@ This document shows how the Velocity GP application should behave for player act
 
 ## 1. Logging In and Authentication
 
-``` mermaid
+```mermaid
 sequenceDiagram
   autonumber
   actor Player
@@ -20,8 +20,8 @@ sequenceDiagram
   participant BFF as Velocity GP BFF/API
   participant AuthProvider as Magic-Link Provider
   participant Store as Player + Team Store
-  participant GarageUI as Garage<br/>Current route '/garage'
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant GarageUI as Garage<br/>Current route '/team-setup'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   Player->>LoginUI: Enter work email, personal contact, and full name
   Player->>LoginUI: Submit login/sign-up form
@@ -50,7 +50,7 @@ sequenceDiagram
   else Current local demo flow in React
     LoginUI->>LoginUI: Call GameContext.login(name, email)
     LoginUI->>AuthClient: Track auth_login_submitted analytics event
-    LoginUI-->>GarageUI: Navigate directly to '/garage'
+    LoginUI-->>GarageUI: Navigate directly to '/team-setup'
     GarageUI-->>Player: Show AI Design Studio immediately
   end
 ```
@@ -62,12 +62,12 @@ sequenceDiagram
   autonumber
   actor Player
   actor Teammates
-  participant GarageUI as Garage / AI Design Studio<br/>Current route '/garage'
+  participant GarageUI as Garage / AI Design Studio<br/>Current route '/team-setup'
   participant Policy as Policy Safety Filter
   participant GenAI as GenAI Design Service
   participant BFF as Velocity GP BFF/API
   participant Store as Team + Player Store
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   Player->>GarageUI: Enter words describing themselves
   Player->>GarageUI: Submit self-description for team logo generation
@@ -104,7 +104,7 @@ sequenceDiagram
     GarageUI->>GarageUI: Wait 2.5s, compose team name from local keywords, use static Unsplash car image
     Player->>GarageUI: Click "Continue to Race"
     GarageUI->>GarageUI: Call GameContext.createTeam(teamName, carImage, keywords)
-    GarageUI-->>RaceHubUI: Navigate to '/race-hub'
+    GarageUI-->>RaceHubUI: Navigate to '/race'
   end
 ```
 
@@ -114,41 +114,45 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
+  participant Identity as Scan Identity Resolver<br/>Session email + seeded mapping
+  participant Browser as Browser Camera APIs
   participant Scanner as QR Scanner
   participant BFF as Velocity GP BFF/API
   participant Rules as Scan + Hazard Rule Engine
   participant Store as QR Claim + Score Store
   participant Leaderboard as Leaderboard Projection<br/>Current route '/leaderboard'
 
-  Player->>RaceHubUI: Tap "Scan QR Code"
-  RaceHubUI->>Scanner: Decode QR payload
-  Scanner-->>RaceHubUI: Return scanned qrCode
+  Player->>RaceHubUI: Tap "Start Camera Scan"
+  RaceHubUI->>Identity: Resolve scan identity
+  Identity->>BFF: GET /events/current/players/me
+  BFF-->>Identity: Return PlayerActiveIdentity
+  Identity-->>RaceHubUI: Return resolved {eventId, playerId, teamId, teamName}
+  Note over RaceHubUI,Identity: If unmapped/event mismatch/event unavailable, scan submit is blocked and camera guidance is shown.
 
-  alt Intended production behavior for a safe, recognized, unclaimed scan
-    RaceHubUI->>BFF: POST /api/hazards/scan<br/>playerId, eventId, qrCode
-    BFF->>Rules: Evaluate scan eligibility and hazard policy
-    Rules->>Store: Load player team status, prior claim record, QR metadata, global scan count
-    Store-->>Rules: Return team ACTIVE, QR recognized, not yet claimed by this player
-    Rules->>Rules: Resolve per-QR hazard ratio first, else global ratio
-    Rules->>Rules: Compute (current_scan_count + 1) % effective_hazard_ratio
+  RaceHubUI->>Browser: Request rear camera (getUserMedia facingMode=environment)
+  Browser-->>RaceHubUI: Stream granted
+  RaceHubUI->>Scanner: Decode video frames (BarcodeDetector, jsQR fallback)
+  Scanner-->>RaceHubUI: Return QR payload candidate
+  RaceHubUI->>RaceHubUI: Dedupe/throttle repeated payload frames
+  RaceHubUI->>BFF: POST /events/:eventId/scans<br/>{ playerId, qrPayload }
+  BFF->>Rules: Evaluate scan eligibility and hazard policy
+  Rules->>Store: Load team status, QR metadata, claim history, and global scan count
+  Store-->>Rules: Team ACTIVE, QR valid, unclaimed by player
+  Rules->>Rules: Resolve hazard decision (weight override first, ratio fallback)
 
-    alt Modulo result is not 0
-      Rules->>Store: Persist player claim, increment global scan count, add QR point value to team fuel score
-      Store-->>Rules: Return updated team score, rank impact, and claim status
-      Rules-->>BFF: Return safe-scan success response
-      BFF-->>RaceHubUI: Return updated score/team state
-      RaceHubUI-->>Player: Show neon-green "Success" overlay
-      RaceHubUI-->>Player: Append scan to recent activity and refresh points/rank
-      RaceHubUI->>Leaderboard: Reflect new score in ranking view
-    else Modulo result is 0
-      Rules-->>BFF: Return hazard outcome instead of points
-      BFF-->>RaceHubUI: Route to Pit Stop sequence
-    end
-  else Current local demo behavior
-    RaceHubUI->>RaceHubUI: Randomly award 50 or 100 points if Math.random() does not trigger hazard
-    RaceHubUI->>RaceHubUI: Call GameContext.addScan(points)
-    RaceHubUI-->>Player: Update Total Points card and Recent Activity list locally
+  alt Hazard is not triggered
+    Rules->>Store: Persist claim, increment scan counter, add QR value to team score
+    Store-->>Rules: Return updated team score/state
+    Rules-->>BFF: Return SAFE response
+    BFF-->>RaceHubUI: SAFE + points/team state
+    RaceHubUI->>RaceHubUI: applyScanOutcome(response)
+    RaceHubUI-->>Player: Show "Scan Registered" + append recent activity
+    RaceHubUI->>Leaderboard: Reflect rank/score updates in leaderboard view
+  else Hazard is triggered
+    Rules-->>BFF: Return HAZARD_PIT response
+    BFF-->>RaceHubUI: Return pit-stop penalty payload
+    RaceHubUI-->>Player: Show hazard feedback and route to Pit Stop flow
   end
 ```
 
@@ -158,76 +162,91 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
   participant Scanner as QR Scanner
   participant BFF as Velocity GP BFF/API
   participant Rules as Hazard Rule Engine
   participant Store as Team + Hazard Store
-  participant Teammates as Other Team Devices
   participant PitStopUI as Pit Stop<br/>Current route '/pit-stop'
 
   Player->>RaceHubUI: Scan a QR code while team status is ACTIVE
   RaceHubUI->>Scanner: Decode venue QR payload
   Scanner-->>RaceHubUI: Return qrCode
 
-  alt Intended production behavior when a hazard is triggered
-    RaceHubUI->>BFF: POST /api/hazards/scan or POST /api/events/:eventId/players/:playerId/hazard-status
-    BFF->>Rules: Evaluate effective hazard ratio and scan counter
-    Rules->>Store: Load QR-specific ratio override, global ratio fallback, and current global scan count
-    Store-->>Rules: Return policy inputs and current_scan_count = 14
-    Rules->>Rules: Compute (14 + 1) % 15 = 0
+  RaceHubUI->>BFF: POST /events/:eventId/scans<br/>{ playerId, qrPayload }
+  BFF->>Rules: Run pre-checks and hazard decision logic
+  Rules->>Store: Load race control state, team status, QR status, claim history, and counters
+  Store-->>Rules: Return policy inputs for hazard decision
+
+  alt QR has hazardWeightOverride (0..100)
+    Rules->>Rules: 0 => never hazard, 100 => always hazard
+    Rules->>Rules: 1..99 => crypto.randomInt(100) < hazardWeightOverride
+  else QR uses ratio fallback
+    Rules->>Rules: Use hazardRatioOverride or globalHazardRatio
+    Rules->>Rules: Trigger hazard when globalScanCountAfter % hazardRatioUsed == 0
+  end
+
+  alt Hazard triggered
     Rules->>Store: Persist hazard encounter, set team status IN_PIT, set pitStopExpiresAt = now + 15 minutes
     Store-->>Rules: Return updated penalty state
-    Rules-->>Teammates: Push scanner-disabled update and shared countdown
     Rules-->>BFF: Return hazard penalty result
     BFF-->>RaceHubUI: Return IN_PIT state + lockout expiry
-    RaceHubUI-->>Player: Show red flashing "HAZARD HIT!" overlay
+    RaceHubUI->>RaceHubUI: applyScanOutcome(response) to update pit-stop state
+    RaceHubUI-->>Player: Show "Hazard Hit" feedback
     RaceHubUI-->>PitStopUI: Navigate to '/pit-stop'
     PitStopUI-->>Player: Show "PIT STOP PENALTY", countdown timer, and Helios rescue instructions
-  else Current local demo behavior
-    RaceHubUI->>RaceHubUI: Randomly set isHazard = Math.random() > 0.85
-    RaceHubUI->>RaceHubUI: Call GameContext.triggerPitStop(currentTeam.id, 900)
-    RaceHubUI-->>PitStopUI: Navigate to '/pit-stop'
-    PitStopUI-->>Player: Show local countdown generated by GameContext interval
+  else Hazard not triggered
+    Rules-->>BFF: Return SAFE response
+    BFF-->>RaceHubUI: Continue normal score update flow
   end
 ```
 
-## 5. Scanning an Invalid or Duplicate QR Code
+## 5. Scanning an Invalid, Duplicate, or Blocked QR Code
 
 ```mermaid
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
   participant Scanner as QR Scanner
   participant BFF as Velocity GP BFF/API
   participant Rules as Scan Validation Rules
   participant Store as QR Claim + Player Risk Store
-  participant AdminDash as Admin Dashboard
+  participant PitStopUI as Pit Stop<br/>Current route '/pit-stop'
 
   Player->>RaceHubUI: Scan a QR code
   RaceHubUI->>Scanner: Decode QR payload
-  Scanner-->>RaceHubUI: Return qrCode
-  RaceHubUI->>BFF: POST /api/hazards/scan<br/>playerId, eventId, qrCode
+  Scanner-->>RaceHubUI: Return qrPayload
+  RaceHubUI->>BFF: POST /events/:eventId/scans<br/>{ playerId, qrPayload }
   BFF->>Rules: Validate QR recognition and claim eligibility
-  Rules->>Store: Lookup QR code and player claim history
+  Rules->>Store: Lookup QR code, team state, race control state, and claim history
 
   alt QR code is not recognized
     Store-->>Rules: No matching QR record
-    Rules->>Store: Deduct 1 team point and mark player "Flagged for Review"
-    Rules-->>AdminDash: Surface invalid-scan signal for organizer review
-    Rules-->>BFF: Return recognized=false + penalty details
+    Rules->>Store: Apply configured invalid-scan penalty and mark player flaggedForReview
+    Rules-->>BFF: Return INVALID + QR_NOT_FOUND
     BFF-->>RaceHubUI: Return invalid-scan response
-    RaceHubUI-->>Player: Show warning and updated fuel score
+    RaceHubUI-->>Player: Show invalid QR warning and keep scanner active
   else QR code is recognized but already claimed by this player
-    Store-->>Rules: Existing claim found for playerId + hazardId
-    Rules-->>BFF: Reject duplicate claim with 0 points awarded
-    BFF-->>RaceHubUI: Return "Already Claimed" style response
+    Store-->>Rules: Existing claim found for playerId + qrCodeId
+    Rules-->>BFF: Return DUPLICATE + ALREADY_CLAIMED
+    BFF-->>RaceHubUI: Return duplicate response
     RaceHubUI-->>Player: Show duplicate-scan feedback and keep score unchanged
-  else QR code is valid and unclaimed
-    Store-->>Rules: QR recognized and no player claim exists
-    Rules-->>BFF: Continue into safe-scan or hazard evaluation flow
-    BFF-->>RaceHubUI: Return next outcome
+  else Scan is blocked because team is in pit
+    Store-->>Rules: Team status is IN_PIT
+    Rules-->>BFF: Return BLOCKED + TEAM_IN_PIT
+    BFF-->>RaceHubUI: Return blocked response
+    RaceHubUI-->>PitStopUI: Navigate to '/pit-stop'
+    PitStopUI-->>Player: Show pit-stop lockout state
+  else Scan is blocked by race control or QR disabled
+    Store-->>Rules: raceControlState = PAUSED or qrCode.enabled = false
+    Rules-->>BFF: Return BLOCKED + RACE_PAUSED/QR_DISABLED
+    BFF-->>RaceHubUI: Return blocked response
+    RaceHubUI-->>Player: Show blocked messaging with retry + camera help guidance
+  else QR code is valid and unclaimed (continues to section 3/4)
+    Store-->>Rules: QR recognized, team ACTIVE, no player claim exists
+    Rules-->>BFF: Continue into SAFE/HAZARD decision flow
+    BFF-->>RaceHubUI: Return SAFE or HAZARD_PIT response
   end
 ```
 
@@ -244,7 +263,7 @@ sequenceDiagram
   participant Rules as Rescue Validation Rules
   participant Store as Team + Rescue Store
   participant Teammates as Penalized Team Devices
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   PitStopUI-->>Player: Show timer and instruct player to find a Helios member
   Player->>HeliosQR: Scan Superpower QR from another player
@@ -283,7 +302,7 @@ sequenceDiagram
   else Current local demo rescue flow
     PitStopUI->>PitStopUI: Click "Scan Helios QR (Demo)"
     PitStopUI->>PitStopUI: Call GameContext.clearPitStop(currentTeam.id)
-    PitStopUI-->>RaceHubUI: Navigate to '/race-hub'
+    PitStopUI-->>RaceHubUI: Navigate to '/race'
   end
 ```
 
@@ -297,7 +316,7 @@ sequenceDiagram
   participant Store as Team Store
   participant PlayerApp as Penalized Player App<br/>Pit Stop route '/pit-stop'
   participant Teammates as Other Penalized Team Devices
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
 
   Scheduler->>Rules: Check teams with status IN_PIT and pitStopExpiresAt
   Rules->>Store: Query teams where server time >= pitStopExpiresAt
@@ -313,7 +332,7 @@ sequenceDiagram
   PlayerApp-->>RaceHubUI: Transition from Pit Stop back to Race Hub
   RaceHubUI-->>PlayerApp: Show scanner, current score, and current rank
 
-  Note over PlayerApp,Store: Current React demo decrements pitStopTimeLeft in GameContext on the client every second, but the BDD system expects backend-owned expiry plus WebSocket updates.
+  Note over PlayerApp,Store: Current app still decrements pitStopTimeLeft in GameContext on the client every second after scan responses seed pitStopExpiresAt; backend-owned realtime unlock push is not yet wired in the web client.
 ```
 
 ## 8. Opening the Leaderboard and Victory Lane
@@ -322,7 +341,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor Player
-  participant RaceHubUI as Race Hub<br/>Current route '/race-hub'
+  participant RaceHubUI as Race Hub<br/>Current route '/race'
   participant BottomNav as Bottom Nav
   participant LeaderboardUI as Leaderboard<br/>Current route '/leaderboard'
   participant VictoryLaneUI as Victory Lane<br/>Current route '/victory-lane'
@@ -358,14 +377,14 @@ sequenceDiagram
   end
 
   Player->>LeaderboardUI: Back to Race Hub if event is still active
-  LeaderboardUI-->>RaceHubUI: Navigate to '/race-hub'
+  LeaderboardUI-->>RaceHubUI: Navigate to '/race'
 ```
 
 ## Current Implementation Gaps
 
-- `Login` currently jumps straight to `/garage`; the BDD flow expects magic-link authentication and team-state-based routing.
+- `Login` currently requests magic links using work email only; the broader BDD identity capture requirements still include additional personal contact fields and full name.
 - `Garage` currently lets one player locally generate/finalize a team identity; the updated target flow collects every teammate's self-description first, then generates one team logo from all descriptions plus the preassigned team name.
-- `RaceHub` currently resolves safe scans vs hazards randomly in local state; the BDD flow expects backend recognition, modulo-based hazard checks, and per-player claim enforcement.
+- Camera fallback in `RaceHub` is guidance + retry only; manual payload entry and image-upload fallback are intentionally not implemented in v1.
 - `PitStop` currently clears penalties with a local demo button; the BDD flow expects backend Helios rescue validation, self-rescue rejection, and cooldown handling.
 - `HeliosProfile` currently enables Helios mode on page visit; the BDD flow expects role assignment to be controlled by event/admin rules.
 - `Leaderboard` and `VictoryLane` currently derive most results from `GameContext`; the BDD flow expects backend-backed standings and event completion data.
@@ -374,4 +393,6 @@ sequenceDiagram
 
 - Every section is a Mermaid `sequenceDiagram` focused on one player action or one system reaction.
 - `alt` branches separate intended BDD behavior from current local demo behavior where the implementation is still mocked.
-- Route names and API paths are written exactly as they currently appear in the React router and BFF route contracts when available.
+- Canonical player routes are `/team-setup` and `/race`; legacy aliases `/garage` and `/race-hub` redirect to canonical paths.
+- Login entry remains `/`, and `/signup` is a supported legacy alias that redirects to `/`.
+- API path references are written exactly as they currently appear in the BFF route contracts.

@@ -25,7 +25,7 @@ ingress:
       name: api
     match:
       path:
-        prefix: /api/v1
+        prefix: /api
   - component:
       name: client
     match:
@@ -87,6 +87,18 @@ services:
         value: "${DATABASE_URL}"
         scope: RUN_AND_BUILD_TIME
         type: SECRET
+      - key: SEED_DATABASE_URL
+        value: "${SEED_DATABASE_URL}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: DIRECT_DATABASE_URL
+        value: "${DIRECT_DATABASE_URL}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: MAGIC_LINK_TOKEN_EXPIRY_DATE
+        value: "${MAGIC_LINK_TOKEN_EXPIRY_DATE}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: VITE_PUBLIC_POSTHOG_KEY
         value: "${POSTHOG_KEY}"
         scope: RUN_AND_BUILD_TIME
@@ -123,8 +135,68 @@ services:
         value: "${API_PACKAGE_PATH}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
+      - key: FRONTEND_ORIGIN
+        value: "${FRONTEND_ORIGIN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: FRONTEND_MAGIC_LINK_ORIGIN
+        value: "${FRONTEND_MAGIC_LINK_ORIGIN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: AUTH_SECRET
+        value: "${AUTH_SECRET}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: MAGIC_LINK_TOKEN_TTL_MINUTES
+        value: "${MAGIC_LINK_TOKEN_TTL_MINUTES}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: AUTH_SESSION_TTL_HOURS
+        value: "${AUTH_SESSION_TTL_HOURS}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: N8N_HOST
+        value: "${N8N_HOST}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: N8N_WEBHOOK_TOKEN
+        value: "${N8N_WEBHOOK_TOKEN}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: MAILTRAP_WEBHOOK_SECRET
+        value: "${MAILTRAP_WEBHOOK_SECRET}"
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET        
+      - key: N8N_EMAIL_WEBHOOK_TIMEOUT_MS
+        value: "${N8N_EMAIL_WEBHOOK_TIMEOUT_MS}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: PIT_RELEASE_SCHEDULER_ENABLED
+        value: "${PIT_RELEASE_SCHEDULER_ENABLED}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: PIT_RELEASE_POLL_INTERVAL_MS
+        value: "${PIT_RELEASE_POLL_INTERVAL_MS}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: PIT_RELEASE_BATCH_SIZE
+        value: "${PIT_RELEASE_BATCH_SIZE}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: PIT_RELEASE_WEBHOOK_URL
+        value: "${PIT_RELEASE_WEBHOOK_URL}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: PIT_RELEASE_WEBHOOK_TIMEOUT_MS
+        value: "${PIT_RELEASE_WEBHOOK_TIMEOUT_MS}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: SERVICE_NAME
+        value: "${SERVICE_NAME}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
     # liveness_health_check:
-    #   http_path: /api/v1/health
+    #   http_path: /health
     #   period_seconds: 10
     #   success_threshold: 1
     #   failure_threshold: 3
@@ -142,17 +214,37 @@ static_sites:
     envs:
       - key: CLIENT_BASE_URL
         value: "${CLIENT_BASE_URL}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: VITE_API_BASE_URL
-        value: "${API_BASE_URL}"
+        value: "${_self.PUBLIC_URL}api"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: VITE_PUBLIC_POSTHOG_KEY
         value: "${POSTHOG_KEY}"
         scope: RUN_AND_BUILD_TIME
         type: SECRET
+      - key: VITE_FRONTEND_MAGIC_LINK_ORIGIN
+        value: "${FRONTEND_MAGIC_LINK_ORIGIN}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: VITE_PUBLIC_POSTHOG_HOST
         value: "${POSTHOG_HOST}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
-      - key: DEBUG
+      - key: VITE_OBSERVABILITY_DEBUG
+        value: "${VITE_OBSERVABILITY_DEBUG}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: VITE_OTEL_TRACE_SAMPLING_RATE
+        value: "${VITE_OTEL_TRACE_SAMPLING_RATE}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: VITE_DEBUG
         value: "${DEBUG}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
+      - key: SOURCEMAP
+        value: "${SOURCEMAP}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL

@@ -2,6 +2,8 @@ import { Router } from 'express';
 
 import { adminRouter } from './admin.js';
 import { devMockRouter } from './devMock.js';
+import { authRouter } from './auth.js';
+import { emailWebhookRouter } from './emailWebhook.js';
 import { eventRouter } from './event.js';
 import { gameRouter } from './game.js';
 import { garageRouter } from './garage.js';
@@ -13,8 +15,11 @@ import { teamRouter } from './team.js';
 
 export const apiRouter = Router();
 
+// Route order is intentionally stable so broad prefixes do not shadow specific handlers.
 apiRouter.use(adminRouter);
 apiRouter.use(devMockRouter);
+apiRouter.use(authRouter);
+apiRouter.use(emailWebhookRouter);
 apiRouter.use(eventRouter);
 apiRouter.use(gameRouter);
 // Garage workflow: player description submission + team logo polling

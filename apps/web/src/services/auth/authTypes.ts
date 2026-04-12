@@ -1,10 +1,17 @@
 export type AuthRole = 'admin' | 'helios' | 'player' | 'anonymous';
+export type AuthAssignmentStatus = 'ASSIGNED_PENDING' | 'ASSIGNED_ACTIVE' | 'UNASSIGNED';
 
 export interface AuthSession {
   userId: string | null;
+  playerId?: string;
+  eventId?: string;
+  teamId?: string | null;
+  teamStatus?: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null;
+  assignmentStatus?: AuthAssignmentStatus;
   role: AuthRole;
   isAuthenticated: boolean;
   email?: string;
+  displayName?: string;
   /**
    * Player context — populated after the backend resolves the magic-link
    * callback and returns the player record for this event.
@@ -22,7 +29,10 @@ export interface AuthSession {
   eventId?: string;
 }
 
+// Storage/event keys are shared across hooks, context, and route guards.
 export const AUTH_SESSION_STORAGE_KEY = 'velocitygp.auth.session';
+export const AUTH_SESSION_TOKEN_STORAGE_KEY = 'velocitygp.auth.token';
+export const AUTH_SESSION_UPDATED_EVENT = 'velocitygp.auth.session.updated';
 
 export const anonymousSession: AuthSession = {
   userId: null,
@@ -31,6 +41,7 @@ export const anonymousSession: AuthSession = {
 };
 
 export function isAuthenticatedSession(session: AuthSession): boolean {
+  // Require explicit user id and non-anonymous role to avoid half-hydrated states.
   return session.isAuthenticated && session.role !== 'anonymous' && session.userId !== null;
 }
 

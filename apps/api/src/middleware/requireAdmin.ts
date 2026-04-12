@@ -4,6 +4,7 @@ import { ForbiddenError, UnauthorizedError } from '../utils/appError.js';
 
 export function requireAdmin(request: Request, response: Response, next: NextFunction): void {
   // #TODO(#12): Validate Auth.js session/JWT from server-managed cookie and map claims to admin role.
+  // Transitional path accepts bearer token or legacy x-user-* headers via requestAuth helper.
   const authContext = resolveRequestAuthContext(request);
   if (!authContext) {
     throw new UnauthorizedError('Authentication is required.');

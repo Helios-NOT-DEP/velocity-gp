@@ -1,3 +1,7 @@
+/**
+ * @file progress.tsx
+ * @description Displays an indicator showing the completion progress of a task.
+ */
 'use client';
 
 import * as React from 'react';
@@ -5,6 +9,7 @@ import * as ProgressPrimitive from '@radix-ui/react-progress';
 
 import { cn } from './utils';
 
+/** Renders horizontal/circular determinate loading states. */
 function Progress({
   className,
   value,

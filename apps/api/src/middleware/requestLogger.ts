@@ -6,18 +6,20 @@ export function requestLogger(request: Request, response: Response, next: NextFu
   const startedAt = process.hrtime.bigint();
 
   response.on('finish', () => {
+    // High-resolution timer avoids coarse duration rounding on fast API paths.
     const durationInMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
-    logger.info(
-      {
-        requestId: response.locals.requestId,
-        method: request.method,
-        path: request.originalUrl,
-        statusCode: response.statusCode,
-        durationInMs,
-      },
-      'request completed'
-    );
+    logger.info('API Request completed', {
+      requestId: response.locals.requestId,
+      method: request.method,
+      path: request.path,
+      ip: request.ip,
+      userAgent: request.get('user-agent'),
+      query: request.query,
+      params: request.params,
+      statusCode: response.statusCode,
+      durationInMs,
+    });
   });
 
   next();

@@ -13,6 +13,7 @@ export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElemen
   const { src, alt, style, className, ...rest } = props;
 
   return didError ? (
+    // Keeps intended layout dimensions when source image fails, avoiding content jumps.
     <div
       className={`inline-block bg-gray-100 text-center align-middle ${className ?? ''}`}
       style={style}

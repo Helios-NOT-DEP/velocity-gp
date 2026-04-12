@@ -1,1 +1,65 @@
-{}
+{
+	"servers": {
+		"chrome-devtools": {
+			"command": "npx",
+			"args": ["-y", "chrome-devtools-mcp@latest", "--slim", "--headless"]
+		},
+		 "mcpDigitalOcean": {
+			"command": "npx",
+			"args": [
+				"@digitalocean/mcp",
+				"--services",
+				"apps",
+				"docs",
+				"insights",
+				"spaces"
+			],
+			"env": {
+				"DIGITALOCEAN_API_TOKEN": "${input:digitalocean-token}"
+			}
+    	},
+		"mailtrap": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"mcp-mailtrap"
+			],
+			"env": {
+				"MAILTRAP_API_TOKEN": "${input:mailtrapApiToken}",
+				"DEFAULT_FROM_EMAIL": "${input:senderEmail}",
+				"MAILTRAP_ACCOUNT_ID": "${input:mailtrapAccountId}",
+				"MAILTRAP_TEST_INBOX_ID": "${input:mailtrapTestInboxId}"
+			},
+			"type": "stdio"
+		}
+	},
+	"inputs": [
+		{
+			"type": "promptString",
+			"id": "mailtrapApiToken",
+			"description": "Mailtrap API Token",
+			"password": true
+		},
+		{
+			"type": "promptString",
+			"id": "senderEmail",
+			"description": "Sender Email Address"
+		},
+		{
+			"type": "promptString",
+			"id": "mailtrapAccountId",
+			"description": "Mailtrap Account ID"
+		},
+		{
+			"type": "promptString",
+			"id": "mailtrapTestInboxId",
+			"description": "Mailtrap Test Inbox ID (optional)"
+		},
+		{
+			"id": "digitalocean-token",
+			"type": "promptString",
+			"description": "DigitalOcean API Token",
+			"password": true
+		}
+	]
+}

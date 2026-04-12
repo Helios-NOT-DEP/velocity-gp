@@ -4,10 +4,14 @@ Quick navigation for all project documentation organized by theme.
 
 ## 📚 Architecture & Design
 
+- **[Architecture Decision Records](./adr/README.md)** — Concise decision log for the architecture choices currently shaping the repo
+
 - **[Repository Guidelines & Architecture](./architecture/AGENTS.md)** — Code organization, coding standards, service layer patterns
 - **[Tech Stack Needed](./architecture/Tech%20Stack%20Needed.md)** — Planned infrastructure and backend architecture
 - **[RepoStructure](./architecture/RepoStructure.md)** — Repository organization and conventions
 - **[Realtime Event Contract](./architecture/realtime-event-contract.md)** — Typed event envelope, channel boundaries, and ordering/idempotency rules for #50/#49
+- **[Team Activity Feed](./architecture/team-activity-feed.md)** — Race Hub team timeline model for onboarding + scan outcomes and polling delivery
+- **[Assignment and Identity Rulebook](./architecture/assignment-identity-rulebook.md)** — Canonical `workEmail` identity, assignment-state mapping, roster/admin rules, and auth-routing contract for #44/#12/#14
 
 ## 📖 Product & Requirements
 

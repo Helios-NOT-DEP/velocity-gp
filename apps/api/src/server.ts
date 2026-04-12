@@ -4,23 +4,22 @@ import { logger } from './lib/logger.js';
 import { startPitReleaseScheduler } from './services/pitReleaseScheduler.js';
 
 const app = createApp();
+// Background scheduler is process-scoped and starts with HTTP server boot.
 const stopPitReleaseScheduler = startPitReleaseScheduler();
 
 app.listen(env.PORT, env.HOST, () => {
-  logger.info(
-    {
-      host: env.HOST,
-      port: env.PORT,
-      apiPrefix: env.API_PREFIX,
-    },
-    'Velocity GP backend listening'
-  );
+  logger.info('Velocity GP backend listening', {
+    host: env.HOST,
+    port: env.PORT,
+    apiPrefix: env.API_PREFIX,
+  });
 });
 
 type ShutdownSignal = 'SIGINT' | 'SIGTERM';
 
 function handleShutdownSignal(signal: ShutdownSignal): void {
-  logger.info({ signal }, 'received shutdown signal');
+  logger.info('received shutdown signal', { signal });
+  // Ensure timers/subscriptions are torn down before process exits.
   stopPitReleaseScheduler();
   process.exit(0);
 }

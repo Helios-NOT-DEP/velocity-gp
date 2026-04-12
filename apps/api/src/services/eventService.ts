@@ -2,6 +2,12 @@ import type { EventSummary } from '@velocity-gp/api-contract';
 
 import { placeholderEvent } from './placeholderData.js';
 
+/**
+ * Event service used by event-facing API handlers.
+ *
+ * This module currently returns placeholder-backed values until event persistence
+ * is fully wired to the database layer.
+ */
 export function listEvents(): EventSummary[] {
   // TODO: Query all events from database
   return [
@@ -16,6 +22,11 @@ export function listEvents(): EventSummary[] {
   ];
 }
 
+/**
+ * Returns a single event summary for the requested ID.
+ *
+ * The current implementation mirrors placeholder data and swaps only the ID.
+ */
 export function getEvent(eventId: string): EventSummary {
   // TODO: Query event from database
   return {
@@ -24,6 +35,11 @@ export function getEvent(eventId: string): EventSummary {
   };
 }
 
+/**
+ * Returns the currently active event summary.
+ *
+ * This is a temporary placeholder implementation.
+ */
 export function getCurrentEvent(): EventSummary {
   // TODO: Query current event from database
   return placeholderEvent;

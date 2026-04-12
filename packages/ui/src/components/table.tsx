@@ -1,9 +1,14 @@
+/**
+ * @file table.tsx
+ * @description A responsive table component.
+ */
 'use client';
 
 import * as React from 'react';
 
 import { cn } from './utils';
 
+/** Renders structured data sets like Roster metrics into grids. */
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
     <div data-slot="table-container" className="relative w-full overflow-x-auto">
@@ -16,10 +21,12 @@ function Table({ className, ...props }: React.ComponentProps<'table'>) {
   );
 }
 
+/** Standardized sub-component or utility serving TableHeader. */
 function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return <thead data-slot="table-header" className={cn('[&_tr]:border-b', className)} {...props} />;
 }
 
+/** Standardized sub-component or utility serving TableBody. */
 function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
   return (
     <tbody
@@ -30,6 +37,7 @@ function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
   );
 }
 
+/** Standardized sub-component or utility serving TableFooter. */
 function TableFooter({ className, ...props }: React.ComponentProps<'tfoot'>) {
   return (
     <tfoot
@@ -40,6 +48,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<'tfoot'>) {
   );
 }
 
+/** Standardized sub-component or utility serving TableRow. */
 function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
   return (
     <tr
@@ -53,6 +62,7 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
   );
 }
 
+/** Standardized sub-component or utility serving TableHead. */
 function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
   return (
     <th
@@ -66,6 +76,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
   );
 }
 
+/** Standardized sub-component or utility serving TableCell. */
 function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   return (
     <td
@@ -79,6 +90,7 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   );
 }
 
+/** Standardized sub-component or utility serving TableCaption. */
 function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) {
   return (
     <caption

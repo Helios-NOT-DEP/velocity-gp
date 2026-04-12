@@ -8,8 +8,9 @@ _As an attendee, I want a frictionless login to join the multi-day event without
 
 #### Scenario: Requesting a Magic Link
 
-- **Given** the Player is on the public Sign Up page (/signup)
-- **When** the Player enters their email work email address
+- **Given** the Player is on the public login entry route (/)
+- **And** `/signup` remains a supported legacy alias that redirects to `/`
+- **When** the Player enters their work email address
 - **And** Personal email or cellphone number and full name
 - **And** the Player clicks "Submit"
 - **Then** the system should send a secure Magic Link via the provided channel

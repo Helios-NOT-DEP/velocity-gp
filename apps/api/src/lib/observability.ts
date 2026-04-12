@@ -8,6 +8,7 @@ type SpanAttributes = Record<string, AttributeValue>;
 const counters = new Map<string, number>();
 
 function buildCounterKey(name: string, labels: SpanAttributes): string {
+  // Sort labels for deterministic metric keys regardless of call-site object ordering.
   const sortedLabels = Object.entries(labels)
     .filter(([, value]) => value !== undefined)
     .sort(([left], [right]) => left.localeCompare(right))
@@ -26,14 +27,11 @@ export function incrementCounter(
   const nextValue = (counters.get(key) ?? 0) + incrementBy;
   counters.set(key, nextValue);
 
-  logger.debug(
-    {
-      metric: name,
-      labels,
-      value: nextValue,
-    },
-    'counter incremented'
-  );
+  logger.debug('counter incremented', {
+    metric: name,
+    labels,
+    value: nextValue,
+  });
 
   return nextValue;
 }
@@ -45,19 +43,19 @@ export async function withTraceSpan<T>(
 ): Promise<T> {
   const startedAt = performance.now();
 
-  logger.debug({ spanName, attributes }, 'span started');
+  logger.debug('span started', { spanName, attributes });
 
   try {
     const result = await run();
     const durationMs = Number((performance.now() - startedAt).toFixed(3));
 
-    logger.debug({ spanName, attributes, durationMs }, 'span completed');
+    logger.debug('span completed', { spanName, attributes, durationMs });
 
     return result;
   } catch (error) {
     const durationMs = Number((performance.now() - startedAt).toFixed(3));
 
-    logger.error({ err: error, spanName, attributes, durationMs }, 'span failed');
+    logger.error('span failed', { err: error, spanName, attributes, durationMs });
     throw error;
   }
 }

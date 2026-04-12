@@ -8,8 +8,15 @@ import type {
   TeamStatus,
 } from '@velocity-gp/api-contract';
 
+/**
+ * Shared placeholder fixture data used by service modules that are not yet fully
+ * wired to persisted storage.
+ */
 const baseTimestamp = new Date('2026-04-06T12:00:00.000Z');
 
+/**
+ * Produces deterministic ISO timestamps relative to the shared base fixture time.
+ */
 export function createIsoDate(offsetMinutes: number = 0): string {
   return new Date(baseTimestamp.getTime() + offsetMinutes * 60_000).toISOString();
 }
@@ -57,6 +64,7 @@ export const placeholderQRCodes: QRCodeSummary[] = [
     status: 'ACTIVE',
     scanCount: 14,
     hazardRatioOverride: null,
+    hazardWeightOverride: null,
     activationStartsAt: createIsoDate(-180),
     activationEndsAt: null,
   },
@@ -70,6 +78,7 @@ export const placeholderQRCodes: QRCodeSummary[] = [
     status: 'ACTIVE',
     scanCount: 4,
     hazardRatioOverride: 5,
+    hazardWeightOverride: 25,
     activationStartsAt: createIsoDate(-180),
     activationEndsAt: null,
   },
@@ -83,6 +92,7 @@ export const placeholderQRCodes: QRCodeSummary[] = [
     status: 'ACTIVE',
     scanCount: 28,
     hazardRatioOverride: null,
+    hazardWeightOverride: null,
     activationStartsAt: createIsoDate(-180),
     activationEndsAt: null,
   },
@@ -96,6 +106,7 @@ export const placeholderQRCodes: QRCodeSummary[] = [
     status: 'DISABLED',
     scanCount: 45,
     hazardRatioOverride: null,
+    hazardWeightOverride: null,
     activationStartsAt: createIsoDate(-300),
     activationEndsAt: createIsoDate(-60),
   },
@@ -111,6 +122,9 @@ export const placeholderRescue: HeliosRescueFlow = {
   status: 'COMPLETED',
 };
 
+/**
+ * Returns a cloned team with status and pit expiry overrides applied.
+ */
 export function withTeamStatus(
   team: Team,
   status: TeamStatus,

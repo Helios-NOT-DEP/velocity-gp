@@ -1,3 +1,7 @@
+/**
+ * @file accordion.tsx
+ * @description A vertically stacked set of interactive headings that each reveal a section of content.
+ */
 'use client';
 
 import * as React from 'react';
@@ -6,10 +10,12 @@ import { ChevronDownIcon } from 'lucide-react';
 
 import { cn } from './utils';
 
+/** Displays collapsible content panels for presenting information in a limited amount of space. */
 function Accordion({ ...props }: React.ComponentProps<typeof AccordionPrimitive.Root>) {
   return <AccordionPrimitive.Root data-slot="accordion" {...props} />;
 }
 
+/** Standardized sub-component or utility serving AccordionItem. */
 function AccordionItem({
   className,
   ...props
@@ -23,6 +29,7 @@ function AccordionItem({
   );
 }
 
+/** Standardized sub-component or utility serving AccordionTrigger. */
 function AccordionTrigger({
   className,
   children,
@@ -45,6 +52,7 @@ function AccordionTrigger({
   );
 }
 
+/** Standardized sub-component or utility serving AccordionContent. */
 function AccordionContent({
   className,
   children,

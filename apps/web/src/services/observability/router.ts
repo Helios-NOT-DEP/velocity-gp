@@ -4,8 +4,11 @@ import { trackAnalyticsEvent } from './analytics';
 
 const routeLabels: Record<string, string> = {
   '/': 'login',
-  '/garage': 'garage',
-  '/race-hub': 'race-hub',
+  '/team-setup': 'team-setup',
+  '/race': 'race',
+  // Alias routes intentionally map to canonical labels for consistent analytics.
+  '/garage': 'team-setup',
+  '/race-hub': 'race',
   '/pit-stop': 'pit-stop',
   '/helios': 'helios',
   '/leaderboard': 'leaderboard',
@@ -20,6 +23,8 @@ function trackRoute(pathname: string) {
 }
 
 export function observeRouter(router: Router) {
+  // Deduplicates route events because router subscriptions can fire repeatedly
+  // during redirects and state-only transitions.
   let previousPathname: string | null = null;
 
   const emitCurrentRoute = () => {

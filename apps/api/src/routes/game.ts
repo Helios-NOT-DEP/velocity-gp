@@ -12,6 +12,7 @@ import { getLeaderboard, getRaceState, updateHazardStatus } from '../services/ga
 
 export const gameRouter = Router();
 
+// Race-state and leaderboard endpoints used by active gameplay surfaces.
 gameRouter.get(
   '/events/:eventId/players/:playerId/race-state',
   validate(raceStateParamsSchema, 'params'),

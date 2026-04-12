@@ -7,6 +7,12 @@ import type {
 
 import { createIsoDate, placeholderPlayer, placeholderTeam } from './placeholderData.js';
 
+/**
+ * Game-state service for race status and leaderboard endpoints.
+ *
+ * These handlers currently synthesize deterministic placeholder responses while
+ * event-state persistence is being finalized.
+ */
 export function getRaceState(eventId: string, playerId: string): GetRaceStateResponse {
   const teamStatus = playerId === placeholderPlayer.id ? 'IN_PIT' : placeholderTeam.status;
 
@@ -28,6 +34,11 @@ export function getRaceState(eventId: string, playerId: string): GetRaceStateRes
   };
 }
 
+/**
+ * Persists and returns a player's hazard status update.
+ *
+ * The implementation currently echoes request input with a synthetic timestamp.
+ */
 export function updateHazardStatus(
   eventId: string,
   playerId: string,
@@ -42,6 +53,11 @@ export function updateHazardStatus(
   };
 }
 
+/**
+ * Returns the event leaderboard in rank order.
+ *
+ * Placeholder standings include one dynamic team name based on the provided event ID.
+ */
 export function getLeaderboard(eventId: string): LeaderboardEntry[] {
   return [
     {

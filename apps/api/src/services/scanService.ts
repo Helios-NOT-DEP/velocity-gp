@@ -1,3 +1,5 @@
+import { randomInt } from 'node:crypto';
+
 import type {
   ScanHazardRequest,
   StableErrorCode,
@@ -10,33 +12,127 @@ import { prisma } from '../db/client.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError } from '../utils/appError.js';
+import {
+  buildScanActivitySummary,
+  recordScanActivityInTransaction,
+} from './teamActivityFeedService.js';
 
+/**
+ * QR scan processing service.
+ *
+ * This service is transaction-heavy and responsible for:
+ * - validating event/player/team/QR state
+ * - creating scan records for all outcomes
+ * - awarding points or applying pit-stop hazards
+ * - retrying serialization conflicts for high-concurrency scans
+ */
 interface SubmitScanInput {
   readonly eventId: string;
   readonly request: SubmitScanRequest;
 }
 
+/**
+ * Maximum retry attempts for serialization conflicts (`P2034` / adapter-level
+ * write conflicts).
+ */
 const SERIALIZATION_RETRY_LIMIT = 3;
 
 function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
   return error instanceof Prisma.PrismaClientKnownRequestError;
 }
 
-function isSerializationFailure(error: unknown): boolean {
-  return isKnownPrismaError(error) && error.code === 'P2034';
+interface AdapterSerializationCause {
+  readonly originalCode?: string;
+  readonly kind?: string;
 }
 
+interface AdapterSerializationErrorShape {
+  readonly name?: string;
+  readonly cause?: AdapterSerializationCause;
+  readonly message?: string;
+}
+
+/**
+ * Detects Prisma adapter-level write-conflict signatures.
+ */
+function isAdapterSerializationFailure(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const adapterError = error as AdapterSerializationErrorShape;
+  if (adapterError.name !== 'DriverAdapterError') {
+    return false;
+  }
+
+  const originalCode = adapterError.cause?.originalCode;
+  if (originalCode === '40001') {
+    return true;
+  }
+
+  const kind = adapterError.cause?.kind;
+  if (kind === 'TransactionWriteConflict') {
+    return true;
+  }
+
+  return adapterError.message?.includes('TransactionWriteConflict') ?? false;
+}
+
+/**
+ * Detects serialization failures that are safe to retry.
+ */
+function isSerializationFailure(error: unknown): boolean {
+  return (
+    (isKnownPrismaError(error) && error.code === 'P2034') || isAdapterSerializationFailure(error)
+  );
+}
+
+/**
+ * Resolves effective hazard ratio with per-QR override precedence.
+ */
 function resolveHazardRatio(hazardRatioOverride: number | null, globalHazardRatio: number): number {
   const configuredRatio = hazardRatioOverride ?? globalHazardRatio;
   return configuredRatio > 0 ? configuredRatio : 1;
 }
 
+interface ResolveHazardDecisionInput {
+  readonly globalScanCountAfter: number;
+  readonly hazardRatioUsed: number;
+  readonly hazardWeightOverride: number | null;
+}
+
+/**
+ * Resolves whether a scan triggers pit hazard.
+ *
+ * If `hazardWeightOverride` is set, it acts as percent chance (0..100).
+ * Otherwise, hazard triggers by modulo using global scan count.
+ */
+function resolveHazardDecision(input: ResolveHazardDecisionInput): boolean {
+  if (input.hazardWeightOverride !== null) {
+    if (input.hazardWeightOverride <= 0) {
+      return false;
+    }
+
+    if (input.hazardWeightOverride >= 100) {
+      return true;
+    }
+
+    return randomInt(100) < input.hazardWeightOverride;
+  }
+
+  return input.globalScanCountAfter % input.hazardRatioUsed === 0;
+}
+
+/**
+ * Executes complete scan processing inside a transaction.
+ */
 async function processScanInTransaction(
   tx: Prisma.TransactionClient,
   input: SubmitScanInput,
   qrPayload: string,
   now: Date
 ): Promise<SubmitScanResponse> {
+  // Load all state that influences scan outcome before mutating any records.
   const [eventConfig, playerWithTeam, globalScanCountBefore] = await Promise.all([
     tx.eventConfig.findUnique({
       where: {
@@ -103,9 +199,11 @@ async function processScanInTransaction(
     },
     select: {
       id: true,
+      label: true,
       status: true,
       value: true,
       hazardRatioOverride: true,
+      hazardWeightOverride: true,
     },
   });
 
@@ -128,6 +226,7 @@ async function processScanInTransaction(
         message,
       },
       select: {
+        id: true,
         createdAt: true,
       },
     });
@@ -139,6 +238,26 @@ async function processScanInTransaction(
       data: {
         isFlaggedForReview: true,
       },
+    });
+
+    await recordScanActivityInTransaction(tx, {
+      sourceKey: `scan:${scanRecord.id}`,
+      eventId: input.eventId,
+      teamId: team.id,
+      playerId: playerWithTeam.id,
+      occurredAt: scanRecord.createdAt,
+      scanOutcome: 'INVALID',
+      pointsAwarded,
+      errorCode: 'QR_NOT_FOUND',
+      qrCodeId: null,
+      qrCodeLabel: null,
+      qrPayload,
+      summary: buildScanActivitySummary({
+        scanOutcome: 'INVALID',
+        qrCodeLabel: null,
+        pointsAwarded,
+        errorCode: 'QR_NOT_FOUND',
+      }),
     });
 
     return {
@@ -161,11 +280,13 @@ async function processScanInTransaction(
     (!team.pitStopExpiresAt || team.pitStopExpiresAt.getTime() > now.getTime());
 
   if (eventConfig.raceControlState === 'PAUSED') {
+    // Race-control pause short-circuits all scans but still records blocked attempts.
     return createBlockedScanResponse(tx, {
       eventId: input.eventId,
       playerId: playerWithTeam.id,
       teamId: team.id,
       qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
       qrPayload,
       message: 'Race control is paused.',
       errorCode: 'RACE_PAUSED',
@@ -180,6 +301,7 @@ async function processScanInTransaction(
       playerId: playerWithTeam.id,
       teamId: team.id,
       qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
       qrPayload,
       message: 'Team is currently in pit stop lockout.',
       errorCode: 'TEAM_IN_PIT',
@@ -194,6 +316,7 @@ async function processScanInTransaction(
       playerId: playerWithTeam.id,
       teamId: team.id,
       qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
       qrPayload,
       message: 'QR code is disabled by admin control.',
       errorCode: 'QR_DISABLED',
@@ -219,6 +342,7 @@ async function processScanInTransaction(
   });
 
   if (claimResult.count === 0) {
+    // Duplicate is determined by unique claim write, avoiding race-prone read-before-write checks.
     const message = 'Player has already claimed this QR code.';
     const scanRecord = await tx.scanRecord.create({
       data: {
@@ -235,8 +359,29 @@ async function processScanInTransaction(
         message,
       },
       select: {
+        id: true,
         createdAt: true,
       },
+    });
+
+    await recordScanActivityInTransaction(tx, {
+      sourceKey: `scan:${scanRecord.id}`,
+      eventId: input.eventId,
+      teamId: team.id,
+      playerId: playerWithTeam.id,
+      occurredAt: scanRecord.createdAt,
+      scanOutcome: 'DUPLICATE',
+      pointsAwarded: 0,
+      errorCode: 'ALREADY_CLAIMED',
+      qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
+      qrPayload,
+      summary: buildScanActivitySummary({
+        scanOutcome: 'DUPLICATE',
+        qrCodeLabel: qrCode.label,
+        pointsAwarded: 0,
+        errorCode: 'ALREADY_CLAIMED',
+      }),
     });
 
     return {
@@ -264,8 +409,13 @@ async function processScanInTransaction(
     },
   });
 
-  const hazardTriggered = globalScanCountAfter % hazardRatioUsed === 0;
+  const hazardTriggered = resolveHazardDecision({
+    globalScanCountAfter,
+    hazardRatioUsed,
+    hazardWeightOverride: qrCode.hazardWeightOverride,
+  });
   if (hazardTriggered) {
+    // Hazard path transitions the team into pit-stop and records team/player state mutation.
     const pitStopExpiresAt = new Date(now.getTime() + eventConfig.pitStopDurationSeconds * 1_000);
 
     const [updatedTeam, scanRecord] = await Promise.all([
@@ -296,6 +446,7 @@ async function processScanInTransaction(
           message: 'Hazard trigger reached. Team moved to pit stop.',
         },
         select: {
+          id: true,
           createdAt: true,
         },
       }),
@@ -322,6 +473,26 @@ async function processScanInTransaction(
         },
       }),
     ]);
+
+    await recordScanActivityInTransaction(tx, {
+      sourceKey: `scan:${scanRecord.id}`,
+      eventId: input.eventId,
+      teamId: team.id,
+      playerId: playerWithTeam.id,
+      occurredAt: scanRecord.createdAt,
+      scanOutcome: 'HAZARD_PIT',
+      pointsAwarded: 0,
+      errorCode: null,
+      qrCodeId: qrCode.id,
+      qrCodeLabel: qrCode.label,
+      qrPayload,
+      summary: buildScanActivitySummary({
+        scanOutcome: 'HAZARD_PIT',
+        qrCodeLabel: qrCode.label,
+        pointsAwarded: 0,
+        errorCode: null,
+      }),
+    });
 
     return {
       outcome: 'HAZARD_PIT',
@@ -368,6 +539,7 @@ async function processScanInTransaction(
         message: 'Safe scan awarded points.',
       },
       select: {
+        id: true,
         createdAt: true,
       },
     }),
@@ -383,6 +555,26 @@ async function processScanInTransaction(
       },
       status: 'RACING',
     },
+  });
+
+  await recordScanActivityInTransaction(tx, {
+    sourceKey: `scan:${scanRecord.id}`,
+    eventId: input.eventId,
+    teamId: team.id,
+    playerId: playerWithTeam.id,
+    occurredAt: scanRecord.createdAt,
+    scanOutcome: 'SAFE',
+    pointsAwarded: qrCode.value,
+    errorCode: null,
+    qrCodeId: qrCode.id,
+    qrCodeLabel: qrCode.label,
+    qrPayload,
+    summary: buildScanActivitySummary({
+      scanOutcome: 'SAFE',
+      qrCodeLabel: qrCode.label,
+      pointsAwarded: qrCode.value,
+      errorCode: null,
+    }),
   });
 
   return {
@@ -406,6 +598,7 @@ interface CreateBlockedScanResponseInput {
   readonly playerId: string;
   readonly teamId: string;
   readonly qrCodeId: string;
+  readonly qrCodeLabel: string | null;
   readonly qrPayload: string;
   readonly message: string;
   readonly errorCode: Extract<StableErrorCode, 'QR_DISABLED' | 'RACE_PAUSED' | 'TEAM_IN_PIT'>;
@@ -413,6 +606,9 @@ interface CreateBlockedScanResponseInput {
   readonly globalScanCountAfter: number;
 }
 
+/**
+ * Creates a canonical blocked-scan record/response pair.
+ */
 async function createBlockedScanResponse(
   tx: Prisma.TransactionClient,
   input: CreateBlockedScanResponseInput
@@ -432,8 +628,29 @@ async function createBlockedScanResponse(
       message: input.message,
     },
     select: {
+      id: true,
       createdAt: true,
     },
+  });
+
+  await recordScanActivityInTransaction(tx, {
+    sourceKey: `scan:${scanRecord.id}`,
+    eventId: input.eventId,
+    teamId: input.teamId,
+    playerId: input.playerId,
+    occurredAt: scanRecord.createdAt,
+    scanOutcome: 'BLOCKED',
+    pointsAwarded: 0,
+    errorCode: input.errorCode,
+    qrCodeId: input.qrCodeId,
+    qrCodeLabel: input.qrCodeLabel,
+    qrPayload: input.qrPayload,
+    summary: buildScanActivitySummary({
+      scanOutcome: 'BLOCKED',
+      qrCodeLabel: input.qrCodeLabel,
+      pointsAwarded: 0,
+      errorCode: input.errorCode,
+    }),
   });
 
   return {
@@ -450,6 +667,11 @@ async function createBlockedScanResponse(
   };
 }
 
+/**
+ * Primary scan ingestion API.
+ *
+ * Uses serializable transactions and bounded retries for write conflicts.
+ */
 export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResponse> {
   const qrPayload = input.request.qrPayload.trim();
   if (!qrPayload) {
@@ -479,15 +701,13 @@ export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResp
             throw error;
           }
 
+          // Retry only known serialization/write-conflict failures under serializable isolation.
           attempt += 1;
-          logger.warn(
-            {
-              eventId: input.eventId,
-              playerId: input.request.playerId,
-              attempt,
-            },
-            'serialization conflict during scan processing, retrying'
-          );
+          logger.warn('serialization conflict during scan processing, retrying', {
+            eventId: input.eventId,
+            playerId: input.request.playerId,
+            attempt,
+          });
         }
       }
 
@@ -499,6 +719,9 @@ export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResp
   );
 }
 
+/**
+ * Backward-compatible adapter for legacy scan contract.
+ */
 export async function submitLegacyScan(request: ScanHazardRequest): Promise<SubmitScanResponse> {
   return submitScan({
     eventId: request.eventId,

@@ -1,14 +1,16 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
-import Signup from './pages/Signup';
+import Login from './pages/Login';
 import Garage from './pages/Garage';
 import RaceHub from './pages/RaceHub';
 import PitStop from './pages/PitStop';
 import HeliosProfile from './pages/HeliosProfile';
 import Leaderboard from './pages/Leaderboard';
 import VictoryLane from './pages/VictoryLane';
+import WaitingAssignment from './pages/WaitingAssignment';
 import RootLayout from './layouts/RootLayout';
 import AdminLayout from './layouts/AdminLayout';
 import AdminRouteGuard from './components/auth/AdminRouteGuard';
+import ProtectedRouteGuard from './components/auth/ProtectedRouteGuard';
 import AdminGameControl from './pages/admin/AdminGameControl';
 import AdminQrCodes from './pages/admin/AdminQrCodes';
 import AdminTeams from './pages/admin/AdminTeams';
@@ -16,27 +18,54 @@ import AdminPlayers from './pages/admin/AdminPlayers';
 import AdminStatistics from './pages/admin/AdminStatistics';
 
 export const appRoutes: RouteObject[] = [
+  // Public auth entrypoint.
   {
     path: '/',
-    Component: Signup,
+    Component: Login,
   },
   {
     path: '/garage',
-    Component: Garage,
+    element: <Navigate to="/team-setup" replace />,
+  },
+  // Legacy alias: preserve older /race-hub links while canonical path is /race.
+  {
+    path: '/race-hub',
+    element: <Navigate to="/race" replace />,
   },
   {
+    path: '/waiting-assignment',
+    Component: WaitingAssignment,
+  },
+  // Team setup remains a standalone pre-race screen outside the bottom-nav layout shell.
+  {
+    path: '/team-setup',
+    element: (
+      <ProtectedRouteGuard>
+        <Garage />
+      </ProtectedRouteGuard>
+    ),
+  },
+  // TODO(figma-sync): Add /team route parity for post-Garage handoff; Figma flow routes Garage -> TeamPage before Race Hub. | Figma source: src/app/routes.ts (/team -> TeamPage) | Impact: user flow
+  {
     path: '/',
-    Component: RootLayout,
+    element: (
+      <ProtectedRouteGuard>
+        <RootLayout />
+      </ProtectedRouteGuard>
+    ),
     children: [
-      { path: 'race-hub', Component: RaceHub },
+      // In-race player navigation rendered with persistent bottom navigation.
+      { path: 'race', Component: RaceHub },
       { path: 'pit-stop', Component: PitStop },
       { path: 'helios', Component: HeliosProfile },
       { path: 'leaderboard', Component: Leaderboard },
       { path: 'victory-lane', Component: VictoryLane },
     ],
   },
+  // TODO(figma-sync): Reconcile split nested admin sections with the single-screen /admin contract in Figma Make to preserve expected admin navigation behavior. | Figma source: src/app/routes.ts (/admin -> Admin) | Impact: admin flow
   {
     path: '/admin',
+    // Guard once at layout level so all nested admin tabs share the same auth gate.
     element: (
       <AdminRouteGuard>
         <AdminLayout />

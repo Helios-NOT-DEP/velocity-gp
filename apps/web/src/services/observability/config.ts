@@ -14,13 +14,16 @@ function parseBoolean(value: boolean | string | undefined, fallback = false) {
   return value === 'true';
 }
 
-function parseNumber(value: string | undefined, fallback: number) {
+function parseTraceSamplingRate(
+  value: string | number | undefined,
+  fallback = DEFAULT_TRACE_SAMPLING_RATE
+) {
   if (value === undefined) {
     return fallback;
   }
 
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  const parsed = typeof value === 'string' ? parseFloat(value) : value;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : fallback;
 }
 
 export const observabilityConfig = {
@@ -28,10 +31,8 @@ export const observabilityConfig = {
   posthogApiKey: import.meta.env.VITE_POSTHOG_API_KEY || import.meta.env.VITE_POSTHOG_KEY || '',
   posthogHost: import.meta.env.VITE_POSTHOG_HOST || DEFAULT_POSTHOG_HOST,
   serviceName: import.meta.env.VITE_OTEL_SERVICE_NAME || DEFAULT_SERVICE_NAME,
-  traceSamplingRate: parseNumber(
-    import.meta.env.VITE_OTEL_TRACE_SAMPLING_RATE,
-    DEFAULT_TRACE_SAMPLING_RATE
-  ),
+  // Sampling rate is currently consumed by tracer bootstrap integration.
+  traceSamplingRate: parseTraceSamplingRate(import.meta.env.VITE_OTEL_TRACE_SAMPLING_RATE),
 };
 
 export function isAnalyticsEnabled() {

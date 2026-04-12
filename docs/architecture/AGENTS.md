@@ -47,7 +47,13 @@ Prefer established project patterns over introducing parallel abstractions. In p
 
 ## Testing Guidelines
 
-Tests are organized in each workspace (`apps/web/tests`, `apps/api/tests`, package-local `tests/`). For any non-trivial feature, add tests alongside the code and prefer colocated names such as `ComponentName.test.tsx` or `route-name.test.ts`.
+Tests are organized in each workspace (`apps/web/tests`, `apps/api/tests`, package-local `tests/`).
+
+Current test taxonomy:
+- API: `apps/api/tests/unit`, `apps/api/tests/integration`
+- Web: `apps/web/tests/unit`, `apps/web/tests/component`, `apps/web/tests/e2e`
+
+For any non-trivial feature, add tests in the correct tier and prefer names such as `ComponentName.test.tsx` or `route-name.test.ts`.
 
 Before opening a PR:
 - Run `npm run build` to verify production build succeeds

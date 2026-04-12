@@ -8,6 +8,7 @@ export default function HeliosProfile() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Ensure profile visit upgrades context role for Helios-specific UI affordances.
     if (gameState.currentUser && !gameState.currentUser.isHelios) {
       becomeHelios();
     }
@@ -23,7 +24,7 @@ export default function HeliosProfile() {
       <div className="max-w-2xl mx-auto">
         {/* Back Button */}
         <button
-          onClick={() => navigate('/race-hub')}
+          onClick={() => navigate('/race')}
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-8"
         >
           <ArrowLeft className="w-5 h-5" />
