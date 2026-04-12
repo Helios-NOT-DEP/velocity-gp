@@ -8,11 +8,14 @@
  */
 
 /** Defines permissible configurations passed to REST verbs. */
+export type QueryParamValue = string | number | boolean | null | undefined;
+export type QueryParams = Record<string, QueryParamValue | readonly QueryParamValue[]>;
+
 export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   body?: unknown;
-  params?: Record<string, string | number>;
+  params?: object;
 }
 
 interface ApiErrorPayload {
@@ -92,9 +95,7 @@ export class ApiClient {
 
     // Add query parameters
     if (options.params) {
-      Object.entries(options.params).forEach(([key, value]) => {
-        url.searchParams.append(key, String(value));
-      });
+      this.appendQueryParams(url, options.params);
     }
 
     const authorizationHeader = readAuthorizationHeaderFromStorage();
@@ -131,7 +132,7 @@ export class ApiClient {
   }
 
   /** Executes an HTTP GET request, safely escaping URL parameters automatically. */
-  get<T>(endpoint: string, params?: Record<string, string | number>) {
+  get<T>(endpoint: string, params?: object) {
     return this.request<T>(endpoint, { method: 'GET', params });
   }
 
@@ -159,6 +160,27 @@ export class ApiClient {
     const normalizedEndpoint = endpoint.replace(/^\/+/, '');
 
     return new URL(normalizedEndpoint, normalizedBaseUrl);
+  }
+
+  private appendQueryParams(url: URL, params: object): void {
+    Object.entries(params).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (this.isQueryParamValue(item)) {
+            url.searchParams.append(key, String(item));
+          }
+        });
+        return;
+      }
+
+      if (this.isQueryParamValue(value)) {
+        url.searchParams.append(key, String(value));
+      }
+    });
+  }
+
+  private isQueryParamValue(value: unknown): value is string | number | boolean {
+    return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
   }
 
   private async parseResponseBody<T>(response: globalThis.Response): Promise<ParsedApiBody<T>> {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
+  ListAdminRosterQuery,
   ListAdminRosterResponse,
   ListAdminRosterTeamsResponse,
   RosterImportApplyResponse,
@@ -102,13 +103,16 @@ export default function AdminPlayers() {
     try {
       // Resolve event once, then hydrate roster + team options in parallel for one UI refresh.
       const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
+      const trimmedSearch = appliedSearch.trim();
+      const rosterQuery: ListAdminRosterQuery = {
+        limit: 100,
+        ...(trimmedSearch.length > 0 ? { q: trimmedSearch } : {}),
+        ...(assignmentFilter !== 'ALL' ? { assignmentStatus: assignmentFilter } : {}),
+        ...(teamFilter !== 'ALL' ? { teamId: teamFilter } : {}),
+      };
+
       const [nextRoster, nextTeamOptions] = await Promise.all([
-        listAdminRoster(resolvedEventId, {
-          q: appliedSearch.trim() || undefined,
-          assignmentStatus: assignmentFilter === 'ALL' ? undefined : assignmentFilter,
-          teamId: teamFilter === 'ALL' ? undefined : teamFilter,
-          limit: 100,
-        }),
+        listAdminRoster(resolvedEventId, rosterQuery),
         listAdminRosterTeams(resolvedEventId),
       ]);
 
