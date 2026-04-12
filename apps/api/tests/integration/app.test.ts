@@ -1270,6 +1270,44 @@ describe('velocity gp backend', () => {
     }
   });
 
+  it('rejects capability updates that disable both admin and player access', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        capabilities: {
+          admin: false,
+          player: false,
+          heliosMember: false,
+        },
+        reason: 'attempt invalid disable',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects capability updates when heliosMember is true without player capability', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        capabilities: {
+          admin: true,
+          player: false,
+          heliosMember: true,
+        },
+        reason: 'attempt invalid helios-only membership',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('allows legacy admin headers when a stale non-admin session cookie is present', async () => {
     const stalePlayerSessionToken = createSessionToken({
       userId: fixtureIds.playerUserId,

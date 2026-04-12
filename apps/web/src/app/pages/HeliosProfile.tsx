@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import React from 'react';
+import { Navigate, useNavigate } from 'react-router';
 import { useGame } from '../context/GameContext';
 import { Zap, Shield, ArrowLeft } from 'lucide-react';
 
@@ -7,19 +7,12 @@ export default function HeliosProfile() {
   const { gameState } = useGame();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (gameState.currentUser && !gameState.currentUser.isHelios) {
-      navigate('/race', { replace: true });
-    }
-  }, [gameState.currentUser, navigate]);
-
   if (!gameState.currentUser) {
-    navigate('/');
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   if (!gameState.currentUser.isHelios) {
-    return null;
+    return <Navigate to="/race" replace />;
   }
 
   return (

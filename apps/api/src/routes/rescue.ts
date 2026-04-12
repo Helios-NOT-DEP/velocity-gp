@@ -17,7 +17,7 @@ const rescueRateLimiter = rateLimit({
   keyGenerator: (request) => {
     const authContext = resolveRequestAuthContext(request);
     if (!authContext) {
-      return `ip:${request.ip}`;
+      return `ip:${request.ip ?? 'unknown'}`;
     }
 
     if (authContext.capabilities.player && !authContext.capabilities.admin) {

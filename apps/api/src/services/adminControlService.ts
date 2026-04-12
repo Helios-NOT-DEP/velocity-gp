@@ -144,6 +144,10 @@ function deriveLegacyRoleFromCapabilities(input: {
   player: boolean;
   heliosMember: boolean;
 }): 'ADMIN' | 'HELIOS' | 'PLAYER' {
+  if (input.admin) {
+    return 'ADMIN';
+  }
+
   if (input.player && input.heliosMember) {
     return 'HELIOS';
   }
@@ -152,7 +156,9 @@ function deriveLegacyRoleFromCapabilities(input: {
     return 'PLAYER';
   }
 
-  return 'ADMIN';
+  throw new ValidationError('At least one of admin/player capability must be enabled.', {
+    capabilities: input,
+  });
 }
 
 /**
@@ -897,14 +903,12 @@ export async function updateUserCapabilities(
           });
         }
 
-        const heliosChanged =
-          currentUser.isHeliosMember !== nextCapabilities.heliosMember ||
-          currentUser.isHelios !== nextCapabilities.heliosMember ||
-          currentUser.role === 'HELIOS' ||
-          nextLegacyRole === 'HELIOS';
+        const previousHeliosMembership = currentUser.isHeliosMember || currentUser.isHelios;
+        const nextHeliosMembership = nextCapabilities.heliosMember;
+        const heliosChanged = previousHeliosMembership !== nextHeliosMembership;
 
         const actionType = heliosChanged
-          ? nextCapabilities.heliosMember
+          ? nextHeliosMembership
             ? 'HELIOS_ASSIGNED'
             : 'HELIOS_REVOKED'
           : 'USER_CAPABILITIES_UPDATED';

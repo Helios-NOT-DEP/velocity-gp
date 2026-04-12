@@ -17,10 +17,7 @@ const scanRateLimiter = rateLimit({
   keyGenerator: (request) => {
     const authContext = resolveRequestAuthContext(request);
     if (!authContext) {
-      // Use the request IP as the rate-limit key when there's no auth context.
-      // `ipKeyGenerator` from express-rate-limit expects an IP string, not the
-      // full request object, so use `request.ip` which is the Express client IP.
-      return `ip:${request.ip}`;
+      return `ip:${request.ip ?? 'unknown'}`;
     }
 
     if (authContext.capabilities.player && !authContext.capabilities.admin) {
