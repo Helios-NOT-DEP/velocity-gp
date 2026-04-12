@@ -1,9 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { Scan, Trophy, User } from 'lucide-react';
+import { useGame } from '@/app/context/GameContext';
 
 export default function BottomNav() {
   const navigate = useNavigate();
+  const { gameState } = useGame();
+  const showHeliosButton = gameState.currentUser?.isHelios === true;
 
   return (
     // Fixed navigation shell for race routes; route-level pages own the main content area.
@@ -22,13 +25,15 @@ export default function BottomNav() {
         <Trophy className="w-5 h-5" />
         Ranks
       </button>
-      <button
-        onClick={() => navigate('/helios')}
-        className="flex-1 py-3 rounded-xl font-semibold bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
-      >
-        <User className="w-5 h-5" />
-        Profile
-      </button>
+      {showHeliosButton && (
+        <button
+          onClick={() => navigate('/helios')}
+          className="flex-1 py-3 rounded-xl font-semibold bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <User className="w-5 h-5" />
+          Helios
+        </button>
+      )}
     </div>
   );
 }

@@ -1,7 +1,13 @@
-import React from 'react';
-import { NavLink, Outlet } from 'react-router';
+import React, { useEffect, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router';
 import { BarChart3, QrCode, Settings, User, Users } from 'lucide-react';
 import { adminSections } from '../admin/sections';
+import {
+  AUTH_SESSION_UPDATED_EVENT,
+  anonymousSession,
+  getSession,
+  type AuthSession,
+} from '@/services/auth';
 
 function desktopNavClassName(isActive: boolean) {
   if (isActive) {
@@ -12,6 +18,34 @@ function desktopNavClassName(isActive: boolean) {
 }
 
 export default function AdminLayout() {
+  const navigate = useNavigate();
+  const [session, setSession] = useState<AuthSession>(anonymousSession);
+
+  useEffect(() => {
+    let active = true;
+    const refreshSession = async () => {
+      const next = await getSession();
+      if (!active) {
+        return;
+      }
+      setSession(next);
+    };
+
+    void refreshSession();
+    const onSessionUpdated = () => {
+      void refreshSession();
+    };
+
+    globalThis.addEventListener(AUTH_SESSION_UPDATED_EVENT, onSessionUpdated);
+    return () => {
+      active = false;
+      globalThis.removeEventListener(AUTH_SESSION_UPDATED_EVENT, onSessionUpdated);
+    };
+  }, []);
+
+  const canSwitchToPlayer =
+    session.capabilities?.admin === true && session.capabilities?.player === true;
+
   // Mobile nav is defined separately from desktop labels to keep short text/icon pairs.
   const mobileNav = [
     { path: '/admin/game-control', label: 'Control', icon: Settings },
@@ -44,6 +78,16 @@ export default function AdminLayout() {
               ACTIVE
             </div>
           </div>
+          {canSwitchToPlayer && (
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => navigate('/race')}
+                className="rounded-full border border-blue-400/40 bg-[#0B1E3B]/90 px-3 py-1 text-xs font-semibold text-blue-200"
+              >
+                Switch to Player
+              </button>
+            </div>
+          )}
         </div>
       </header>
 

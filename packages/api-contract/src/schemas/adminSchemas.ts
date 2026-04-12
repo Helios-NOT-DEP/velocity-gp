@@ -59,6 +59,34 @@ export const updateHeliosRoleSchema = z.object({
   reason: z.string().min(2).optional(),
 });
 
+/** Canonical user capability mutation schema. */
+export const updateUserCapabilitiesSchema = z
+  .object({
+    capabilities: z.object({
+      admin: z.boolean(),
+      player: z.boolean(),
+      heliosMember: z.boolean(),
+    }),
+    reason: z.string().min(2).optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.capabilities.admin && !value.capabilities.player) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['capabilities'],
+        message: 'At least one of admin/player capability must be enabled.',
+      });
+    }
+
+    if (value.capabilities.heliosMember && !value.capabilities.player) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['capabilities', 'heliosMember'],
+        message: 'Helios membership requires player capability.',
+      });
+    }
+  });
+
 /**
  * Strict numeric enforcement preventing users from setting impossible hazard weights.
  * Locks between 0-100 to represent proper probability spread.

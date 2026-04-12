@@ -117,6 +117,9 @@ async function resolveRescuer(
           role: 'HELIOS',
         },
         {
+          isHeliosMember: true,
+        },
+        {
           isHelios: true,
         },
       ],

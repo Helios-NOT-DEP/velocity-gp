@@ -602,6 +602,24 @@ describe('velocity gp backend', () => {
     expect(typeof response.body.data.message).toBe('string');
   });
 
+  it('accepts magic-link requests for admin users without active player assignment', async () => {
+    const adminEmail = `admin-${token}@velocitygp.dev`;
+
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        return;
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: adminEmail });
+
+    expect(response.status).toBe(202);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.accepted).toBe(true);
+  });
+
   it('rejects Mailtrap webhook requests without a valid bearer token', async () => {
     const response = await request(app)
       .post(`${apiPrefix}/webhooks/mailtrap/events`)
@@ -1185,6 +1203,109 @@ describe('velocity gp backend', () => {
     expect(response.body.data.scope).toBe('admin');
     expect(response.body.data.userId).toBe('admin-1');
     expect(response.body.data.role).toBe('admin');
+  });
+
+  it('updates user capabilities through the unified admin endpoint', async () => {
+    try {
+      const response = await request(app)
+        .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({
+          capabilities: {
+            admin: true,
+            player: true,
+            heliosMember: true,
+          },
+          reason: 'promoted for event operations',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.userId).toBe(fixtureIds.playerUserId);
+      expect(response.body.data.capabilities).toEqual({
+        admin: true,
+        player: true,
+        heliosMember: true,
+      });
+
+      const [user, audit] = await Promise.all([
+        prisma.user.findUnique({
+          where: {
+            id: fixtureIds.playerUserId,
+          },
+          select: {
+            canAdmin: true,
+            canPlayer: true,
+            isHeliosMember: true,
+          },
+        }),
+        prisma.adminActionAudit.findFirst({
+          where: {
+            targetId: fixtureIds.playerUserId,
+            actionType: 'HELIOS_ASSIGNED',
+          },
+        }),
+      ]);
+
+      expect(user).toMatchObject({
+        canAdmin: true,
+        canPlayer: true,
+        isHeliosMember: true,
+      });
+      expect(audit).not.toBeNull();
+    } finally {
+      await prisma.user.update({
+        where: {
+          id: fixtureIds.playerUserId,
+        },
+        data: {
+          role: 'PLAYER',
+          canAdmin: false,
+          canPlayer: true,
+          isHeliosMember: false,
+          isHelios: false,
+        },
+      });
+    }
+  });
+
+  it('rejects capability updates that disable both admin and player access', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        capabilities: {
+          admin: false,
+          player: false,
+          heliosMember: false,
+        },
+        reason: 'attempt invalid disable',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects capability updates when heliosMember is true without player capability', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        capabilities: {
+          admin: true,
+          player: false,
+          heliosMember: true,
+        },
+        reason: 'attempt invalid helios-only membership',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
 
   it('allows legacy admin headers when a stale non-admin session cookie is present', async () => {

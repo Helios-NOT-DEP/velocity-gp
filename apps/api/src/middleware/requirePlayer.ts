@@ -19,12 +19,11 @@ export function requirePlayer(request: Request, response: Response, next: NextFu
     throw new UnauthorizedError('Authentication is required.');
   }
 
-  // All authenticated roles are permitted — admins and Helios staff may act on behalf of players.
-  if (
-    authContext.role !== 'player' &&
-    authContext.role !== 'helios' &&
-    authContext.role !== 'admin'
-  ) {
+  // Any authenticated account with player/admin capability can access player endpoints.
+  // Legacy role fallback remains for backward compatibility with older session shapes.
+  const hasLegacyRole =
+    authContext.role === 'player' || authContext.role === 'helios' || authContext.role === 'admin';
+  if (!authContext.capabilities.player && !authContext.capabilities.admin && !hasLegacyRole) {
     throw new ForbiddenError('A valid player session is required.');
   }
 

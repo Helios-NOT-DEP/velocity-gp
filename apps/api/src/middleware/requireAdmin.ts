@@ -10,7 +10,7 @@ export function requireAdmin(request: Request, response: Response, next: NextFun
     throw new UnauthorizedError('Authentication is required.');
   }
 
-  if (authContext.role !== 'admin') {
+  if (!authContext.capabilities.admin && authContext.role !== 'admin') {
     throw new ForbiddenError('Admin access is required.');
   }
 

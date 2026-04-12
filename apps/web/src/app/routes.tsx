@@ -11,6 +11,7 @@ import WaitingAssignment from './pages/WaitingAssignment';
 import RootLayout from './layouts/RootLayout';
 import AdminLayout from './layouts/AdminLayout';
 import AdminRouteGuard from './components/auth/AdminRouteGuard';
+import HeliosRouteGuard from './components/auth/HeliosRouteGuard';
 import ProtectedRouteGuard from './components/auth/ProtectedRouteGuard';
 import AdminGameControl from './pages/admin/AdminGameControl';
 import AdminQrCodes from './pages/admin/AdminQrCodes';
@@ -69,7 +70,14 @@ export const appRoutes: RouteObject[] = [
       // In-race player navigation rendered with persistent bottom navigation.
       { path: 'race', Component: RaceHub },
       { path: 'pit-stop', Component: PitStop },
-      { path: 'helios', Component: HeliosProfile },
+      {
+        path: 'helios',
+        element: (
+          <HeliosRouteGuard>
+            <HeliosProfile />
+          </HeliosRouteGuard>
+        ),
+      },
       { path: 'leaderboard', Component: Leaderboard },
       { path: 'victory-lane', Component: VictoryLane },
     ],
