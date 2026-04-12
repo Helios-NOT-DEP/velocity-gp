@@ -885,19 +885,33 @@ export async function updateUserCapabilities(
           },
         });
 
-        const activeEvent = await tx.event.findFirst({
+        const userEvent = await tx.player.findFirst({
           where: {
-            status: 'ACTIVE',
+            userId,
           },
-          orderBy: {
-            updatedAt: 'desc',
-          },
+          orderBy: [{ joinedAt: 'desc' }, { createdAt: 'desc' }],
           select: {
-            id: true,
+            eventId: true,
           },
         });
 
-        if (!activeEvent) {
+        const fallbackActiveEvent = userEvent
+          ? null
+          : await tx.event.findFirst({
+              where: {
+                status: 'ACTIVE',
+              },
+              orderBy: {
+                updatedAt: 'desc',
+              },
+              select: {
+                id: true,
+              },
+            });
+
+        const auditEventId = userEvent?.eventId ?? fallbackActiveEvent?.id;
+
+        if (!auditEventId) {
           throw new ValidationError('Cannot create audit entry without an event context.', {
             userId,
           });
@@ -915,7 +929,7 @@ export async function updateUserCapabilities(
 
         const audit = await tx.adminActionAudit.create({
           data: {
-            eventId: activeEvent.id,
+            eventId: auditEventId,
             actorUserId: actorId,
             actionType,
             targetType: 'USER',
