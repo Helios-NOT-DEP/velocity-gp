@@ -132,7 +132,7 @@ export class ApiClient {
   }
 
   /** Executes an HTTP GET request, safely escaping URL parameters automatically. */
-  get<T>(endpoint: string, params?: object) {
+  get<T>(endpoint: string, params?: QueryParams) {
     return this.request<T>(endpoint, { method: 'GET', params });
   }
 
