@@ -131,6 +131,7 @@ const envSchema = z.object({
   MAILTRAP_AUDIT_ACTOR_EMAIL: optionalEmail.default('system+mailtrap@velocitygp.internal'),
   N8N_WEBHOOK_TOKEN: optionalMinString(16),
   N8N_HOST: optionalUrl,
+  N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE: optionalMinString(1).default('/webhook/{env}/QRCodeGen'),
   N8N_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),

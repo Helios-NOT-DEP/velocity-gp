@@ -17,6 +17,7 @@ function toHazardRecord(hazard: {
   value: number;
   zone: string | null;
   payload: string;
+  qrImageUrl: string | null;
   status: 'ACTIVE' | 'DISABLED';
   scanCount: number;
   hazardRatioOverride: number | null;
@@ -46,9 +47,10 @@ export async function scanHazard(request: ScanHazardRequest): Promise<ScanHazard
  * Falls back to placeholder data when a persisted record is not found.
  */
 export async function getHazard(hazardId: string): Promise<Hazard> {
-  const qrCode = await prisma.qRCode.findUnique({
+  const qrCode = await prisma.qRCode.findFirst({
     where: {
       id: hazardId,
+      deletedAt: null,
     },
     select: {
       id: true,
@@ -57,6 +59,7 @@ export async function getHazard(hazardId: string): Promise<Hazard> {
       value: true,
       zone: true,
       payload: true,
+      qrImageUrl: true,
       status: true,
       scanCount: true,
       hazardRatioOverride: true,
@@ -90,6 +93,7 @@ export async function listHazards(eventId: string): Promise<Hazard[]> {
   const qrCodes = await prisma.qRCode.findMany({
     where: {
       eventId,
+      deletedAt: null,
     },
     orderBy: {
       label: 'asc',
@@ -101,6 +105,7 @@ export async function listHazards(eventId: string): Promise<Hazard[]> {
       value: true,
       zone: true,
       payload: true,
+      qrImageUrl: true,
       status: true,
       scanCount: true,
       hazardRatioOverride: true,

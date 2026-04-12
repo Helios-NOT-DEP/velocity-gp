@@ -76,6 +76,9 @@ enum AdminActionType {
     HELIOS_REVOKED
     PIT_MANUAL_ENTER
     PIT_MANUAL_CLEAR
+    QR_CREATED
+    QR_STATUS_UPDATED
+    QR_DELETED
     QR_HAZARD_RANDOMIZER_UPDATED
     SCORE_RESET
     ROSTER_IMPORTED
@@ -204,6 +207,7 @@ model QRCode {
     value                Int
     zone                 String?
     payload              String       @unique
+    qrImageUrl           String?
     status               QRCodeStatus @default(ACTIVE)
     activationStartsAt   DateTime?
     activationEndsAt     DateTime?
@@ -212,6 +216,7 @@ model QRCode {
     scanCount            Int          @default(0)
     createdAt            DateTime     @default(now())
     updatedAt            DateTime     @updatedAt
+    deletedAt            DateTime?
 
     event       Event         @relation(fields: [eventId], references: [id])
     claims      QRCodeClaim[]
@@ -221,6 +226,7 @@ model QRCode {
     @@unique([eventId, label])
     @@index([eventId])
     @@index([eventId, status])
+    @@index([eventId, deletedAt])
 }
 
 model QRCodeClaim {

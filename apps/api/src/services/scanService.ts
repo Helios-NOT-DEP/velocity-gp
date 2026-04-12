@@ -196,6 +196,15 @@ async function processScanInTransaction(
     where: {
       eventId: input.eventId,
       payload: qrPayload,
+      deletedAt: null,
+      AND: [
+        {
+          OR: [{ activationStartsAt: null }, { activationStartsAt: { lte: now } }],
+        },
+        {
+          OR: [{ activationEndsAt: null }, { activationEndsAt: { gt: now } }],
+        },
+      ],
     },
     select: {
       id: true,
