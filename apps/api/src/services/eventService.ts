@@ -1,46 +1,94 @@
 import type { EventSummary } from '@velocity-gp/api-contract';
 
-import { placeholderEvent } from './placeholderData.js';
+import { prisma } from '../db/client.js';
+import { NotFoundError } from '../utils/appError.js';
 
 /**
  * Event service used by event-facing API handlers.
  *
- * This module currently returns placeholder-backed values until event persistence
- * is fully wired to the database layer.
+ * All functions query the database directly via Prisma and map
+ * `Event` records to the `EventSummary` contract type.
  */
-export function listEvents(): EventSummary[] {
-  // TODO: Query all events from database
-  return [
-    placeholderEvent,
-    {
-      id: 'event-456',
-      name: 'Velocity GP Night Relay',
-      startDate: '2026-05-12T18:00:00.000Z',
-      endDate: '2026-05-13T02:00:00.000Z',
-      status: 'UPCOMING',
-    },
-  ];
-}
 
-/**
- * Returns a single event summary for the requested ID.
- *
- * The current implementation mirrors placeholder data and swaps only the ID.
- */
-export function getEvent(eventId: string): EventSummary {
-  // TODO: Query event from database
+function toEventSummary(event: {
+  id: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
+}): EventSummary {
   return {
-    ...placeholderEvent,
-    id: eventId,
+    id: event.id,
+    name: event.name,
+    startDate: event.startDate.toISOString(),
+    endDate: event.endDate.toISOString(),
+    status: event.status,
   };
 }
 
 /**
- * Returns the currently active event summary.
- *
- * This is a temporary placeholder implementation.
+ * Returns all events ordered by most recently updated.
  */
-export function getCurrentEvent(): EventSummary {
-  // TODO: Query current event from database
-  return placeholderEvent;
+export async function listEvents(): Promise<EventSummary[]> {
+  const events = await prisma.event.findMany({
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      startDate: true,
+      endDate: true,
+      status: true,
+    },
+  });
+
+  return events.map(toEventSummary);
+}
+
+/**
+ * Returns a single event by ID.
+ *
+ * @throws {NotFoundError} if the event does not exist.
+ */
+export async function getEvent(eventId: string): Promise<EventSummary> {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: {
+      id: true,
+      name: true,
+      startDate: true,
+      endDate: true,
+      status: true,
+    },
+  });
+
+  if (!event) {
+    throw new NotFoundError('Event not found.', { eventId });
+  }
+
+  return toEventSummary(event);
+}
+
+/**
+ * Returns the currently active event.
+ *
+ * @throws {NotFoundError} if no event has status ACTIVE.
+ */
+export async function getCurrentEvent(): Promise<EventSummary> {
+  const event = await prisma.event.findFirst({
+    where: { status: 'ACTIVE' },
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      startDate: true,
+      endDate: true,
+      status: true,
+    },
+  });
+
+  if (!event) {
+    throw new NotFoundError('No active event found.');
+  }
+
+  return toEventSummary(event);
 }

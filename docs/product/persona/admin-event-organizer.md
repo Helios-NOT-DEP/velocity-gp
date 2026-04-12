@@ -41,11 +41,18 @@ _As an organizer, I need to create and manage the QR scoring assets used during 
 #### Scenario: Creating a New QR Code from the Admin Portal
 
 - **Given** the Admin is on the "QR Codes" section
-- **When** the Admin enters a QR code name and point value
+- **When** the Admin enters a QR code label, point value, zone, and optional activation window
 - **And** clicks "Generate QR Code"
 - **Then** the System should create a unique QR scoring asset
 - **And** the console should render a scannable QR preview card for that asset
 - **And** the new QR code should appear in the QR code grid with status `ACTIVE`.
+
+#### Scenario: Downloading a Generated QR Asset
+
+- **Given** a QR code is visible in the "QR Codes" section
+- **When** the Admin selects "Download" on that QR card
+- **Then** the portal should download the generated QR asset
+- **And** the downloaded code should represent the same playable payload used by race scanners.
 
 #### Scenario: Reviewing QR Code Performance in the Grid
 

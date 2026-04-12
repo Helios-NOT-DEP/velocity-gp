@@ -36,6 +36,19 @@ function normalizeOrigin(origin: string | null | undefined): string | null {
   }
 }
 
+function resolveScanPathPayload(parsedUrl: URL): string | null {
+  const scanPathMatch = parsedUrl.pathname.match(/^\/scan\/([^/]+)$/);
+  if (!scanPathMatch) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(scanPathMatch[1]);
+  } catch {
+    return null;
+  }
+}
+
 export function getTrustedQrRedirectOrigin(): string | null {
   return normalizeOrigin(import.meta.env.VITE_FRONTEND_MAGIC_LINK_ORIGIN);
 }
@@ -95,6 +108,15 @@ export function classifyQrPayload(
       url: parsedUrl.toString(),
       reason: 'origin_mismatch',
       message: `Only QR links from ${normalizedTrustedOrigin} can redirect from Race Hub.`,
+    };
+  }
+
+  // Gameplay QR assets now encode trusted /scan/:payload URLs.
+  const scanPayload = resolveScanPathPayload(parsedUrl);
+  if (scanPayload) {
+    return {
+      kind: 'gameplay',
+      payload: scanPayload,
     };
   }
 

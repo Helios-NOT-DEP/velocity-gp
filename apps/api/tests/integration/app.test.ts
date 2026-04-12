@@ -1,7 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app/createApp.js';
 import { env } from '../../src/config/env.js';
@@ -41,6 +41,23 @@ describe('velocity gp backend', () => {
       'x-mailtrap-signature': `sha256=${signature}`,
       'x-mailtrap-timestamp': timestamp,
     };
+  }
+
+  function createPlayerSessionAuthHeader(
+    overrides?: Partial<{ playerId: string; userId: string; teamId: string }>
+  ): string {
+    const sessionToken = createSessionToken({
+      userId: overrides?.userId ?? fixtureIds.playerUserId,
+      playerId: overrides?.playerId ?? fixtureIds.playerId,
+      eventId: fixtureIds.eventId,
+      teamId: overrides?.teamId ?? fixtureIds.teamId,
+      teamStatus: 'ACTIVE',
+      role: 'player',
+      email: `player-${token}@velocitygp.dev`,
+      displayName: 'Player Fixture',
+    });
+
+    return `Bearer ${sessionToken}`;
   }
 
   beforeAll(async () => {
@@ -255,12 +272,38 @@ describe('velocity gp backend', () => {
   it('accepts canonical scan submissions and returns typed outcomes', async () => {
     const safeResponse = await request(app)
       .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
       .send({ playerId: fixtureIds.playerId, qrPayload: fixtureIds.qrPayload });
 
     expect(safeResponse.status).toBe(200);
     expect(safeResponse.body.success).toBe(true);
     expect(safeResponse.body.data.outcome).toBe('SAFE');
     expect(safeResponse.body.data.pointsAwarded).toBeGreaterThan(0);
+  });
+
+  it('accepts scan submissions for legacy header-auth players', async () => {
+    const legacyPayload = `VG-LEGACY-${token.toUpperCase()}`;
+    await prisma.qRCode.create({
+      data: {
+        id: `qr-legacy-${token}`,
+        eventId: fixtureIds.eventId,
+        label: `Legacy QR ${token}`,
+        value: 20,
+        zone: 'Legacy Zone',
+        payload: legacyPayload,
+        status: 'ACTIVE',
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('x-user-id', fixtureIds.playerId)
+      .set('x-user-role', 'player')
+      .send({ playerId: fixtureIds.playerId, qrPayload: legacyPayload });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.outcome).toBe('SAFE');
   });
 
   it('supports legacy /hazards/scan alias with matching contract shape', async () => {
@@ -322,6 +365,7 @@ describe('velocity gp backend', () => {
 
     const scanResponse = await request(app)
       .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
       .send({
         playerId: fixtureIds.playerId,
         qrPayload: feedQrPayload,
@@ -414,6 +458,79 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(403);
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe('AUTH_TEAM_CONTEXT_MISMATCH');
+  });
+
+  it('rejects scans for QR codes outside activation window', async () => {
+    const futurePayload = `VG-FUTURE-${token.toUpperCase()}`;
+    await prisma.qRCode.create({
+      data: {
+        id: `qr-future-${token}`,
+        eventId: fixtureIds.eventId,
+        label: `Future QR ${token}`,
+        value: 100,
+        zone: 'Future Zone',
+        payload: futurePayload,
+        status: 'ACTIVE',
+        activationStartsAt: new Date(Date.now() + 60 * 60 * 1_000),
+        activationEndsAt: null,
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
+      .send({ playerId: fixtureIds.playerId, qrPayload: futurePayload });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.outcome).toBe('INVALID');
+    expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
+  });
+
+  it('returns duplicate scan outcomes with HTTP 200 for successful processing', async () => {
+    const authorization = createPlayerSessionAuthHeader();
+    const duplicatePayload = `VG-DUPLICATE-${token.toUpperCase()}`;
+
+    await prisma.qRCode.create({
+      data: {
+        id: `qr-duplicate-${token}`,
+        eventId: fixtureIds.eventId,
+        label: `Duplicate QR ${token}`,
+        value: 10,
+        zone: 'Duplicate Zone',
+        payload: duplicatePayload,
+        status: 'ACTIVE',
+      },
+    });
+
+    const firstResponse = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', authorization)
+      .send({ playerId: fixtureIds.playerId, qrPayload: duplicatePayload });
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.body.data.outcome).toBe('SAFE');
+
+    const duplicateResponse = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', authorization)
+      .send({ playerId: fixtureIds.playerId, qrPayload: duplicatePayload });
+    expect(duplicateResponse.status).toBe(200);
+    expect(duplicateResponse.body.success).toBe(true);
+    expect(duplicateResponse.body.data.outcome).toBe('DUPLICATE');
+  });
+
+  it('rejects player sessions that submit scans for a different playerId', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('authorization', createPlayerSessionAuthHeader())
+      .send({
+        playerId: fixtureIds.unassignedPlayerId,
+        qrPayload: fixtureIds.qrPayload,
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('FORBIDDEN');
   });
 
   it('validates request bodies', async () => {
@@ -1103,6 +1220,101 @@ describe('velocity gp backend', () => {
     expect(response.body.data.state).toBe('PAUSED');
   });
 
+  it('creates QR inventory entries and generates downloadable assets via n8n webhook', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          qrImageURL: 'https://cdn.velocitygp.app/qr/new-code.png',
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        }
+      )
+    );
+
+    try {
+      const response = await request(app)
+        .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({
+          label: `Generated QR ${token}`,
+          value: 160,
+          zone: 'North Ramp',
+          activationStartsAt: '2026-04-06T10:15:00.000Z',
+          activationEndsAt: '2026-04-06T17:15:00.000Z',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.eventId).toBe(fixtureIds.eventId);
+      expect(response.body.data.qrCode.status).toBe('ACTIVE');
+      expect(response.body.data.qrCode.zone).toBe('North Ramp');
+      expect(response.body.data.qrCode.qrImageUrl).toBe(
+        'https://cdn.velocitygp.app/qr/new-code.png'
+      );
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(calledUrl).toContain('/webhook/dev/QRCodeGen');
+      const generationBody = JSON.parse(String(calledInit.body)) as { id: string; url: string };
+      expect(generationBody.id).toBe(response.body.data.qrCode.id);
+      expect(generationBody.url).toContain('/scan/');
+
+      const persisted = await prisma.qRCode.findUnique({
+        where: {
+          id: response.body.data.qrCode.id,
+        },
+        select: {
+          qrImageUrl: true,
+          deletedAt: true,
+        },
+      });
+      expect(persisted?.qrImageUrl).toBe('https://cdn.velocitygp.app/qr/new-code.png');
+      expect(persisted?.deletedAt).toBeNull();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('returns validation error when admin creates a duplicate QR label', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          qrImageURL: 'https://cdn.velocitygp.app/qr/duplicate.png',
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        }
+      )
+    );
+
+    try {
+      const response = await request(app)
+        .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({
+          label: `App QR ${token}`,
+          value: 120,
+          zone: 'North Ramp',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.error.message).toContain('already exists');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('updates per-QR hazard randomizer weight through admin endpoints', async () => {
     const response = await request(app)
       .patch(
@@ -1154,6 +1366,56 @@ describe('velocity gp backend', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
     }
+  });
+
+  it('updates QR status through admin endpoints', async () => {
+    const response = await request(app)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}/status`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ status: 'DISABLED', reason: 'leaked code' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.status).toBe('DISABLED');
+
+    const persisted = await prisma.qRCode.findUnique({
+      where: { id: fixtureIds.qrCodeId },
+      select: { status: true },
+    });
+    expect(persisted?.status).toBe('DISABLED');
+  });
+
+  it('soft-deletes QR codes from admin inventory without removing historical rows', async () => {
+    const response = await request(app)
+      .delete(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/${fixtureIds.qrCodeId}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.qrCodeId).toBe(fixtureIds.qrCodeId);
+
+    const [persisted, inventory] = await Promise.all([
+      prisma.qRCode.findUnique({
+        where: { id: fixtureIds.qrCodeId },
+        select: { deletedAt: true, status: true },
+      }),
+      request(app)
+        .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin'),
+    ]);
+
+    expect(persisted?.deletedAt).not.toBeNull();
+    expect(persisted?.status).toBe('DISABLED');
+    expect(inventory.status).toBe(200);
+    const inventoryIds = (inventory.body.data.qrCodes as Array<{ id: string }>).map(
+      (item) => item.id
+    );
+    expect(inventoryIds).not.toContain(fixtureIds.qrCodeId);
   });
 
   it('validates admin payloads for manual pit control', async () => {

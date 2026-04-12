@@ -28,7 +28,7 @@ export const eventRouter = Router();
 eventRouter.get(
   '/events',
   asyncHandler(async (_request, response) => {
-    response.json(successResponse(listEvents(), { requestId: response.locals.requestId }));
+    response.json(successResponse(await listEvents(), { requestId: response.locals.requestId }));
   })
 );
 
@@ -41,7 +41,9 @@ eventRouter.get(
 eventRouter.get(
   '/events/current',
   asyncHandler(async (_request, response) => {
-    response.json(successResponse(getCurrentEvent(), { requestId: response.locals.requestId }));
+    response.json(
+      successResponse(await getCurrentEvent(), { requestId: response.locals.requestId })
+    );
   })
 );
 
@@ -138,6 +140,8 @@ eventRouter.get(
   asyncHandler(async (request, response) => {
     const eventId = String(request.params.eventId);
 
-    response.json(successResponse(getEvent(eventId), { requestId: response.locals.requestId }));
+    response.json(
+      successResponse(await getEvent(eventId), { requestId: response.locals.requestId })
+    );
   })
 );

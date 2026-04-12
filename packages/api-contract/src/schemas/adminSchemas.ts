@@ -61,3 +61,59 @@ export const updateHeliosRoleSchema = z.object({
 export const updateQrHazardRandomizerSchema = z.object({
   hazardWeightOverride: z.number().int().min(0).max(100).nullable(),
 });
+
+const optionalTrimmedString = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => {
+    if (!value) {
+      return undefined;
+    }
+
+    return value;
+  });
+
+/**
+ * Validates admin QR creation payloads including optional activation windows.
+ */
+export const createAdminQRCodeSchema = z
+  .object({
+    label: z.string().trim().min(1),
+    value: z.number().int().positive(),
+    zone: optionalTrimmedString,
+    activationStartsAt: z.string().datetime().optional(),
+    activationEndsAt: z.string().datetime().optional(),
+  })
+  .refine(
+    (value) => {
+      if (!value.activationStartsAt || !value.activationEndsAt) {
+        return true;
+      }
+
+      return (
+        new Date(value.activationStartsAt).getTime() < new Date(value.activationEndsAt).getTime()
+      );
+    },
+    {
+      message: 'activationEndsAt must be later than activationStartsAt.',
+      path: ['activationEndsAt'],
+    }
+  );
+
+/**
+ * Validates status changes for existing QR codes.
+ */
+export const setAdminQRCodeStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'DISABLED']),
+  reason: z.string().trim().min(2).optional(),
+});
+
+/**
+ * Validates query parameters for listing admin audit entries.
+ * Supports cursor-based pagination with a configurable page size.
+ */
+export const adminAuditListQuerySchema = z.object({
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});

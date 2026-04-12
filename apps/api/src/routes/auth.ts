@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { requestMagicLinkSchema, verifyMagicLinkSchema } from '@velocity-gp/api-contract/schemas';
+import { env } from '../config/env.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import {
@@ -33,7 +34,7 @@ authRouter.post(
     response.cookie(AUTH_SESSION_COOKIE_NAME, verifyResult.sessionToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env['NODE_ENV'] === 'production',
+      secure: env.NODE_ENV === 'production',
       maxAge: AUTH_SESSION_COOKIE_MAX_AGE_MS,
       path: '/',
     });
@@ -78,7 +79,7 @@ authRouter.post(
     response.clearCookie(AUTH_SESSION_COOKIE_NAME, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env['NODE_ENV'] === 'production',
+      secure: env.NODE_ENV === 'production',
       path: '/',
     });
 

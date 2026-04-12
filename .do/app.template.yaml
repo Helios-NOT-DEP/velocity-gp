@@ -159,6 +159,10 @@ services:
         value: "${N8N_HOST}"
         scope: RUN_AND_BUILD_TIME
         type: GENERAL
+      - key: N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE
+        value: "${N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE}"
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: N8N_WEBHOOK_TOKEN
         value: "${N8N_WEBHOOK_TOKEN}"
         scope: RUN_AND_BUILD_TIME

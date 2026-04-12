@@ -19,6 +19,9 @@ export type AdminActionType =
   | 'HELIOS_REVOKED'
   | 'PIT_MANUAL_ENTER'
   | 'PIT_MANUAL_CLEAR'
+  | 'QR_CREATED'
+  | 'QR_STATUS_UPDATED'
+  | 'QR_DELETED'
   | 'QR_HAZARD_RANDOMIZER_UPDATED'
   | 'SCORE_RESET'
   | 'ROSTER_IMPORTED'
@@ -102,4 +105,12 @@ export interface AdminAuditEntry {
   readonly targetId: string | null;
   readonly details?: Record<string, unknown>;
   readonly createdAt: string;
+}
+
+/**
+ * Cursor-paginated audit listing response for admin audit endpoints.
+ */
+export interface ListAdminAuditsResponse {
+  readonly items: AdminAuditEntry[];
+  readonly nextCursor: string | null;
 }

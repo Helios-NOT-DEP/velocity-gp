@@ -15,29 +15,40 @@ export interface ApiRequestOptions {
   params?: Record<string, string | number>;
 }
 
-/**
- * Standardized resolved wrapper returned by every async method on the ApiClient.
- * Flattens the HTTP status alongside the strictly-typed Data payload or bounded Error.
- */
-export interface ApiResponse<T> {
-  data: T;
-  status: number;
-  ok: boolean;
-  error?: {
-    code?: string;
-    message?: string;
-    details?: Record<string, unknown>;
-  };
+interface ApiErrorPayload {
+  code?: string;
+  message?: string;
+  details?: Record<string, unknown>;
 }
 
-interface ParsedApiBody<T> {
+export interface ApiSuccessResponse<T> {
   data: T;
-  error?: ApiResponse<T>['error'];
+  status: number;
+  ok: true;
+  error?: undefined;
+}
+
+export interface ApiFailureResponse {
+  data: undefined;
+  status: number;
+  ok: false;
+  error?: ApiErrorPayload;
+}
+
+/**
+ * Standardized resolved wrapper returned by every async method on the ApiClient.
+ * `ok` is the discriminator: when true, `data` is typed and present.
+ */
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiFailureResponse;
+
+interface ParsedApiBody<T> {
+  data: T | undefined;
+  error?: ApiErrorPayload;
 }
 
 interface ApiEnvelope<T> {
   data?: T;
-  error?: ApiResponse<T>['error'];
+  error?: ApiErrorPayload;
   success?: boolean;
 }
 
@@ -87,24 +98,35 @@ export class ApiClient {
     }
 
     const authorizationHeader = readAuthorizationHeaderFromStorage();
+    const hasBody = options.body !== undefined;
     const response = await fetch(url.toString(), {
       method: options.method || 'GET',
       credentials: 'include',
       headers: {
-        'Content-Type': 'application/json',
+        // Only set Content-Type when a body is present — GET and DELETE requests
+        // should not advertise a JSON content type with no payload.
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         ...(authorizationHeader ? { Authorization: authorizationHeader } : {}),
         ...options.headers,
       },
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body: hasBody ? JSON.stringify(options.body) : undefined,
     });
 
     const parsedBody = await this.parseResponseBody<T>(response);
 
     return {
-      data: parsedBody.data,
-      status: response.status,
-      ok: response.ok,
-      error: parsedBody.error,
+      ...(response.ok
+        ? {
+            data: parsedBody.data as T,
+            status: response.status,
+            ok: true as const,
+          }
+        : {
+            data: undefined,
+            status: response.status,
+            ok: false as const,
+            error: parsedBody.error,
+          }),
     };
   }
 
@@ -144,7 +166,7 @@ export class ApiClient {
 
     if (!contentType.includes('application/json')) {
       // Non-JSON endpoints are treated as data-less responses by this client abstraction.
-      return { data: undefined as T };
+      return { data: undefined };
     }
 
     const payload = (await response.json()) as T | ApiEnvelope<T>;
@@ -153,7 +175,7 @@ export class ApiClient {
       // Preferred contract: `{ success, data|error }` envelope from api-contract/http helpers.
       if (payload.success === false) {
         return {
-          data: undefined as T,
+          data: undefined,
           error: payload.error,
         };
       }

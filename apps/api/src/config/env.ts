@@ -106,6 +106,14 @@ function assertSafeMagicLinkOriginInProduction(origin: string): void {
   }
 }
 
+function assertRequiredSecretsInProduction(parsedEnv: { AUTH_SECRET?: string }): void {
+  if (!parsedEnv.AUTH_SECRET || parsedEnv.AUTH_SECRET.trim().length === 0) {
+    throw new Error(
+      'AUTH_SECRET must be set in production. Sessions cannot be signed securely without it.'
+    );
+  }
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
@@ -131,6 +139,7 @@ const envSchema = z.object({
   MAILTRAP_AUDIT_ACTOR_EMAIL: optionalEmail.default('system+mailtrap@velocitygp.internal'),
   N8N_WEBHOOK_TOKEN: optionalMinString(16),
   N8N_HOST: optionalUrl,
+  N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE: optionalMinString(1).default('/webhook/{env}/QRCodeGen'),
   N8N_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
@@ -169,11 +178,12 @@ const frontendMagicLinkOrigin = parsedEnv.FRONTEND_MAGIC_LINK_ORIGIN ?? frontend
 
 if (parsedEnv.NODE_ENV === 'production') {
   assertSafeMagicLinkOriginInProduction(frontendMagicLinkOrigin);
+  assertRequiredSecretsInProduction(parsedEnv);
 }
 
 export const env = {
   ...parsedEnv,
-  FRONTEND_ORIGIN: frontendOrigin,
-  FRONTEND_ORIGINS: frontendOriginsFromEnv,
+  FRONTEND_PRIMARY_ORIGIN: frontendOrigin,
+  FRONTEND_ALLOWED_ORIGINS: frontendOriginsFromEnv,
   FRONTEND_MAGIC_LINK_ORIGIN: frontendMagicLinkOrigin,
 };

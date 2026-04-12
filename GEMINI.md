@@ -85,5 +85,7 @@ Velocity GP is a TypeScript monorepo for a multi-day endurance game experience. 
 2. **Implement**: Apply the fix or feature.
 3. **Validate**:
     - Run `npm run lint`.
-    - Run workspace-specific tests (e.g., `npm run test --workspace=@velocity-gp/api`).
+    - Run `npm run format`.
     - Run `npm run build` to ensure no breaking changes in shared contracts.
+    - Run workspace-specific tests (e.g., `npm run test --workspace=@velocity-gp/api`).
+    - Run `npm run test:web:e2e` to ensure no breaking changes in web-related workspaces.

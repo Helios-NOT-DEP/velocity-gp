@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useGame } from '../context/GameContext';
 import { AlertTriangle, Clock, Zap } from 'lucide-react';
@@ -12,6 +12,37 @@ export default function PitStop() {
     navigate('/race');
     return null;
   }
+
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  useEffect(() => {
+    const currentTeam = gameState.currentTeam;
+    const expiresAt = currentTeam?.pitStopExpiresAt;
+    if (!expiresAt) {
+      setTimeLeft(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const expiration = new Date(expiresAt).getTime();
+      const remainingSeconds = Math.max(0, Math.floor((expiration - now) / 1000));
+      setTimeLeft(remainingSeconds);
+
+      if (remainingSeconds === 0 && currentTeam?.inPitStop) {
+        clearPitStop(currentTeam.id);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [
+    clearPitStop,
+    gameState.currentTeam?.id,
+    gameState.currentTeam?.inPitStop,
+    gameState.currentTeam?.pitStopExpiresAt,
+  ]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -63,7 +94,7 @@ export default function PitStop() {
             className="text-7xl font-bold text-center tabular-nums text-white mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            {formatTime(gameState.currentTeam.pitStopTimeLeft || 0)}
+            {formatTime(timeLeft)}
           </div>
 
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">

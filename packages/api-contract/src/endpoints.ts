@@ -140,6 +140,16 @@ export const adminEndpoints = {
   /** Adjusts the probabilities/randomizer for QR hazards dynamically mid-game. */
   updateQrHazardRandomizer: (eventId: string, qrCodeId: string) =>
     `/admin/events/${eventId}/qr-codes/${qrCodeId}/hazard-randomizer`,
+  /** Returns the admin QR inventory for an event. */
+  listAdminQRCodes: (eventId: string) => `/admin/events/${eventId}/qr-codes`,
+  /** Creates a new QR inventory entry for an event and generates an asset. */
+  createAdminQRCode: (eventId: string) => `/admin/events/${eventId}/qr-codes`,
+  /** Updates active/disabled status on an event QR code. */
+  setAdminQRCodeStatus: (eventId: string, qrCodeId: string) =>
+    `/admin/events/${eventId}/qr-codes/${qrCodeId}/status`,
+  /** Soft-deletes an event QR code from active inventory. */
+  deleteAdminQRCode: (eventId: string, qrCodeId: string) =>
+    `/admin/events/${eventId}/qr-codes/${qrCodeId}`,
   /** Toggles HELIOS (staff) privileges for a given user account. */
   updateHeliosRole: (userId: string) => `/admin/users/${userId}/helios-role`,
   /** Retrieves the centralized log of all administrative actions taken during the event. */

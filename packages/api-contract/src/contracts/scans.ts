@@ -71,10 +71,12 @@ export interface HazardPitScanResult extends ScanResultBase {
 
 /**
  * Denotes a QR code inherently non-functional or unrecognizable by the game server.
+ * The penalty is applied to the team's score and reflected in `teamScore`.
  */
 export interface InvalidScanResult extends ScanResultBase {
   readonly outcome: 'INVALID';
   readonly pointsAwarded: number;
+  readonly teamScore: number;
   readonly errorCode: Extract<StableErrorCode, 'QR_NOT_FOUND'>;
   readonly flaggedForReview: boolean;
 }

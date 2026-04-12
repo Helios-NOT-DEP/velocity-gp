@@ -24,6 +24,18 @@ hazardRouter.post(
 );
 
 hazardRouter.get(
+  '/qr-codes/:hazardId',
+  validate(hazardParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const hazardId = String(request.params.hazardId);
+
+    response.json(
+      successResponse(await getHazard(hazardId), { requestId: response.locals.requestId })
+    );
+  })
+);
+
+hazardRouter.get(
   '/hazards/:hazardId',
   validate(hazardParamsSchema, 'params'),
   asyncHandler(async (request, response) => {
@@ -31,6 +43,18 @@ hazardRouter.get(
 
     response.json(
       successResponse(await getHazard(hazardId), { requestId: response.locals.requestId })
+    );
+  })
+);
+
+hazardRouter.get(
+  '/events/:eventId/qr-codes',
+  validate(eventHazardsParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+
+    response.json(
+      successResponse(await listHazards(eventId), { requestId: response.locals.requestId })
     );
   })
 );

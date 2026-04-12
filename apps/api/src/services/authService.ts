@@ -21,6 +21,7 @@ import { getEmailDispatcher } from './emailDispatchService.js';
 import { logger } from '../lib/logger.js';
 import { AUTH_SESSION_COOKIE_NAME, resolveSessionToken } from './authSessionToken.js';
 import { recordOnboardingCompletedActivity } from './teamActivityFeedService.js';
+import { normalizeWorkEmail } from '../utils/normalizeEmail.js';
 
 /**
  * Authentication service for magic-link and session flows.
@@ -44,13 +45,6 @@ interface EligiblePlayer {
   readonly teamId: string | null;
   readonly teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null;
   readonly eventName: string;
-}
-
-/**
- * Normalizes incoming work-email values for stable lookups.
- */
-function normalizeWorkEmail(email: string): string {
-  return email.trim().toLowerCase();
 }
 
 /**
@@ -272,6 +266,7 @@ export async function requestMagicLink(
     });
 
     const magicLinkUrl = resolveFrontendMagicLinkUrl(magicLinkToken);
+    let deliveryStatus: 'dispatched' | 'dispatch_failed' = 'dispatched';
     try {
       await getEmailDispatcher().dispatch({
         templateKey: 'magic_link_login',
@@ -283,6 +278,7 @@ export async function requestMagicLink(
         },
       });
     } catch (error) {
+      deliveryStatus = 'dispatch_failed';
       incrementCounter('auth.magic_link.request.dispatch.failure.total');
       logger.error('Magic link dispatch failed', {
         userId: eligiblePlayer.userId,
@@ -294,11 +290,12 @@ export async function requestMagicLink(
     }
 
     incrementCounter('auth.magic_link.request.accepted.total');
-    logger.debug('Magic link request accepted', { eligiblePlayer });
+    logger.debug('Magic link request accepted', { eligiblePlayer, deliveryStatus });
 
     return {
       accepted: true,
       message: GENERIC_MAGIC_LINK_MESSAGE,
+      deliveryStatus,
     };
   });
 }
