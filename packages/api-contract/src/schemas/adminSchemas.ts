@@ -24,6 +24,11 @@ export const adminEventQrCodeParamsSchema = z.object({
   qrCodeId: z.string().min(1),
 });
 
+export const adminEventMultiplierRuleParamsSchema = z.object({
+  eventId: z.string().min(1),
+  ruleId: z.string().min(1),
+});
+
 /** Enforces structure for generic user mutation endpoints. */
 export const adminUserParamsSchema = z.object({
   userId: z.string().min(1),
@@ -58,9 +63,20 @@ export const updateHeliosRoleSchema = z.object({
  * Strict numeric enforcement preventing users from setting impossible hazard weights.
  * Locks between 0-100 to represent proper probability spread.
  */
-export const updateQrHazardRandomizerSchema = z.object({
-  hazardWeightOverride: z.number().int().min(0).max(100).nullable(),
-});
+export const updateQrHazardRandomizerSchema = z
+  .object({
+    hazardRatioOverride: z.number().int().min(1).max(10_000).nullable().optional(),
+    hazardWeightOverride: z.number().int().min(0).max(100).nullable().optional(),
+  })
+  .refine(
+    (value) =>
+      Object.prototype.hasOwnProperty.call(value, 'hazardRatioOverride') ||
+      Object.prototype.hasOwnProperty.call(value, 'hazardWeightOverride'),
+    {
+      message: 'At least one override must be provided.',
+      path: ['hazardWeightOverride'],
+    }
+  );
 
 const optionalTrimmedString = z
   .string()
@@ -84,6 +100,8 @@ export const createAdminQRCodeSchema = z
     zone: optionalTrimmedString,
     activationStartsAt: z.string().datetime().optional(),
     activationEndsAt: z.string().datetime().optional(),
+    hazardRatioOverride: z.number().int().min(1).max(10_000).nullable().optional(),
+    hazardWeightOverride: z.number().int().min(0).max(100).nullable().optional(),
   })
   .refine(
     (value) => {
@@ -108,6 +126,109 @@ export const setAdminQRCodeStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
   reason: z.string().trim().min(2).optional(),
 });
+
+export const updateEventHazardSettingsSchema = z.object({
+  globalHazardRatio: z.number().int().min(1).max(10_000),
+  reason: z.string().trim().min(2).optional(),
+});
+
+function parsePossiblyInvalidInteger(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.trunc(value) : Number.NaN;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return Number.NaN;
+    }
+
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+
+  return Number.NaN;
+}
+
+const qrImportRowSchema = z
+  .object({
+    label: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value.trim() : '')),
+    value: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .transform((value) => parsePossiblyInvalidInteger(value)),
+    zone: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value : null)),
+    activationStartsAt: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value.trim() : null)),
+    activationEndsAt: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value.trim() : null)),
+    hazardRatioOverride: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .transform((value) => {
+        if (value === null || value === undefined || value === '') {
+          return null;
+        }
+        return parsePossiblyInvalidInteger(value);
+      }),
+    hazardWeightOverride: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .transform((value) => {
+        if (value === null || value === undefined || value === '') {
+          return null;
+        }
+        return parsePossiblyInvalidInteger(value);
+      }),
+  })
+  .strict();
+
+export const qrImportPreviewSchema = z.object({
+  rows: z.array(qrImportRowSchema).min(1).max(5_000),
+});
+
+export const qrImportApplySchema = z.object({
+  rows: z.array(qrImportRowSchema).min(1).max(5_000),
+});
+
+export const exportQrAssetsSchema = z.object({
+  qrCodeIds: z.array(z.string().min(1)).min(1).max(5_000).optional(),
+});
+
+export const createHazardMultiplierRuleSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    startsAt: z.string().datetime(),
+    endsAt: z.string().datetime(),
+    ratioMultiplier: z.number().positive().max(100),
+  })
+  .refine((value) => new Date(value.startsAt).getTime() < new Date(value.endsAt).getTime(), {
+    message: 'endsAt must be later than startsAt.',
+    path: ['endsAt'],
+  });
+
+export const updateHazardMultiplierRuleSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    startsAt: z.string().datetime().optional(),
+    endsAt: z.string().datetime().optional(),
+    ratioMultiplier: z.number().positive().max(100).optional(),
+  })
+  .refine(
+    (value) => {
+      if (!value.startsAt || !value.endsAt) {
+        return true;
+      }
+      return new Date(value.startsAt).getTime() < new Date(value.endsAt).getTime();
+    },
+    {
+      message: 'endsAt must be later than startsAt.',
+      path: ['endsAt'],
+    }
+  );
 
 /**
  * Validates query parameters for listing admin audit entries.

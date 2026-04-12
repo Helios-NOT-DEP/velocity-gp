@@ -140,6 +140,26 @@ export const adminEndpoints = {
   /** Adjusts the probabilities/randomizer for QR hazards dynamically mid-game. */
   updateQrHazardRandomizer: (eventId: string, qrCodeId: string) =>
     `/admin/events/${eventId}/qr-codes/${qrCodeId}/hazard-randomizer`,
+  /** Reads global hazard settings for an event. */
+  getHazardSettings: (eventId: string) => `/admin/events/${eventId}/hazard-settings`,
+  /** Updates global hazard settings for an event. */
+  updateHazardSettings: (eventId: string) => `/admin/events/${eventId}/hazard-settings`,
+  /** Validates a bulk QR import payload and returns line-level errors. */
+  previewQrImport: (eventId: string) => `/admin/events/${eventId}/qr-codes/import/preview`,
+  /** Applies valid rows from a bulk QR import payload. */
+  applyQrImport: (eventId: string) => `/admin/events/${eventId}/qr-codes/import/apply`,
+  /** Exports QR image assets and a manifest archive for selected QR codes. */
+  exportQrAssets: (eventId: string) => `/admin/events/${eventId}/qr-codes/export`,
+  /** Lists scheduled hazard multiplier rules for an event. */
+  listHazardMultipliers: (eventId: string) => `/admin/events/${eventId}/hazard-multipliers`,
+  /** Creates a scheduled hazard multiplier rule for an event. */
+  createHazardMultiplier: (eventId: string) => `/admin/events/${eventId}/hazard-multipliers`,
+  /** Updates a scheduled hazard multiplier rule for an event. */
+  updateHazardMultiplier: (eventId: string, ruleId: string) =>
+    `/admin/events/${eventId}/hazard-multipliers/${ruleId}`,
+  /** Deletes a scheduled hazard multiplier rule for an event. */
+  deleteHazardMultiplier: (eventId: string, ruleId: string) =>
+    `/admin/events/${eventId}/hazard-multipliers/${ruleId}`,
   /** Returns the admin QR inventory for an event. */
   listAdminQRCodes: (eventId: string) => `/admin/events/${eventId}/qr-codes`,
   /** Creates a new QR inventory entry for an event and generates an asset. */

@@ -95,6 +95,15 @@ function resolveHazardRatio(hazardRatioOverride: number | null, globalHazardRati
   return configuredRatio > 0 ? configuredRatio : 1;
 }
 
+function applyHazardMultiplier(baseRatio: number, ratioMultiplier: number | null): number {
+  if (ratioMultiplier === null) {
+    return baseRatio;
+  }
+
+  const multiplied = Math.round(baseRatio * ratioMultiplier);
+  return multiplied > 0 ? multiplied : 1;
+}
+
 interface ResolveHazardDecisionInput {
   readonly globalScanCountAfter: number;
   readonly hazardRatioUsed: number;
@@ -133,41 +142,59 @@ async function processScanInTransaction(
   now: Date
 ): Promise<SubmitScanResponse> {
   // Load all state that influences scan outcome before mutating any records.
-  const [eventConfig, playerWithTeam, globalScanCountBefore] = await Promise.all([
-    tx.eventConfig.findUnique({
-      where: {
-        eventId: input.eventId,
-      },
-      select: {
-        eventId: true,
-        globalHazardRatio: true,
-        invalidScanPenalty: true,
-        pitStopDurationSeconds: true,
-        raceControlState: true,
-      },
-    }),
-    tx.player.findFirst({
-      where: {
-        id: input.request.playerId,
-        eventId: input.eventId,
-      },
-      include: {
-        team: {
-          select: {
-            id: true,
-            score: true,
-            status: true,
-            pitStopExpiresAt: true,
+  const [eventConfig, playerWithTeam, globalScanCountBefore, activeMultiplierRule] =
+    await Promise.all([
+      tx.eventConfig.findUnique({
+        where: {
+          eventId: input.eventId,
+        },
+        select: {
+          eventId: true,
+          globalHazardRatio: true,
+          invalidScanPenalty: true,
+          pitStopDurationSeconds: true,
+          raceControlState: true,
+        },
+      }),
+      tx.player.findFirst({
+        where: {
+          id: input.request.playerId,
+          eventId: input.eventId,
+        },
+        include: {
+          team: {
+            select: {
+              id: true,
+              score: true,
+              status: true,
+              pitStopExpiresAt: true,
+            },
           },
         },
-      },
-    }),
-    tx.scanRecord.count({
-      where: {
-        eventId: input.eventId,
-      },
-    }),
-  ]);
+      }),
+      tx.scanRecord.count({
+        where: {
+          eventId: input.eventId,
+        },
+      }),
+      tx.hazardMultiplierRule.findFirst({
+        where: {
+          eventId: input.eventId,
+          deletedAt: null,
+          startsAt: {
+            lte: now,
+          },
+          endsAt: {
+            gt: now,
+          },
+        },
+        orderBy: [{ startsAt: 'desc' }, { createdAt: 'desc' }],
+        select: {
+          id: true,
+          ratioMultiplier: true,
+        },
+      }),
+    ]);
 
   if (!eventConfig) {
     throw new ValidationError('Event configuration is missing for scan processing.', {
@@ -342,9 +369,13 @@ async function processScanInTransaction(
     });
   }
 
-  const hazardRatioUsed = resolveHazardRatio(
+  const baseHazardRatio = resolveHazardRatio(
     qrCode.hazardRatioOverride,
     eventConfig.globalHazardRatio
+  );
+  const hazardRatioUsed = applyHazardMultiplier(
+    baseHazardRatio,
+    activeMultiplierRule?.ratioMultiplier ?? null
   );
 
   const claimResult = await tx.qRCodeClaim.createMany({

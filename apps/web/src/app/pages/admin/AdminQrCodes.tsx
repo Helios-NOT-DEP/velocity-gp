@@ -1,20 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Download, Loader2, Plus, QrCode, RefreshCcw, Save, Trash2, X } from 'lucide-react';
 import {
-  adminEndpoints,
-  apiClient,
-  eventEndpoints,
-  type CreateQRCodeRequest,
-  type EventSummary,
-  type QRCodeSummary,
-  type UpdateQrHazardRandomizerResponse,
-} from '@/services/api';
+  Check,
+  Download,
+  Loader2,
+  Plus,
+  QrCode,
+  RefreshCcw,
+  Save,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
+import type { QRCodeSummary, QrImportPreviewResponse, QrImportRowInput } from '@/services/api';
 import {
+  applyQrImport,
   createAdminQRCode,
   deleteAdminQRCode,
+  exportQrAssets,
   listAdminQRCodes,
+  parseQrCsvFile,
+  previewQrImport,
   setAdminQRCodeStatus,
+  updateAdminQrHazardOverrides,
 } from '@/services/admin/qrCodes';
+import { getCurrentEventId } from '@/services/admin/roster';
 import { adminDemoQrCodes, type AdminQrCode } from '../../admin/adminViewData';
 
 function toAdminQrCode(qrCode: QRCodeSummary): AdminQrCode {
@@ -59,6 +68,18 @@ function clampHazardWeight(value: number): number {
   return Math.trunc(value);
 }
 
+function clampHazardRatio(value: number): number {
+  if (value < 1) {
+    return 1;
+  }
+
+  if (value > 10_000) {
+    return 10_000;
+  }
+
+  return Math.trunc(value);
+}
+
 function formatActivationWindow(start: string | null, end: string | null): string {
   if (!start && !end) {
     return 'Always active';
@@ -75,7 +96,6 @@ function downloadQrAsset(qrCode: AdminQrCode): void {
     return;
   }
 
-  // Use a temporary anchor so operators can quickly save generated CDN assets.
   const link = document.createElement('a');
   link.href = qrCode.qrImageUrl;
   link.download = `${qrCode.name.replace(/\s+/g, '-').toLowerCase()}.png`;
@@ -83,6 +103,24 @@ function downloadQrAsset(qrCode: AdminQrCode): void {
   document.body.append(link);
   link.click();
   link.remove();
+}
+
+function downloadZipArchive(fileName: string, base64Payload: string, mimeType: string): void {
+  const binary = window.atob(base64Payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  const blob = new window.Blob([bytes], { type: mimeType });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 export default function AdminQrCodes() {
@@ -97,35 +135,42 @@ export default function AdminQrCodes() {
   const [isCreating, setIsCreating] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draftWeights, setDraftWeights] = useState<Record<string, number>>({});
+  const [draftRatios, setDraftRatios] = useState<Record<string, number>>({});
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string | null>>({});
+  const [importRows, setImportRows] = useState<readonly QrImportRowInput[]>([]);
+  const [importPreview, setImportPreview] = useState<QrImportPreviewResponse | null>(null);
+  const [isPreviewingImport, setIsPreviewingImport] = useState(false);
+  const [isApplyingImport, setIsApplyingImport] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function hydrateQrCodes(nextEventId: string) {
+    const qrResponse = await listAdminQRCodes(nextEventId);
+    const nextQrCodes = qrResponse.qrCodes.map(toAdminQrCode);
+    setQrCodes(nextQrCodes);
+    setDraftWeights(
+      Object.fromEntries(nextQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0]))
+    );
+    setDraftRatios(
+      Object.fromEntries(nextQrCodes.map((code) => [code.id, code.hazardRatioOverride ?? 1]))
+    );
+  }
 
   useEffect(() => {
     let isMounted = true;
 
-    async function hydrateQrCodes() {
+    async function bootstrap() {
       setIsHydrating(true);
       setLoadError(null);
 
       try {
-        const eventResponse = await apiClient.get<EventSummary>(eventEndpoints.getCurrentEvent);
-        if (!eventResponse.ok) {
-          throw new Error(`Failed to load current event: ${eventResponse.status}`);
-        }
-
-        const nextEventId = eventResponse.data.id;
-        const qrResponse = await listAdminQRCodes(nextEventId);
-
+        const nextEventId = await getCurrentEventId();
         if (!isMounted) {
           return;
         }
 
-        const nextQrCodes = qrResponse.qrCodes.map(toAdminQrCode);
         setEventId(nextEventId);
-        setQrCodes(nextQrCodes);
-        setDraftWeights(
-          Object.fromEntries(nextQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0]))
-        );
+        await hydrateQrCodes(nextEventId);
       } catch {
         if (!isMounted) {
           return;
@@ -138,6 +183,11 @@ export default function AdminQrCodes() {
             adminDemoQrCodes.map((code) => [code.id, code.hazardWeightOverride ?? 0])
           )
         );
+        setDraftRatios(
+          Object.fromEntries(
+            adminDemoQrCodes.map((code) => [code.id, code.hazardRatioOverride ?? 1])
+          )
+        );
         setLoadError('Live QR inventory unavailable. Showing local demo data.');
       } finally {
         if (isMounted) {
@@ -146,7 +196,7 @@ export default function AdminQrCodes() {
       }
     }
 
-    void hydrateQrCodes();
+    void bootstrap();
 
     return () => {
       isMounted = false;
@@ -181,21 +231,17 @@ export default function AdminQrCodes() {
     setLoadError(null);
 
     try {
-      const activationStartsAtIso = toApiIsoDateTime(activationStartsAt);
-      const activationEndsAtIso = toApiIsoDateTime(activationEndsAt);
-      const request: CreateQRCodeRequest = {
+      const request = {
         label: newQRName.trim(),
         value: points,
         zone: newQRZone.trim() || undefined,
-        activationStartsAt: activationStartsAtIso,
-        activationEndsAt: activationEndsAtIso,
+        activationStartsAt: toApiIsoDateTime(activationStartsAt),
+        activationEndsAt: toApiIsoDateTime(activationEndsAt),
       };
 
-      const created = await createAdminQRCode(eventId, request);
-      const createdCode = toAdminQrCode(created.qrCode);
+      await createAdminQRCode(eventId, request);
+      await hydrateQrCodes(eventId);
 
-      setQrCodes((existing) => [createdCode, ...existing]);
-      setDraftWeights((existing) => ({ ...existing, [createdCode.id]: 0 }));
       setNewQRName('');
       setNewQRPoints('100');
       setNewQRZone('');
@@ -227,18 +273,12 @@ export default function AdminQrCodes() {
     setRowErrors((existing) => ({ ...existing, [id]: null }));
 
     try {
-      await setAdminQRCodeStatus(eventId, id, {
-        status: nextStatus,
-      });
-
+      await setAdminQRCodeStatus(eventId, id, { status: nextStatus });
       setQrCodes((existing) =>
         existing.map((code) => (code.id === id ? { ...code, active: !code.active } : code))
       );
     } catch {
-      setRowErrors((existing) => ({
-        ...existing,
-        [id]: 'Unable to update QR status. Try again.',
-      }));
+      setRowErrors((existing) => ({ ...existing, [id]: 'Unable to update QR status. Try again.' }));
     } finally {
       setSavingById((existing) => ({ ...existing, [id]: false }));
     }
@@ -246,10 +286,7 @@ export default function AdminQrCodes() {
 
   async function removeCode(id: string) {
     if (!eventId) {
-      setRowErrors((existing) => ({
-        ...existing,
-        [id]: 'Delete is unavailable in demo mode.',
-      }));
+      setRowErrors((existing) => ({ ...existing, [id]: 'Delete is unavailable in demo mode.' }));
       return;
     }
 
@@ -264,28 +301,34 @@ export default function AdminQrCodes() {
         delete next[id];
         return next;
       });
+      setDraftRatios((existing) => {
+        const next = { ...existing };
+        delete next[id];
+        return next;
+      });
     } catch {
-      setRowErrors((existing) => ({
-        ...existing,
-        [id]: 'Unable to delete QR code. Try again.',
-      }));
+      setRowErrors((existing) => ({ ...existing, [id]: 'Unable to delete QR code. Try again.' }));
     } finally {
       setSavingById((existing) => ({ ...existing, [id]: false }));
     }
   }
 
   function updateDraftWeight(id: string, value: number) {
-    setDraftWeights((existing) => ({
-      ...existing,
-      [id]: clampHazardWeight(value),
-    }));
+    setDraftWeights((existing) => ({ ...existing, [id]: clampHazardWeight(value) }));
   }
 
-  async function persistHazardWeight(id: string, nextWeight: number | null) {
+  function updateDraftRatio(id: string, value: number) {
+    setDraftRatios((existing) => ({ ...existing, [id]: clampHazardRatio(value) }));
+  }
+
+  async function persistHazardOverrides(
+    id: string,
+    mode: 'save' | 'fallback-weight' | 'fallback-ratio'
+  ) {
     if (!eventId) {
       setRowErrors((existing) => ({
         ...existing,
-        [id]: 'Weight persistence is unavailable in demo mode.',
+        [id]: 'Hazard persistence is unavailable in demo mode.',
       }));
       return;
     }
@@ -294,42 +337,103 @@ export default function AdminQrCodes() {
     setRowErrors((existing) => ({ ...existing, [id]: null }));
 
     try {
-      const response = await apiClient.request<UpdateQrHazardRandomizerResponse>(
-        adminEndpoints.updateQrHazardRandomizer(eventId, id),
-        {
-          method: 'PATCH',
-          body: {
-            hazardWeightOverride: nextWeight,
-          },
-        }
-      );
+      const request =
+        mode === 'fallback-weight'
+          ? { hazardWeightOverride: null }
+          : mode === 'fallback-ratio'
+            ? { hazardRatioOverride: null }
+            : {
+                hazardWeightOverride: clampHazardWeight(draftWeights[id] ?? 0),
+                hazardRatioOverride: clampHazardRatio(draftRatios[id] ?? 1),
+              };
 
-      if (!response.ok) {
-        throw new Error(`Failed to persist hazard weight (${response.status}).`);
-      }
+      const response = await updateAdminQrHazardOverrides(eventId, id, request);
 
       setQrCodes((existing) =>
         existing.map((code) =>
           code.id === id
             ? {
                 ...code,
-                hazardWeightOverride: response.data.hazardWeightOverride,
+                hazardWeightOverride: response.hazardWeightOverride,
+                hazardRatioOverride: response.hazardRatioOverride,
               }
             : code
         )
       );
 
-      setDraftWeights((existing) => ({
-        ...existing,
-        [id]: response.data.hazardWeightOverride ?? existing[id] ?? 0,
-      }));
+      setDraftWeights((existing) => ({ ...existing, [id]: response.hazardWeightOverride ?? 0 }));
+      setDraftRatios((existing) => ({ ...existing, [id]: response.hazardRatioOverride ?? 1 }));
     } catch {
       setRowErrors((existing) => ({
         ...existing,
-        [id]: 'Unable to save hazard randomizer. Try again.',
+        [id]: 'Unable to save hazard overrides. Try again.',
       }));
     } finally {
       setSavingById((existing) => ({ ...existing, [id]: false }));
+    }
+  }
+
+  async function handleCsvUpload(event: React.ChangeEvent<globalThis.HTMLInputElement>) {
+    if (!event.target.files || event.target.files.length === 0 || !eventId) {
+      return;
+    }
+
+    const [file] = event.target.files;
+    setIsPreviewingImport(true);
+    setLoadError(null);
+
+    try {
+      const rows = await parseQrCsvFile(file);
+      const preview = await previewQrImport(eventId, rows);
+      setImportRows(rows);
+      setImportPreview(preview);
+    } catch {
+      setLoadError('Unable to parse/preview QR CSV import. Check required headers and row values.');
+      setImportRows([]);
+      setImportPreview(null);
+    } finally {
+      setIsPreviewingImport(false);
+      event.target.value = '';
+    }
+  }
+
+  async function handleApplyImport() {
+    if (!eventId || importRows.length === 0) {
+      return;
+    }
+
+    setIsApplyingImport(true);
+    setLoadError(null);
+    try {
+      await applyQrImport(eventId, importRows);
+      await hydrateQrCodes(eventId);
+      const refreshedPreview = await previewQrImport(eventId, importRows);
+      setImportPreview(refreshedPreview);
+    } catch {
+      setLoadError('Unable to apply QR import.');
+    } finally {
+      setIsApplyingImport(false);
+    }
+  }
+
+  async function handleExportAssets() {
+    if (!eventId) {
+      return;
+    }
+
+    setIsExporting(true);
+    setLoadError(null);
+
+    try {
+      const exported = await exportQrAssets(
+        eventId,
+        qrCodes.map((code) => code.id)
+      );
+      downloadZipArchive(exported.fileName, exported.archiveBase64, exported.mimeType);
+    } catch {
+      setLoadError('Unable to export QR assets zip archive.');
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -350,6 +454,76 @@ export default function AdminQrCodes() {
           {loadError}
         </div>
       )}
+
+      <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-6">
+        <h3 className="font-['Space_Grotesk'] text-2xl mb-4 flex items-center gap-2">
+          <Upload className="w-6 h-6 text-[#00D4FF]" />
+          Bulk QR Import (CSV)
+        </h3>
+
+        <div className="flex flex-wrap gap-3 items-center">
+          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-700 bg-black/30 text-sm cursor-pointer hover:border-[#00D4FF]/60">
+            <Upload className="w-4 h-4" />
+            Choose CSV
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(event) => {
+                void handleCsvUpload(event);
+              }}
+              disabled={isDemoMode || isPreviewingImport}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              void handleApplyImport();
+            }}
+            disabled={isDemoMode || isApplyingImport || !importPreview || importRows.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00D4FF]/20 border border-[#00D4FF]/30 text-[#00D4FF] disabled:opacity-50"
+          >
+            {isApplyingImport ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            Apply Import
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void handleExportAssets();
+            }}
+            disabled={isDemoMode || isExporting || qrCodes.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#39FF14]/15 border border-[#39FF14]/30 text-[#39FF14] disabled:opacity-50"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Export ZIP
+          </button>
+        </div>
+
+        {importPreview && (
+          <div className="mt-4 rounded-lg border border-gray-700 bg-black/30 p-3 text-sm">
+            <p className="text-gray-300">
+              Preview: {importPreview.summary.valid} valid / {importPreview.summary.invalid} invalid
+              / {importPreview.summary.total} total
+            </p>
+            <div className="max-h-44 overflow-auto mt-2 space-y-1">
+              {importPreview.rows.slice(0, 25).map((row) => (
+                <div key={`${row.rowNumber}-${row.label}`} className="text-xs text-gray-400">
+                  Row {row.rowNumber}: {row.label} ({row.action})
+                  {row.errors.length > 0 ? ` - ${row.errors.join('; ')}` : ''}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </article>
 
       <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-6">
         <h3 className="font-['Space_Grotesk'] text-2xl mb-4 flex items-center gap-2">
@@ -439,6 +613,7 @@ export default function AdminQrCodes() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {qrCodes.map((qrCode) => {
           const draftWeight = draftWeights[qrCode.id] ?? qrCode.hazardWeightOverride ?? 0;
+          const draftRatio = draftRatios[qrCode.id] ?? qrCode.hazardRatioOverride ?? 1;
           const isSaving = Boolean(savingById[qrCode.id]);
           const rowError = rowErrors[qrCode.id];
 
@@ -495,13 +670,31 @@ export default function AdminQrCodes() {
               <div className="mb-4 rounded-lg border border-gray-700/80 bg-black/30 p-3 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-300">
-                    Hazard Randomizer
+                    Hazard Overrides
                   </p>
-                  <span className="text-xs font-mono text-[#00D4FF]">
-                    {qrCode.hazardWeightOverride === null
-                      ? 'Fallback'
-                      : `${qrCode.hazardWeightOverride}%`}
-                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-400 w-24">Ratio</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10000}
+                    value={draftRatio}
+                    onChange={(event) => updateDraftRatio(qrCode.id, Number(event.target.value))}
+                    className="w-28 px-2 py-1 bg-black/50 border border-gray-700 rounded text-sm text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void persistHazardOverrides(qrCode.id, 'fallback-ratio');
+                    }}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs font-semibold disabled:opacity-60"
+                  >
+                    <RefreshCcw className="w-3 h-3" />
+                    Fallback Ratio
+                  </button>
                 </div>
 
                 <input
@@ -515,6 +708,7 @@ export default function AdminQrCodes() {
                 />
 
                 <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-400 w-24">Weight %</label>
                   <input
                     type="number"
                     min={0}
@@ -527,7 +721,7 @@ export default function AdminQrCodes() {
                   <button
                     type="button"
                     onClick={() => {
-                      void persistHazardWeight(qrCode.id, clampHazardWeight(draftWeight));
+                      void persistHazardOverrides(qrCode.id, 'save');
                     }}
                     disabled={isSaving}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#00D4FF]/15 border border-[#00D4FF]/30 text-[#00D4FF] text-xs font-semibold disabled:opacity-60"
@@ -542,24 +736,26 @@ export default function AdminQrCodes() {
                   <button
                     type="button"
                     onClick={() => {
-                      void persistHazardWeight(qrCode.id, null);
+                      void persistHazardOverrides(qrCode.id, 'fallback-weight');
                     }}
                     disabled={isSaving}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs font-semibold disabled:opacity-60"
                   >
                     <RefreshCcw className="w-3 h-3" />
-                    Use Fallback
+                    Fallback Weight
                   </button>
                 </div>
 
                 <p className="text-xs text-gray-400">
+                  Ratio:{' '}
+                  {qrCode.hazardRatioOverride === null
+                    ? 'event global ratio'
+                    : qrCode.hazardRatioOverride}
+                  . Weight:{' '}
                   {qrCode.hazardWeightOverride === null
-                    ? `Using ratio fallback policy${
-                        qrCode.hazardRatioOverride !== null
-                          ? ` (per-QR ratio ${qrCode.hazardRatioOverride})`
-                          : ' (event global ratio)'
-                      }.`
-                    : 'Using per-QR probability override.'}
+                    ? 'ratio mode'
+                    : `${qrCode.hazardWeightOverride}%`}
+                  .
                 </p>
 
                 {rowError && <p className="text-xs text-red-300">{rowError}</p>}
