@@ -110,10 +110,7 @@ async function callOpenAIModeration(text: string): Promise<ModerationResult> {
   const flaggedCategory =
     Object.entries(result.categories).find(([, flagged]) => flagged)?.[0] ?? 'unknown';
 
-  logger.info(
-    { flaggedCategory },
-    '[moderationService] Description flagged by OpenAI moderation'
-  );
+  logger.info('[moderationService] Description flagged by OpenAI moderation', { flaggedCategory });
 
   return {
     safe: false,
@@ -134,7 +131,7 @@ function keywordFallback(text: string): ModerationResult {
   const match = BLOCKED_KEYWORDS.find((kw) => lower.includes(kw));
 
   if (match) {
-    logger.info({ match }, '[moderationService] Keyword fallback blocked description');
+    logger.info('[moderationService] Keyword fallback blocked description', { match });
     return {
       safe: false,
       flaggedCategory: 'keyword-blocklist',

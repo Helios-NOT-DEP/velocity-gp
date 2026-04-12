@@ -58,10 +58,7 @@ export async function submitDescription(
 ): Promise<GarageSubmitResponse> {
   const { playerId, teamId, eventId, description } = request;
 
-  logger.info(
-    { playerId, teamId },
-    '[garageService] submitDescription — starting moderation'
-  );
+  logger.info('[garageService] submitDescription — starting moderation', { playerId, teamId });
 
   // ── Step 1: Moderate the description ──────────────────────────────────────
   // moderateText throws only on infrastructure failure; content rejections are
@@ -69,10 +66,9 @@ export async function submitDescription(
   const moderation = await moderateText(description);
 
   if (!moderation.safe) {
-    logger.info(
-      { playerId, teamId, flaggedCategory: moderation.flaggedCategory },
-      '[garageService] Description rejected by moderation'
-    );
+    logger.info('[garageService] Description rejected by moderation', {
+      playerId, teamId, flaggedCategory: moderation.flaggedCategory,
+    });
 
     // Upsert a REJECTED row so the admin audit trail captures the attempt,
     // but mark moderatedAt so we know it was settled (not just PENDING).
@@ -123,10 +119,7 @@ export async function submitDescription(
     },
   });
 
-  logger.info(
-    { playerId, teamId },
-    '[garageService] Description approved and stored'
-  );
+  logger.info('[garageService] Description approved and stored', { playerId, teamId });
 
   // ── Step 3: Check quota and maybe trigger logo generation ─────────────────
   await maybeEnqueueLogoGeneration(teamId);
@@ -190,10 +183,9 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
   // single-player submission triggers logo generation without needing teammates.
   const requiredCount = env.GARAGE_REQUIRED_PLAYER_COUNT ?? team.requiredPlayerCount;
 
-  logger.debug(
-    { teamId, approvedCount, required: requiredCount, dbRequired: team.requiredPlayerCount, logoStatus: team.logoStatus },
-    '[garageService] maybeEnqueueLogoGeneration — quota check'
-  );
+  logger.debug('[garageService] maybeEnqueueLogoGeneration — quota check', {
+    teamId, approvedCount, required: requiredCount, dbRequired: team.requiredPlayerCount, logoStatus: team.logoStatus,
+  });
 
   // Has the quota been reached?
   if (approvedCount < requiredCount) {
@@ -208,10 +200,9 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
     : (['PENDING', 'FAILED'] as const);
 
   if (isLateJoiner) {
-    logger.info(
-      { teamId, approvedCount, required: requiredCount },
-      '[garageService] Late joiner detected — re-triggering logo generation to include new description'
-    );
+    logger.info('[garageService] Late joiner detected — re-triggering logo generation to include new description', {
+      teamId, approvedCount, required: requiredCount,
+    });
   }
 
   // ── Atomic status-flip: claim GENERATING ──────────────────────────────────
@@ -227,11 +218,11 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
 
   if (claimed === 0) {
     // Another request already claimed the lock, or logo is already READY
-    logger.debug({ teamId }, '[garageService] Logo generation already claimed/running — skipping');
+    logger.debug('[garageService] Logo generation already claimed/running — skipping', { teamId });
     return;
   }
 
-  logger.info({ teamId }, '[garageService] Quota reached — starting logo generation');
+  logger.info('[garageService] Quota reached — starting logo generation', { teamId });
 
   // ── Dispatch logo generation as a background task ─────────────────────────
   // Fire-and-forget: claim GENERATING synchronously above (atomic), then let
@@ -267,19 +258,17 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
 
     // Log each description being incorporated so the prompt build is fully traceable
     descriptions.forEach((desc, i) => {
-      logger.info(
-        { teamId, teamName, memberIndex: i + 1, total: descriptions.length, playerId: submissions[i].playerId, description: desc },
-        '[garageService] Including member description in logo prompt'
-      );
+      logger.info('[garageService] Including member description in logo prompt', {
+        teamId, teamName, memberIndex: i + 1, total: descriptions.length, playerId: submissions[i].playerId, description: desc,
+      });
     });
 
     // Build a structured prompt the image model can act on directly
     const prompt = buildLogoPrompt(teamName, descriptions);
 
-    logger.info(
-      { teamId, teamName, descriptionCount: descriptions.length, prompt },
-      '[garageService] Final logo prompt constructed — dispatching to n8n'
-    );
+    logger.info('[garageService] Final logo prompt constructed — dispatching to n8n', {
+      teamId, teamName, descriptionCount: descriptions.length, prompt,
+    });
 
     // generateTeamLogo calls the n8n webhook which runs an OpenAI image
     // generation step, uploads the image to storage, and returns the URL.
@@ -299,7 +288,7 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
       },
     });
 
-    logger.info({ teamId, logoUrl }, '[garageService] Logo generated and stored');
+    logger.info('[garageService] Logo generated and stored', { teamId, logoUrl });
   } catch (error) {
     // Mark as FAILED so the next approved submission can retry
     await prisma.team.update({
@@ -308,7 +297,7 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
     });
 
     const message = error instanceof Error ? error.message : String(error);
-    logger.error({ teamId, message }, '[garageService] Logo generation failed');
+    logger.error('[garageService] Logo generation failed', { teamId, message });
     // Do NOT re-throw — triggerLogoGeneration is called fire-and-forget via setImmediate.
     // Re-throwing would create an unhandled rejection that crashes the process.
     // The UI polls /status and will see FAILED, allowing the next submission to retry.

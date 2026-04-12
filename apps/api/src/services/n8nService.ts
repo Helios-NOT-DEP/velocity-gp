@@ -40,18 +40,14 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
   // Dev fallback: if no n8n URL is configured, return a placeholder so the full
   // garage flow (submit → GENERATING → READY → logo reveal) can be tested locally.
   if (!env.N8N_IMAGE_API_URL) {
-    logger.warn(
-      { teamName },
-      '[n8nService] N8N_IMAGE_API_URL not set — returning placeholder logo URL (dev mode)'
-    );
+    logger.warn('[n8nService] N8N_IMAGE_API_URL not set — returning placeholder logo URL (dev mode)', { teamName });
     const encoded = encodeURIComponent(teamName);
     return `https://placehold.co/512x512/0B1E3B/00D4FF?text=${encoded}`;
   }
 
-  logger.info(
-    { url: env.N8N_IMAGE_API_URL, teamName, promptLength: prompt.length },
-    '[n8nService] POST to n8n webhook'
-  );
+  logger.info('[n8nService] POST to n8n webhook', {
+    url: env.N8N_IMAGE_API_URL, teamName, promptLength: prompt.length,
+  });
 
   const response = await fetch(env.N8N_IMAGE_API_URL, {
     method: 'POST',
@@ -66,14 +62,14 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
 
   if (!response.ok) {
     const body = await response.text();
-    logger.error({ status: response.status, body }, '[n8nService] n8n webhook error');
+    logger.error('[n8nService] n8n webhook error', { status: response.status, body });
     throw new Error(`N8N API error: ${response.status} ${response.statusText}`);
   }
 
   const responseText = await response.text();
 
   if (!responseText || responseText.trim() === '') {
-    logger.error({ status: response.status }, '[n8nService] n8n returned empty response body');
+    logger.error('[n8nService] n8n returned empty response body', { status: response.status });
     throw new Error('n8n workflow returned an empty response — check the Respond to Webhook node is configured');
   }
 
@@ -81,7 +77,7 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
   try {
     data = JSON.parse(responseText) as { imageUrl?: string; imageFileName?: string };
   } catch {
-    logger.error({ responseText }, '[n8nService] n8n returned non-JSON response');
+    logger.error('[n8nService] n8n returned non-JSON response', { responseText });
     throw new Error(`n8n returned unexpected response: ${responseText.slice(0, 200)}`);
   }
 
@@ -94,10 +90,10 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
   if (data.imageFileName) {
     const base = (env.STORAGE_BASE_URL ?? 'https://cdn.velocitygp.app').replace(/\/$/, '');
     const imageUrl = `${base}/${data.imageFileName}`;
-    logger.info({ imageUrl }, '[n8nService] Constructed imageUrl from STORAGE_BASE_URL + imageFileName');
+    logger.info('[n8nService] Constructed imageUrl from STORAGE_BASE_URL + imageFileName', { imageUrl });
     return imageUrl;
   }
 
-  logger.error({ data }, '[n8nService] n8n response missing imageUrl and imageFileName fields');
+  logger.error('[n8nService] n8n response missing imageUrl and imageFileName fields', { data });
   throw new Error(`n8n response missing imageUrl — got: ${JSON.stringify(data)}`);
 }

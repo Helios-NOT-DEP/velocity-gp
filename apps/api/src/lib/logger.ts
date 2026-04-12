@@ -1,49 +1,176 @@
-import pino from 'pino';
+import { mkdirSync } from 'node:fs';
 
 import { env } from '../config/env.js';
 
-const logLevel = env.LOG_LEVEL ?? 'info';
+// export const logger = pino({
+//   level: env.LOG_LEVEL,
+// });
 
-const _pino = pino({ level: logLevel });
+/**
+ * Winston Logger configuration and helpers for consistent structured logging.
+ *
+ * @changeHistory
+ * - 2025-02-15: Converted to named exports and documented module purpose (GitHub Copilot)
+ * - 2025-11-20: Lint fixes - Added explicit return types for request logger helper (GitHub Copilot)
+ * - 2025-12-11: Migrated to OpenTelemetry for PostHog logging (Antigravity)
+ * - 2025-01-26: Fixed OpenTelemetry setup to use NodeSDK for proper PostHog integration (GitHub Copilot)
+ */
+import { logs } from '@opentelemetry/api-logs';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+import { OpenTelemetryTransportV3 } from '@opentelemetry/winston-transport';
+import * as winston from 'winston';
 
-type LogMetadata = Record<string, unknown> | undefined;
+const packageJson = { version: '1.0.0' }; // require(env.packageJson.apiPath);
 
-// Dual-convention logger wrapper: accepts both
-//   logger.info('message', { meta })   — message-first (Winston/RequestLogger style)
-//   logger.info({ meta }, 'message')   — object-first (pino native style)
-function makeLogMethod(pinoMethod: (obj: object, msg: string) => void) {
-  return (msgOrObj: string | LogMetadata, metaOrMsg?: LogMetadata | string): void => {
-    if (typeof msgOrObj === 'string') {
-      pinoMethod(metaOrMsg as LogMetadata ?? {}, msgOrObj);
-    } else {
-      pinoMethod(msgOrObj ?? {}, (metaOrMsg as string) ?? '');
-    }
-  };
+// Initialize configuration
+const posthogKey = env.VITE_PUBLIC_POSTHOG_KEY;
+const posthogHost = env.VITE_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
+const logLevel = env.LOG_LEVEL || 'info';
+const nodeEnv = env.NODE_ENV || 'development';
+const serviceName = env.SERVICE_NAME || 'agent-portal-api';
+
+// -- OpenTelemetry Setup --
+let loggerProvider: LoggerProvider | null = null;
+let otelTransport: OpenTelemetryTransportV3 | null = null;
+
+/* v8 ignore start */
+if (posthogKey) {
+  // Create a Resource that identifies this service
+  const resource = resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: serviceName,
+    [ATTR_SERVICE_VERSION]: packageJson.version,
+    deploymentEnvironment: nodeEnv,
+  });
+
+  // Create the OTLP Log Exporter targeting PostHog
+  const logExporter = new OTLPLogExporter({
+    url: `${posthogHost}/i/v1/logs`,
+    headers: {
+      Authorization: `Bearer ${posthogKey}`,
+    },
+  });
+
+  // Create LoggerProvider with resource and processors
+  loggerProvider = new LoggerProvider({
+    resource: resource,
+    processors: [new BatchLogRecordProcessor(logExporter)],
+  });
+
+  // Register the provider globally
+  // Required because OpenTelemetryTransportV3 uses the global logger API
+  logs.setGlobalLoggerProvider(loggerProvider);
+
+  // Create the Winston Transport
+  otelTransport = new OpenTelemetryTransportV3();
+}
+/* v8 ignore stop */
+
+// -- Winston Format Setup --
+const { splat, combine, timestamp, errors, metadata } = winston.format;
+
+const myFormat = winston.format.printf((info) => {
+  const { timestamp, label, module, level, message, service, stack } = info;
+  const source = module || label || service || serviceName;
+  const renderedMessage = stack || message;
+  const extraMetadata =
+    info.metadata && Object.keys(info.metadata).length > 0
+      ? ` ${JSON.stringify(info.metadata)}`
+      : '';
+
+  return `${timestamp} [${source}] ${level}: ${renderedMessage}${extraMetadata}`;
+});
+
+// -- Create Winston Logger --
+export const logger = winston.createLogger({
+  level: logLevel,
+  format: combine(
+    timestamp(),
+    errors({ stack: true }),
+    splat(),
+    metadata({
+      fillExcept: ['timestamp', 'label', 'module', 'level', 'message', 'service', 'stack'],
+    }),
+    myFormat
+  ),
+  defaultMeta: {
+    service: serviceName,
+    environment: nodeEnv,
+  },
+  transports: [
+    // Console output
+    new winston.transports.Console({
+      stderrLevels: ['error'],
+    }),
+  ],
+});
+
+// Add OpenTelemetry Transport if configured
+if (otelTransport) {
+  logger.add(otelTransport);
 }
 
-export const logger = {
-  info: makeLogMethod(_pino.info.bind(_pino)),
-  warn: makeLogMethod(_pino.warn.bind(_pino)),
-  error: makeLogMethod(_pino.error.bind(_pino)),
-  debug: makeLogMethod(_pino.debug.bind(_pino)),
-};
+// -- File Transports (Production/Dev) --
+if (nodeEnv === 'production' || nodeEnv === 'development') {
+  const logsDirectory = 'logs';
 
-// -- Lifecycle stub (OpenTelemetry PostHog flush — no-op until OTel is wired) --
+  try {
+    mkdirSync(logsDirectory, { recursive: true });
+
+    // Error logs
+    logger.add(
+      new winston.transports.File({
+        filename: `${logsDirectory}/error.log`,
+        level: 'error',
+        maxsize: 10485760, // 10MB
+        maxFiles: 5,
+      })
+    );
+
+    // Combined logs
+    logger.add(
+      new winston.transports.File({
+        filename: `${logsDirectory}/combined.log`,
+        maxsize: 10485760, // 10MB
+        maxFiles: 5,
+      })
+    );
+  } catch (error) {
+    logger.warn('File logging disabled due to logger directory initialization failure.', {
+      logsDirectory,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+// -- Lifecycle Helpers --
+
+/**
+ * Flushes logs and shuts down the OpenTelemetry SDK.
+ * Ensures all logs are sent before application shutdown.
+ */
+/* v8 ignore start */
 export const flushPostHog = async (): Promise<void> => {
-  // TODO: wire up OTel LoggerProvider when PostHog integration is enabled
+  if (loggerProvider) {
+    await loggerProvider.shutdown();
+  }
 };
+/* v8 ignore stop */
 
-// Create a stream for HTTP request logging middleware
+// Create a stream for Morgan HTTP logging middleware
 export const httpLoggerStream = {
   write: (message: string) => {
-    _pino.info(message.trim());
+    logger.info(message.trim());
   },
 };
 
-// -- Request-scoped logger --------------------------------------------------------
-// Creates a child logger that includes the correlationId on every log line.
+// -- Request Logging Helper --
 
-export interface RequestLogger {
+type LogMetadata = Record<string, unknown> | undefined;
+
+interface RequestLogger {
   error: (message: string, meta?: LogMetadata) => void;
   warn: (message: string, meta?: LogMetadata) => void;
   info: (message: string, meta?: LogMetadata) => void;
@@ -51,11 +178,18 @@ export interface RequestLogger {
 }
 
 export function createRequestLogger(correlationId: string): RequestLogger {
-  const child = _pino.child({ correlationId });
   return {
-    error: (message, meta) => child.error(meta ?? {}, message),
-    warn: (message, meta) => child.warn(meta ?? {}, message),
-    info: (message, meta) => child.info(meta ?? {}, message),
-    debug: (message, meta) => child.debug(meta ?? {}, message),
+    error: (message: string, meta?: LogMetadata) => {
+      logger.error(message, { correlationId, ...meta });
+    },
+    warn: (message: string, meta?: LogMetadata) => {
+      logger.warn(message, { correlationId, ...meta });
+    },
+    info: (message: string, meta?: LogMetadata) => {
+      logger.info(message, { correlationId, ...meta });
+    },
+    debug: (message: string, meta?: LogMetadata) => {
+      logger.debug(message, { correlationId, ...meta });
+    },
   };
 }
