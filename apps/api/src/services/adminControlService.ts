@@ -1,5 +1,5 @@
 import type {
-  AdminAuditEntry,
+  ListAdminAuditsResponse,
   ManualPitControlRequest,
   ManualPitControlResponse,
   UpdateHeliosRoleRequest,
@@ -509,7 +509,7 @@ export async function updateQrHazardRandomizer(
 export async function listAdminAudits(
   eventId: string,
   options: { cursor?: string; limit?: number } = {}
-): Promise<{ items: AdminAuditEntry[]; nextCursor: string | null }> {
+): Promise<ListAdminAuditsResponse> {
   const limit = options.limit ?? 50;
 
   const audits = await prisma.adminActionAudit.findMany({

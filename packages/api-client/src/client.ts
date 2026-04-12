@@ -15,32 +15,40 @@ export interface ApiRequestOptions {
   params?: Record<string, string | number>;
 }
 
+interface ApiErrorPayload {
+  code?: string;
+  message?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ApiSuccessResponse<T> {
+  data: T;
+  status: number;
+  ok: true;
+  error?: undefined;
+}
+
+export interface ApiFailureResponse {
+  data: undefined;
+  status: number;
+  ok: false;
+  error?: ApiErrorPayload;
+}
+
 /**
  * Standardized resolved wrapper returned by every async method on the ApiClient.
- * Flattens the HTTP status alongside the strictly-typed Data payload or bounded Error.
- *
- * `data` is typed as `T | undefined` — always check `response.ok` before accessing it,
- * as it will be `undefined` when `ok` is false or the response carries no body.
+ * `ok` is the discriminator: when true, `data` is typed and present.
  */
-export interface ApiResponse<T> {
-  data: T | undefined;
-  status: number;
-  ok: boolean;
-  error?: {
-    code?: string;
-    message?: string;
-    details?: Record<string, unknown>;
-  };
-}
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiFailureResponse;
 
 interface ParsedApiBody<T> {
   data: T | undefined;
-  error?: ApiResponse<T>['error'];
+  error?: ApiErrorPayload;
 }
 
 interface ApiEnvelope<T> {
   data?: T;
-  error?: ApiResponse<T>['error'];
+  error?: ApiErrorPayload;
   success?: boolean;
 }
 
@@ -107,10 +115,18 @@ export class ApiClient {
     const parsedBody = await this.parseResponseBody<T>(response);
 
     return {
-      data: parsedBody.data,
-      status: response.status,
-      ok: response.ok,
-      error: parsedBody.error,
+      ...(response.ok
+        ? {
+            data: parsedBody.data as T,
+            status: response.status,
+            ok: true as const,
+          }
+        : {
+            data: undefined,
+            status: response.status,
+            ok: false as const,
+            error: parsedBody.error,
+          }),
     };
   }
 

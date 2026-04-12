@@ -106,3 +106,11 @@ export interface AdminAuditEntry {
   readonly details?: Record<string, unknown>;
   readonly createdAt: string;
 }
+
+/**
+ * Cursor-paginated audit listing response for admin audit endpoints.
+ */
+export interface ListAdminAuditsResponse {
+  readonly items: AdminAuditEntry[];
+  readonly nextCursor: string | null;
+}
