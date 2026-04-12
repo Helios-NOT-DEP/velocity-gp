@@ -16,7 +16,8 @@ export default function PitStop() {
   const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
-    const expiresAt = gameState.currentTeam?.pitStopExpiresAt;
+    const currentTeam = gameState.currentTeam;
+    const expiresAt = currentTeam?.pitStopExpiresAt;
     if (!expiresAt) {
       setTimeLeft(0);
       return;
@@ -25,13 +26,23 @@ export default function PitStop() {
     const updateTimer = () => {
       const now = Date.now();
       const expiration = new Date(expiresAt).getTime();
-      setTimeLeft(Math.max(0, Math.floor((expiration - now) / 1000)));
+      const remainingSeconds = Math.max(0, Math.floor((expiration - now) / 1000));
+      setTimeLeft(remainingSeconds);
+
+      if (remainingSeconds === 0 && currentTeam?.inPitStop) {
+        clearPitStop(currentTeam.id);
+      }
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [gameState.currentTeam?.pitStopExpiresAt]);
+  }, [
+    clearPitStop,
+    gameState.currentTeam?.id,
+    gameState.currentTeam?.inPitStop,
+    gameState.currentTeam?.pitStopExpiresAt,
+  ]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

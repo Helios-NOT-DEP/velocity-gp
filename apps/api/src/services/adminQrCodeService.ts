@@ -127,7 +127,6 @@ function getN8nWebhookUrl(): string {
   if (!env.N8N_HOST) {
     throw new ValidationError('N8N_HOST must be configured for QR asset generation.');
   }
-
   const baseUrl = env.N8N_HOST;
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   const environmentSegment = env.NODE_ENV === 'production' ? 'prod' : 'dev';
@@ -321,73 +320,25 @@ export async function createAdminQRCode(
     const qrCodeId = `qr-${randomUUID()}`;
     const payload = buildQrPayload();
     const trustedScanUrl = buildTrustedScanUrl(payload);
-    const qrImageUrl = await generateQrAsset({ id: qrCodeId, url: trustedScanUrl });
 
-    let result: CreateQRCodeResponse;
     try {
-      result = await prisma.$transaction(async (tx) => {
-        const actorId = await resolveActorUserId(tx, context.actorUserId);
-
-        const createdQrCode = await tx.qRCode.create({
-          data: {
-            id: qrCodeId,
-            eventId,
-            label: request.label,
-            value: request.value,
-            zone: request.zone ?? null,
-            payload,
-            qrImageUrl,
-            status: 'ACTIVE',
-            activationStartsAt: request.activationStartsAt
-              ? new Date(request.activationStartsAt)
-              : null,
-            activationEndsAt: request.activationEndsAt ? new Date(request.activationEndsAt) : null,
-            hazardRatioOverride: null,
-            hazardWeightOverride: null,
-          },
-          select: {
-            id: true,
-            eventId: true,
-            label: true,
-            value: true,
-            zone: true,
-            payload: true,
-            qrImageUrl: true,
-            status: true,
-            scanCount: true,
-            hazardRatioOverride: true,
-            hazardWeightOverride: true,
-            activationStartsAt: true,
-            activationEndsAt: true,
-          },
-        });
-
-        const audit = await tx.adminActionAudit.create({
-          data: {
-            eventId,
-            actorUserId: actorId,
-            actionType: 'QR_CREATED',
-            targetType: 'QR_CODE',
-            targetId: createdQrCode.id,
-            details: {
-              label: createdQrCode.label,
-              value: createdQrCode.value,
-              zone: createdQrCode.zone,
-              activationStartsAt: toISOStringOrNull(createdQrCode.activationStartsAt),
-              activationEndsAt: toISOStringOrNull(createdQrCode.activationEndsAt),
-              qrImageUrl,
-            },
-          },
-          select: {
-            id: true,
-          },
-        });
-
-        return {
+      await prisma.qRCode.create({
+        data: {
+          id: qrCodeId,
           eventId,
-          qrCode: toQRCodeSummary(createdQrCode),
-          auditId: audit.id,
-        };
+          label: request.label,
+          value: request.value,
+          zone: request.zone ?? null,
+          payload,
+          qrImageUrl: null,
+          status: 'ACTIVE',
+          activationStartsAt: request.activationStartsAt
+            ? new Date(request.activationStartsAt)
+            : null,
+          activationEndsAt: request.activationEndsAt ? new Date(request.activationEndsAt) : null,
+          hazardRatioOverride: null,
+          hazardWeightOverride: null,
+        },
       });
     } catch (error) {
       if (isKnownPrismaError(error)) {
@@ -407,6 +358,74 @@ export async function createAdminQRCode(
 
       throw error;
     }
+
+    let qrImageUrl: string;
+    try {
+      qrImageUrl = await generateQrAsset({ id: qrCodeId, url: trustedScanUrl });
+    } catch (error) {
+      await prisma.qRCode.deleteMany({
+        where: {
+          id: qrCodeId,
+          eventId,
+          qrImageUrl: null,
+        },
+      });
+
+      throw error;
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const actorId = await resolveActorUserId(tx, context.actorUserId);
+
+      const updatedQrCode = await tx.qRCode.update({
+        where: { id: qrCodeId },
+        data: {
+          qrImageUrl,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          label: true,
+          value: true,
+          zone: true,
+          payload: true,
+          qrImageUrl: true,
+          status: true,
+          scanCount: true,
+          hazardRatioOverride: true,
+          hazardWeightOverride: true,
+          activationStartsAt: true,
+          activationEndsAt: true,
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId: actorId,
+          actionType: 'QR_CREATED',
+          targetType: 'QR_CODE',
+          targetId: updatedQrCode.id,
+          details: {
+            label: updatedQrCode.label,
+            value: updatedQrCode.value,
+            zone: updatedQrCode.zone,
+            activationStartsAt: toISOStringOrNull(updatedQrCode.activationStartsAt),
+            activationEndsAt: toISOStringOrNull(updatedQrCode.activationEndsAt),
+            qrImageUrl,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        eventId,
+        qrCode: toQRCodeSummary(updatedQrCode),
+        auditId: audit.id,
+      };
+    });
 
     incrementCounter('admin.qr_code.created');
     return result;
