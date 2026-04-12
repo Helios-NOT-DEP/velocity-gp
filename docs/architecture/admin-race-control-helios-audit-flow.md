@@ -25,7 +25,7 @@ Related roster payloads now include `isHelios` on each admin roster row so the a
 
 - Race control is stored in `EventConfig.raceControlState`.
 - When paused, scan processing is blocked server-side with `outcome=BLOCKED` and `errorCode=RACE_PAUSED`.
-- UI state is hydrated from `GET /race-control` and updated optimistically only after mutation success.
+- UI state is hydrated from `GET /admin/events/:eventId/race-control` and updated optimistically only after mutation success.
 - Pause/resume mutations return `auditId` and `updatedAt` for immediate audit/UI refresh.
 
 ## Helios Assignment Semantics
