@@ -14,6 +14,18 @@ export const rescueRouter = Router();
 const rescueRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  keyGenerator: (request) => {
+    const authContext = resolveRequestAuthContext(request);
+    if (!authContext) {
+      return `ip:${request.ip ?? 'unknown'}`;
+    }
+
+    if (authContext.role === 'player') {
+      return `player:${authContext.playerId ?? authContext.userId}`;
+    }
+
+    return `${authContext.role}:${authContext.userId}`;
+  },
 });
 
 // Rescue workflow endpoints for Helios intervention lifecycle.

@@ -281,6 +281,31 @@ describe('velocity gp backend', () => {
     expect(safeResponse.body.data.pointsAwarded).toBeGreaterThan(0);
   });
 
+  it('accepts scan submissions for legacy header-auth players', async () => {
+    const legacyPayload = `VG-LEGACY-${token.toUpperCase()}`;
+    await prisma.qRCode.create({
+      data: {
+        id: `qr-legacy-${token}`,
+        eventId: fixtureIds.eventId,
+        label: `Legacy QR ${token}`,
+        value: 20,
+        zone: 'Legacy Zone',
+        payload: legacyPayload,
+        status: 'ACTIVE',
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/events/${fixtureIds.eventId}/scans`)
+      .set('x-user-id', fixtureIds.playerId)
+      .set('x-user-role', 'player')
+      .send({ playerId: fixtureIds.playerId, qrPayload: legacyPayload });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.outcome).toBe('SAFE');
+  });
+
   it('supports legacy /hazards/scan alias with matching contract shape', async () => {
     const response = await request(app).post(`${apiPrefix}/hazards/scan`).send({
       playerId: fixtureIds.playerId,
