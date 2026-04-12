@@ -16,7 +16,18 @@ export function validate<T>(
       return;
     }
 
-    request[source] = result.data;
+    // Express 5 makes `request.query` and `request.params` read-only getters,
+    // so we can only replace properties in-place rather than reassigning.
+    if (source === 'body') {
+      request.body = result.data;
+    } else {
+      const target = request[source] as Record<string, unknown>;
+      const parsed = result.data as Record<string, unknown>;
+      for (const key of Object.keys(target)) {
+        if (!(key in parsed)) delete target[key];
+      }
+      Object.assign(target, parsed);
+    }
     next();
   };
 }
