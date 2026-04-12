@@ -202,7 +202,7 @@ async function seedUsers(): Promise<void> {
         id: ids.users.neerPatel,
         email: 'neerpatel@gmail.com',
         displayName: 'Neer Patel',
-        role: 'Admin',
+        role: 'ADMIN',
         canAdmin: true,
         canPlayer: true,
         isHeliosMember: true,
