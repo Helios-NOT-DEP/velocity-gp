@@ -4,6 +4,3 @@
 npm test
 npm run lint
 npm run format
-npm run version:bump:changed
-
-git update-index --again
