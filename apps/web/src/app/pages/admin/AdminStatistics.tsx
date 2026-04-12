@@ -143,16 +143,15 @@ export default function AdminStatistics() {
 
       <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-6">
         <h3 className="font-['Space_Grotesk'] text-2xl mb-4">Active QR Codes</h3>
-        {qrLoadError ? (
-          <p className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-200 mb-4">
-            {qrLoadError}
-          </p>
-        ) : null}
         {isHydratingQrCodes ? (
           <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-black/30 p-4 text-sm text-gray-300">
             <Loader2 className="w-4 h-4 animate-spin" />
             Loading active QR codes...
           </div>
+        ) : qrLoadError ? (
+          <p className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+            {qrLoadError}
+          </p>
         ) : statistics.flags.hasNoActiveQrCodes ? (
           <p className="rounded-lg border border-gray-700 bg-black/30 p-4 text-sm text-gray-300">
             No QR codes are currently active.
