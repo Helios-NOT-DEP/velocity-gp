@@ -25,8 +25,7 @@ export function createTeam(request: { teamname: string }): Team {
     status: 'PENDING',
     pitStopExpiresAt: null,
     members: [],
-    score: 0//,
-    // logoUrl,
+    score: 0
   };
 }
 

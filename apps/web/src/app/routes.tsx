@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import Login from './pages/Login';
+import LoginCallback from './pages/LoginCallback';
 import Garage from './pages/Garage';
 import RaceHub from './pages/RaceHub';
 import PitStop from './pages/PitStop';
@@ -22,6 +23,15 @@ export const appRoutes: RouteObject[] = [
   {
     path: '/',
     Component: Login,
+  },
+  // TODO(figma-sync): Reconcile auth callback/waiting routes with the simplified Figma route map so the designed entry flow and production auth flow do not diverge unexpectedly. | Figma source: src/app/routes.ts (Login -> Garage baseline) | Impact: user flow
+  {
+    path: '/login/callback',
+    Component: LoginCallback,
+  },
+  {
+    path: '/signup',
+    element: <Navigate to="/" replace />,
   },
   {
     path: '/garage',

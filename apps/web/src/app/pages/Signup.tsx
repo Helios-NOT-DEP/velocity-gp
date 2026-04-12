@@ -12,10 +12,10 @@ import { sendVerificationEmail, savePlayerSession } from '@/services/auth';
 // Remove (or guard with import.meta.env.DEV) once Auth.js is wired end-to-end.
 // These IDs must match the values in prisma/seed.ts.
 const DEV_PLAYER_SESSION = {
-  userId: 'user-player-lina',
-  email: 'lina@velocitygp.dev',
-  playerId: 'player-lina-active',
-  teamId: 'team-apex-comets',
+  userId: 'user-player-noah',
+  email: 'noah@velocitygp.dev',
+  playerId: 'player-noah-active',
+  teamId: 'team-nova-thunder',
   eventId: 'event-velocity-active',
   role: 'player',
 } as const;

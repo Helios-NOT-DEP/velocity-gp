@@ -12,21 +12,6 @@ export interface AuthSession {
   isAuthenticated: boolean;
   email?: string;
   displayName?: string;
-  /**
-   * Player context — populated after the backend resolves the magic-link
-   * callback and returns the player record for this event.
-   *
-   * These three IDs are all the Garage page needs to make API calls.
-   * They are stored in localStorage alongside the rest of the session so the
-   * player can refresh the page without losing their place.
-   *
-   * - playerId: the Player row ID (e.g. "player-lina-active")
-   * - teamId:   the Team row ID the player was pre-assigned to
-   * - eventId:  the Event row ID for the current race
-   */
-  playerId?: string;
-  teamId?: string;
-  eventId?: string;
 }
 
 // Storage/event keys are shared across hooks, context, and route guards.

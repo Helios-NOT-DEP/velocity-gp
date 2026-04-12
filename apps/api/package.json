@@ -55,10 +55,5 @@
     "tsx": "^4.20.6",
     "typescript": "^6.0.2",
     "vitest": "^4.1.2"
-  },
-  "vite": {
-    "api": {
-      "base": "http://localhost:4000/api"
-    }
   }
 }
