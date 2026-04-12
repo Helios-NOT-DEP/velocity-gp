@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { resolveRequestAuthContext } from '../lib/requestAuth.js';
@@ -10,9 +11,15 @@ import { completeRescue, getRescueStatus, initiateRescue } from '../services/res
 
 export const rescueRouter = Router();
 
+const rescueRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
 // Rescue workflow endpoints for Helios intervention lifecycle.
 rescueRouter.post(
   '/rescue/initiate',
+  rescueRateLimiter,
   requirePlayer,
   validate(initiateRescueSchema),
   asyncHandler(async (request, response) => {
@@ -32,6 +39,7 @@ rescueRouter.post(
 
 rescueRouter.get(
   '/rescue/:playerId/status',
+  rescueRateLimiter,
   requirePlayer,
   validate(rescuePlayerParamsSchema, 'params'),
   asyncHandler(async (request, response) => {
@@ -45,6 +53,7 @@ rescueRouter.get(
 
 rescueRouter.post(
   '/rescue/:playerId/complete',
+  rescueRateLimiter,
   requirePlayer,
   validate(rescuePlayerParamsSchema, 'params'),
   asyncHandler(async (request, response) => {
