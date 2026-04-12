@@ -106,11 +106,12 @@ describe('AdminQrCodes operations', () => {
     expect(patchUrl).toContain('/admin/events/event-1/qr-codes/qr-alpha/hazard-randomizer');
     expect((patchOptions.headers as Record<string, string>)['x-user-id']).toBe('admin-1');
     expect((patchOptions.headers as Record<string, string>)['x-user-role']).toBe('admin');
-    expect(JSON.parse(String(patchOptions.body))).toEqual({ hazardWeightOverride: 77 });
-
-    await waitFor(() => {
-      expect(screen.getByText('77%')).toBeTruthy();
+    expect(JSON.parse(String(patchOptions.body))).toEqual({
+      hazardRatioOverride: 1,
+      hazardWeightOverride: 77,
     });
+
+    expect((weightInput as { value: string }).value).toBe('77');
   });
 
   it('creates a new QR code with zone and activation window fields', async () => {
@@ -163,6 +164,31 @@ describe('AdminQrCodes operations', () => {
             },
           },
         })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            eventId: 'event-1',
+            qrCodes: [
+              {
+                id: 'qr-new',
+                eventId: 'event-1',
+                label: 'Checkpoint Delta',
+                value: 150,
+                zone: 'Roof',
+                payload: 'VG-DELTA-09',
+                qrImageUrl: 'https://cdn.velocitygp.app/qr/delta.png',
+                status: 'ACTIVE',
+                scanCount: 0,
+                hazardRatioOverride: null,
+                hazardWeightOverride: null,
+                activationStartsAt: '2026-04-06T10:00:00.000Z',
+                activationEndsAt: '2026-04-06T16:00:00.000Z',
+              },
+            ],
+          },
+        })
       );
 
     const { container } = render(<AdminQrCodes />);
@@ -183,7 +209,7 @@ describe('AdminQrCodes operations', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Generate QR Code' }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
       expect(screen.getByText('Checkpoint Delta')).toBeTruthy();
     });
 

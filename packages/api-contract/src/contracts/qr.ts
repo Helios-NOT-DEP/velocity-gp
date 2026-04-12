@@ -38,6 +38,8 @@ export interface CreateQRCodeRequest {
   readonly zone?: string;
   readonly activationStartsAt?: string;
   readonly activationEndsAt?: string;
+  readonly hazardRatioOverride?: number | null;
+  readonly hazardWeightOverride?: number | null;
 }
 
 /**
@@ -83,7 +85,8 @@ export interface DeleteQRCodeResponse {
  * the mathematical likelihood of a specific QR code inflicting a Pit Penalty.
  */
 export interface UpdateQrHazardRandomizerRequest {
-  readonly hazardWeightOverride: number | null;
+  readonly hazardRatioOverride?: number | null;
+  readonly hazardWeightOverride?: number | null;
 }
 
 /**
@@ -92,6 +95,7 @@ export interface UpdateQrHazardRandomizerRequest {
 export interface UpdateQrHazardRandomizerResponse {
   readonly eventId: string;
   readonly qrCodeId: string;
+  readonly hazardRatioOverride: number | null;
   readonly hazardWeightOverride: number | null;
   readonly updatedAt: string;
   readonly auditId: string;
@@ -103,6 +107,82 @@ export interface UpdateQrHazardRandomizerResponse {
 export interface ListEventQRCodesResponse {
   readonly eventId: string;
   readonly qrCodes: QRCodeSummary[];
+}
+
+export interface QrImportRowInput {
+  readonly label: string;
+  readonly value: number;
+  readonly zone?: string | null;
+  readonly activationStartsAt?: string | null;
+  readonly activationEndsAt?: string | null;
+  readonly hazardRatioOverride?: number | null;
+  readonly hazardWeightOverride?: number | null;
+}
+
+export type QrImportAction = 'create' | 'invalid' | 'unchanged';
+
+export interface QrImportPreviewRequest {
+  readonly rows: readonly QrImportRowInput[];
+}
+
+export interface QrImportPreviewRow {
+  readonly rowNumber: number;
+  readonly label: string;
+  readonly value: number;
+  readonly zone: string | null;
+  readonly activationStartsAt: string | null;
+  readonly activationEndsAt: string | null;
+  readonly hazardRatioOverride: number | null;
+  readonly hazardWeightOverride: number | null;
+  readonly action: QrImportAction;
+  readonly isValid: boolean;
+  readonly errors: readonly string[];
+  readonly existingQrCodeId: string | null;
+}
+
+export interface QrImportPreviewSummary {
+  readonly total: number;
+  readonly valid: number;
+  readonly invalid: number;
+  readonly create: number;
+  readonly unchanged: number;
+}
+
+export interface QrImportPreviewResponse {
+  readonly rows: readonly QrImportPreviewRow[];
+  readonly summary: QrImportPreviewSummary;
+}
+
+export interface QrImportApplyRequest {
+  readonly rows: readonly QrImportRowInput[];
+}
+
+export interface QrImportApplySummary {
+  readonly total: number;
+  readonly processed: number;
+  readonly invalid: number;
+  readonly created: number;
+  readonly unchanged: number;
+}
+
+export interface QrImportApplyResponse {
+  readonly rows: readonly QrImportPreviewRow[];
+  readonly summary: QrImportApplySummary;
+  readonly createdQrCodeIds: readonly string[];
+  readonly auditId: string;
+}
+
+export interface ExportQrAssetsRequest {
+  readonly qrCodeIds?: readonly string[];
+}
+
+export interface ExportQrAssetsResponse {
+  readonly eventId: string;
+  readonly fileName: string;
+  readonly mimeType: 'application/zip';
+  readonly archiveBase64: string;
+  readonly included: number;
+  readonly failed: number;
 }
 
 /**

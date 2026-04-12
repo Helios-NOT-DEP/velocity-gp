@@ -1,10 +1,18 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import JSZip from 'jszip';
 
 import type {
   CreateQRCodeRequest,
   CreateQRCodeResponse,
   DeleteQRCodeResponse,
+  ExportQrAssetsRequest,
+  ExportQrAssetsResponse,
   ListEventQRCodesResponse,
+  QrImportApplyRequest,
+  QrImportApplyResponse,
+  QrImportPreviewRequest,
+  QrImportPreviewResponse,
+  QrImportPreviewRow,
   QRCodeSummary,
   SetQRCodeStatusRequest,
   SetQRCodeStatusResponse,
@@ -68,6 +76,54 @@ function toQRCodeSummary(qrCode: {
     activationStartsAt: toISOStringOrNull(qrCode.activationStartsAt),
     activationEndsAt: toISOStringOrNull(qrCode.activationEndsAt),
   };
+}
+
+function normalizeNullableString(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function parseOptionalDate(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function toPreviewSummary(rows: readonly QrImportPreviewRow[]): QrImportPreviewResponse['summary'] {
+  const summary = {
+    total: rows.length,
+    valid: 0,
+    invalid: 0,
+    create: 0,
+    unchanged: 0,
+  };
+
+  for (const row of rows) {
+    if (row.isValid) {
+      summary.valid += 1;
+    } else {
+      summary.invalid += 1;
+    }
+
+    if (row.action === 'create') {
+      summary.create += 1;
+    } else if (row.action === 'unchanged') {
+      summary.unchanged += 1;
+    }
+  }
+
+  return summary;
 }
 
 function getN8nWebhookUrl(): string {
@@ -189,6 +245,132 @@ async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
   }
 }
 
+async function resolveQrImportPreviewRows(
+  eventId: string,
+  request: QrImportPreviewRequest
+): Promise<QrImportPreviewRow[]> {
+  const event = await prisma.event.findUnique({
+    where: {
+      id: eventId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!event) {
+    throw new ValidationError('Event does not exist.', { eventId });
+  }
+
+  const existing = await prisma.qRCode.findMany({
+    where: {
+      eventId,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      label: true,
+      value: true,
+      zone: true,
+      activationStartsAt: true,
+      activationEndsAt: true,
+      hazardRatioOverride: true,
+      hazardWeightOverride: true,
+    },
+  });
+  const existingByLabel = new Map(existing.map((item) => [item.label.trim().toLowerCase(), item]));
+
+  const labelCount = new Map<string, number>();
+  for (const row of request.rows) {
+    const normalizedLabel = row.label.trim().toLowerCase();
+    labelCount.set(normalizedLabel, (labelCount.get(normalizedLabel) ?? 0) + 1);
+  }
+
+  return request.rows.map((row, index) => {
+    const errors: string[] = [];
+    const label = row.label.trim();
+    const zone = normalizeNullableString(row.zone);
+    const normalizedLabel = label.toLowerCase();
+    const activationStartsAt = parseOptionalDate(row.activationStartsAt);
+    const activationEndsAt = parseOptionalDate(row.activationEndsAt);
+    const hazardRatioOverride = row.hazardRatioOverride ?? null;
+    const hazardWeightOverride = row.hazardWeightOverride ?? null;
+
+    if (!label) {
+      errors.push('Label is required.');
+    }
+
+    if (!Number.isFinite(row.value) || row.value <= 0 || !Number.isInteger(row.value)) {
+      errors.push('Value must be a positive integer.');
+    }
+
+    if (labelCount.get(normalizedLabel) && (labelCount.get(normalizedLabel) ?? 0) > 1) {
+      errors.push('Duplicate label in import payload.');
+    }
+
+    if (row.activationStartsAt && !activationStartsAt) {
+      errors.push('activationStartsAt must be a valid ISO datetime.');
+    }
+    if (row.activationEndsAt && !activationEndsAt) {
+      errors.push('activationEndsAt must be a valid ISO datetime.');
+    }
+    if (
+      activationStartsAt &&
+      activationEndsAt &&
+      activationStartsAt.getTime() >= activationEndsAt.getTime()
+    ) {
+      errors.push('activationEndsAt must be later than activationStartsAt.');
+    }
+
+    if (
+      hazardRatioOverride !== null &&
+      (!Number.isInteger(hazardRatioOverride) || hazardRatioOverride < 1)
+    ) {
+      errors.push('hazardRatioOverride must be a positive integer when provided.');
+    }
+
+    if (
+      hazardWeightOverride !== null &&
+      (!Number.isInteger(hazardWeightOverride) ||
+        hazardWeightOverride < 0 ||
+        hazardWeightOverride > 100)
+    ) {
+      errors.push('hazardWeightOverride must be an integer from 0-100 when provided.');
+    }
+
+    const existingRow = existingByLabel.get(normalizedLabel) ?? null;
+    const unchanged =
+      existingRow &&
+      existingRow.value === row.value &&
+      (existingRow.zone ?? null) === zone &&
+      (existingRow.activationStartsAt?.toISOString() ?? null) ===
+        (activationStartsAt ? activationStartsAt.toISOString() : null) &&
+      (existingRow.activationEndsAt?.toISOString() ?? null) ===
+        (activationEndsAt ? activationEndsAt.toISOString() : null) &&
+      (existingRow.hazardRatioOverride ?? null) === hazardRatioOverride &&
+      (existingRow.hazardWeightOverride ?? null) === hazardWeightOverride;
+
+    if (existingRow && !unchanged) {
+      errors.push('Label already exists for this event.');
+    }
+
+    return {
+      rowNumber: index + 2,
+      label,
+      value: row.value,
+      zone,
+      activationStartsAt: activationStartsAt ? activationStartsAt.toISOString() : null,
+      activationEndsAt: activationEndsAt ? activationEndsAt.toISOString() : null,
+      hazardRatioOverride,
+      hazardWeightOverride,
+      action: errors.length > 0 ? 'invalid' : unchanged ? 'unchanged' : 'create',
+      isValid: errors.length === 0,
+      errors,
+      existingQrCodeId: existingRow?.id ?? null,
+    } satisfies QrImportPreviewRow;
+  });
+}
+
 /**
  * Retrieves the full active inventory of QR codes for an event.
  * Excludes soft-deleted QR codes.
@@ -226,6 +408,184 @@ export async function listAdminQRCodes(eventId: string): Promise<ListEventQRCode
     eventId,
     qrCodes: qrCodes.map(toQRCodeSummary),
   };
+}
+
+export async function previewQrImport(
+  eventId: string,
+  request: QrImportPreviewRequest
+): Promise<QrImportPreviewResponse> {
+  return withTraceSpan('admin.qr_code.import.preview', { eventId }, async () => {
+    const rows = await resolveQrImportPreviewRows(eventId, request);
+    return {
+      rows,
+      summary: toPreviewSummary(rows),
+    };
+  });
+}
+
+export async function applyQrImport(
+  eventId: string,
+  request: QrImportApplyRequest,
+  context: AdminActionContext = {}
+): Promise<QrImportApplyResponse> {
+  return withTraceSpan('admin.qr_code.import.apply', { eventId }, async () => {
+    const previewRows = await resolveQrImportPreviewRows(eventId, request);
+    const createdQrCodeIds: string[] = [];
+    let created = 0;
+    let unchanged = 0;
+    let invalid = 0;
+    let processed = 0;
+
+    for (const row of previewRows) {
+      if (!row.isValid || row.action === 'invalid') {
+        invalid += 1;
+        continue;
+      }
+
+      processed += 1;
+
+      if (row.action === 'unchanged') {
+        unchanged += 1;
+        continue;
+      }
+      const createdRecord = await createAdminQRCode(
+        eventId,
+        {
+          label: row.label,
+          value: row.value,
+          zone: row.zone ?? undefined,
+          activationStartsAt: row.activationStartsAt ?? undefined,
+          activationEndsAt: row.activationEndsAt ?? undefined,
+          hazardRatioOverride: row.hazardRatioOverride,
+          hazardWeightOverride: row.hazardWeightOverride,
+        },
+        context
+      );
+      created += 1;
+      createdQrCodeIds.push(createdRecord.qrCode.id);
+    }
+
+    const auditId = await prisma.$transaction(async (tx) => {
+      const actorId = await resolveActorUserId(tx, context.actorUserId);
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId: actorId,
+          actionType: 'QR_IMPORT_APPLIED',
+          targetType: 'QR_IMPORT',
+          details: {
+            total: previewRows.length,
+            processed,
+            invalid,
+            created,
+            unchanged,
+            createdQrCodeIds,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+      return audit.id;
+    });
+
+    return {
+      rows: previewRows,
+      summary: {
+        total: previewRows.length,
+        processed,
+        invalid,
+        created,
+        unchanged,
+      },
+      createdQrCodeIds,
+      auditId,
+    };
+  });
+}
+
+export async function exportQrAssets(
+  eventId: string,
+  request: ExportQrAssetsRequest
+): Promise<ExportQrAssetsResponse> {
+  return withTraceSpan('admin.qr_code.export', { eventId }, async () => {
+    const qrCodes = await prisma.qRCode.findMany({
+      where: {
+        eventId,
+        deletedAt: null,
+        ...(request.qrCodeIds?.length
+          ? {
+              id: {
+                in: [...request.qrCodeIds],
+              },
+            }
+          : {}),
+      },
+      orderBy: {
+        label: 'asc',
+      },
+      select: {
+        id: true,
+        label: true,
+        payload: true,
+        zone: true,
+        status: true,
+        qrImageUrl: true,
+      },
+    });
+
+    const zip = new JSZip();
+    const manifestRows = ['id,label,payload,zone,status,qrImageUrl,assetPath,assetStatus'];
+
+    let failed = 0;
+    for (const qrCode of qrCodes) {
+      const safeLabel = qrCode.label.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-+/g, '-');
+      const fileBase = `${safeLabel || 'qr'}-${qrCode.id}`;
+      let assetPath = '';
+      let assetStatus = 'skipped';
+
+      if (qrCode.qrImageUrl) {
+        try {
+          const response = await fetch(qrCode.qrImageUrl);
+          if (!response.ok) {
+            throw new Error(`status=${response.status}`);
+          }
+          const buffer = await response.arrayBuffer();
+          assetPath = `assets/${fileBase}.png`;
+          zip.file(assetPath, buffer);
+          assetStatus = 'included';
+        } catch {
+          failed += 1;
+          assetStatus = 'fetch_failed';
+        }
+      }
+
+      manifestRows.push(
+        [
+          qrCode.id,
+          `"${qrCode.label.replace(/"/g, '""')}"`,
+          `"${qrCode.payload.replace(/"/g, '""')}"`,
+          `"${(qrCode.zone ?? '').replace(/"/g, '""')}"`,
+          qrCode.status,
+          `"${(qrCode.qrImageUrl ?? '').replace(/"/g, '""')}"`,
+          `"${assetPath}"`,
+          assetStatus,
+        ].join(',')
+      );
+    }
+
+    zip.file('manifest.csv', `${manifestRows.join('\n')}\n`);
+    const archiveBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+    return {
+      eventId,
+      fileName: `velocity-gp-qr-assets-${eventId}.zip`,
+      mimeType: 'application/zip',
+      archiveBase64: archiveBuffer.toString('base64'),
+      included: qrCodes.length - failed,
+      failed,
+    };
+  });
 }
 
 /**
@@ -287,8 +647,8 @@ export async function createAdminQRCode(
             ? new Date(request.activationStartsAt)
             : null,
           activationEndsAt: request.activationEndsAt ? new Date(request.activationEndsAt) : null,
-          hazardRatioOverride: null,
-          hazardWeightOverride: null,
+          hazardRatioOverride: request.hazardRatioOverride ?? null,
+          hazardWeightOverride: request.hazardWeightOverride ?? null,
         },
       });
     } catch (error) {

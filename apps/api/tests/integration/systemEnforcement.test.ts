@@ -77,6 +77,11 @@ async function cleanupEventData(eventId: string, userIds: string[]): Promise<voi
       eventId,
     },
   });
+  await prisma.hazardMultiplierRule.deleteMany({
+    where: {
+      eventId,
+    },
+  });
   await prisma.event.deleteMany({
     where: {
       id: eventId,
@@ -417,6 +422,80 @@ describe('system backend enforcement', () => {
       });
 
       expect(team?.status).toBe('ACTIVE');
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('applies active scheduled hazard multipliers to the effective hazard ratio', async () => {
+    const fixture = await createScanFixture({
+      globalHazardRatio: 4,
+      qrHazardOverride: null,
+      initialGlobalScanCount: 1,
+    });
+
+    try {
+      const now = new Date();
+      await prisma.hazardMultiplierRule.create({
+        data: {
+          eventId: fixture.eventId,
+          name: 'Peak Window',
+          startsAt: new Date(now.getTime() - 60_000),
+          endsAt: new Date(now.getTime() + 60_000),
+          ratioMultiplier: 0.5,
+        },
+      });
+
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: fixture.qrPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('HAZARD_PIT');
+      if (response.outcome !== 'HAZARD_PIT') {
+        throw new Error(`Expected HAZARD_PIT outcome but received ${response.outcome}.`);
+      }
+      expect(response.hazardRatioUsed).toBe(2);
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('ignores scheduled multipliers outside their configured time window', async () => {
+    const fixture = await createScanFixture({
+      globalHazardRatio: 4,
+      qrHazardOverride: null,
+      initialGlobalScanCount: 1,
+    });
+
+    try {
+      const now = new Date();
+      await prisma.hazardMultiplierRule.create({
+        data: {
+          eventId: fixture.eventId,
+          name: 'Expired Rule',
+          startsAt: new Date(now.getTime() - 10 * 60_000),
+          endsAt: new Date(now.getTime() - 5 * 60_000),
+          ratioMultiplier: 0.5,
+        },
+      });
+
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: fixture.qrPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('SAFE');
+      if (response.outcome !== 'SAFE') {
+        throw new Error(`Expected SAFE outcome but received ${response.outcome}.`);
+      }
+      expect(response.hazardRatioUsed).toBe(4);
     } finally {
       await cleanupEventData(fixture.eventId, fixture.userIds);
     }

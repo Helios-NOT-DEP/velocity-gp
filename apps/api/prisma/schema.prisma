@@ -86,6 +86,11 @@ enum AdminActionType {
     ROSTER_REASSIGNED
     ROSTER_UNASSIGNED
     EMAIL_RETURN_FLAGGED
+    EVENT_HAZARD_SETTINGS_UPDATED
+    QR_IMPORT_APPLIED
+    HAZARD_MULTIPLIER_CREATED
+    HAZARD_MULTIPLIER_UPDATED
+    HAZARD_MULTIPLIER_DELETED
 }
 
 enum EmailProvider {
@@ -135,6 +140,7 @@ model Event {
     teamTransitions   TeamStateTransition[]
     adminActionAudits AdminActionAudit[]
     emailEvents       EmailEvent[]
+    hazardMultiplierRules HazardMultiplierRule[]
 }
 
 model EventConfig {
@@ -148,6 +154,24 @@ model EventConfig {
     updatedAt              DateTime         @updatedAt
 
     event Event @relation(fields: [eventId], references: [id])
+}
+
+model HazardMultiplierRule {
+    id              String   @id @default(cuid())
+    eventId         String
+    name            String
+    startsAt        DateTime
+    endsAt          DateTime
+    ratioMultiplier Float
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+    deletedAt       DateTime?
+
+    event Event @relation(fields: [eventId], references: [id])
+
+    @@index([eventId, startsAt])
+    @@index([eventId, endsAt])
+    @@index([eventId, deletedAt])
 }
 
 model Team {

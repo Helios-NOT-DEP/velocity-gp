@@ -6,6 +6,7 @@ import { getRequestAuthContext } from '../lib/requestAuth.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
 import { validate } from '../middleware/validate.js';
 import {
+  adminEventMultiplierRuleParamsSchema,
   adminEventRosterPlayerParamsSchema,
   adminEventParamsSchema,
   adminEventQrCodeParamsSchema,
@@ -13,26 +14,41 @@ import {
   adminUserParamsSchema,
   adminAuditListQuerySchema,
   adminRosterListQuerySchema,
+  createHazardMultiplierRuleSchema,
   createAdminQRCodeSchema,
+  exportQrAssetsSchema,
   manualPitControlSchema,
+  qrImportApplySchema,
+  qrImportPreviewSchema,
   rosterImportApplySchema,
   rosterImportPreviewSchema,
   setAdminQRCodeStatusSchema,
+  updateEventHazardSettingsSchema,
+  updateHazardMultiplierRuleSchema,
   updateRosterAssignmentSchema,
   updateQrHazardRandomizerSchema,
   updateHeliosRoleSchema,
   updateRaceControlSchema,
 } from '@velocity-gp/api-contract/schemas';
 import {
+  createHazardMultiplierRule,
+  deleteHazardMultiplierRule,
+  getEventHazardSettings,
+  listHazardMultiplierRules,
   listAdminAudits,
   manualPitControl,
+  updateEventHazardSettings,
+  updateHazardMultiplierRule,
   updateQrHazardRandomizer,
   updateHeliosRole,
   updateRaceControl,
 } from '../services/adminControlService.js';
 import {
+  applyQrImport,
   createAdminQRCode,
+  exportQrAssets,
   listAdminQRCodes,
+  previewQrImport,
   setAdminQRCodeStatus,
   softDeleteAdminQRCode,
 } from '../services/adminQrCodeService.js';
@@ -286,6 +302,152 @@ adminRouter.patch(
         {
           requestId: response.locals.requestId,
         }
+      )
+    );
+  })
+);
+
+adminRouter.get(
+  '/admin/events/:eventId/hazard-settings',
+  validate(adminEventParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    response.json(
+      successResponse(await getEventHazardSettings(eventId), {
+        requestId: response.locals.requestId,
+      })
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/hazard-settings',
+  validate(adminEventParamsSchema, 'params'),
+  validate(updateEventHazardSettingsSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await updateEventHazardSettings(eventId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/qr-codes/import/preview',
+  validate(adminEventParamsSchema, 'params'),
+  validate(qrImportPreviewSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    response.json(
+      successResponse(await previewQrImport(eventId, request.body), {
+        requestId: response.locals.requestId,
+      })
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/qr-codes/import/apply',
+  validate(adminEventParamsSchema, 'params'),
+  validate(qrImportApplySchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const authContext = getRequestAuthContext(response);
+    response.json(
+      successResponse(
+        await applyQrImport(eventId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/qr-codes/export',
+  validate(adminEventParamsSchema, 'params'),
+  validate(exportQrAssetsSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    response.json(
+      successResponse(await exportQrAssets(eventId, request.body), {
+        requestId: response.locals.requestId,
+      })
+    );
+  })
+);
+
+adminRouter.get(
+  '/admin/events/:eventId/hazard-multipliers',
+  validate(adminEventParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    response.json(
+      successResponse(await listHazardMultiplierRules(eventId), {
+        requestId: response.locals.requestId,
+      })
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/hazard-multipliers',
+  validate(adminEventParamsSchema, 'params'),
+  validate(createHazardMultiplierRuleSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const authContext = getRequestAuthContext(response);
+    response.json(
+      successResponse(
+        await createHazardMultiplierRule(eventId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/hazard-multipliers/:ruleId',
+  validate(adminEventMultiplierRuleParamsSchema, 'params'),
+  validate(updateHazardMultiplierRuleSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const ruleId = String(request.params.ruleId);
+    const authContext = getRequestAuthContext(response);
+    response.json(
+      successResponse(
+        await updateHazardMultiplierRule(eventId, ruleId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.delete(
+  '/admin/events/:eventId/hazard-multipliers/:ruleId',
+  validate(adminEventMultiplierRuleParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const ruleId = String(request.params.ruleId);
+    const authContext = getRequestAuthContext(response);
+    response.json(
+      successResponse(
+        await deleteHazardMultiplierRule(eventId, ruleId, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
       )
     );
   })
