@@ -156,8 +156,9 @@ export async function getTeamGarageStatus(
 /**
  * Checks whether the team has reached its submission quota.
  * If so, attempts to atomically claim the GENERATING state and dispatches the
- * n8n logo generation call in the background (fire-and-forget from route layer,
- * but awaited here for correctness — the route uses asyncHandler so errors surface).
+ * n8n logo generation call as a background task (fire-and-forget via setImmediate).
+ * The submit response is returned to the client immediately; the UI polls /status
+ * every ~4s and sees GENERATING → READY when the job completes.
  *
  * Idempotency:
  *   The `updateMany` only matches teams whose logoStatus is NOT already GENERATING.
@@ -232,13 +233,15 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
 
   logger.info({ teamId }, '[garageService] Quota reached — starting logo generation');
 
-  // ── Dispatch logo generation ───────────────────────────────────────────────
-  // We await here so errors propagate through asyncHandler → errorHandler.
-  // The route's response has already been built before we reach this point via
-  // submitDescription, so a failure here only affects logo status, not the
-  // submit response itself (garageService is called before the response is sent
-  // via the route handler ordering — see garage.ts route for details).
-  await triggerLogoGeneration(teamId, team.name);
+  // ── Dispatch logo generation as a background task ─────────────────────────
+  // Fire-and-forget: claim GENERATING synchronously above (atomic), then let
+  // the n8n call happen in the background.  This means:
+  //   • The submit response always returns fast (no n8n latency exposed to user)
+  //   • The UI polls /status every ~4s and sees GENERATING → READY when done
+  //   • If n8n fails, the status is set to FAILED and the next submission retries
+  setImmediate(() => {
+    void triggerLogoGeneration(teamId, team.name);
+  });
 }
 
 // ── Internal: n8n logo generation ────────────────────────────────────────────
@@ -306,11 +309,9 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
 
     const message = error instanceof Error ? error.message : String(error);
     logger.error({ teamId, message }, '[garageService] Logo generation failed');
-
-    // Re-throw so the asyncHandler surfaces a 500 in the submit response
-    throw new AppError(502, 'LOGO_GENERATION_FAILED', 'Team logo generation failed.', {
-      upstream: message,
-    });
+    // Do NOT re-throw — triggerLogoGeneration is called fire-and-forget via setImmediate.
+    // Re-throwing would create an unhandled rejection that crashes the process.
+    // The UI polls /status and will see FAILED, allowing the next submission to retry.
   }
 }
 

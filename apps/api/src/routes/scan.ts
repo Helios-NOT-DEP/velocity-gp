@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -17,7 +17,7 @@ const scanRateLimiter = rateLimit({
   keyGenerator: (request) => {
     const authContext = resolveRequestAuthContext(request);
     if (!authContext) {
-      return `ip:${request.ip ?? 'unknown'}`;
+      return `ip:${ipKeyGenerator(request.ip ?? '')}`;
     }
 
     if (authContext.role === 'player') {

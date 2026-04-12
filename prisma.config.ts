@@ -1,6 +1,7 @@
 import 'dotenv/config';
 
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
+import { resolveSeedDatabaseUrl } from './apps/api/src/db/resolveSeedDatabaseUrl.js';
 
 export default defineConfig({
   schema: 'apps/api/prisma/schema.prisma',
@@ -9,6 +10,6 @@ export default defineConfig({
     seed: 'tsx apps/api/prisma/seed.ts',
   },
   datasource: {
-    url: resolveDatasourceUrl(),
+    url: resolveSeedDatabaseUrl().url,
   },
 });

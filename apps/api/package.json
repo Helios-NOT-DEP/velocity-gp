@@ -36,8 +36,8 @@
     "express-rate-limit": "^8.3.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "kuler": "^2.0.0",
     "jszip": "^3.10.1",
+    "kuler": "^2.0.0",
     "pg": "^8.20.0",
     "pino": "^10.1.0",
     "vite": "6.4.2",
@@ -56,5 +56,10 @@
     "tsx": "^4.20.6",
     "typescript": "^6.0.2",
     "vitest": "^4.1.2"
+  },
+  "vite": {
+    "api": {
+      "base": "http://localhost:4000/api"
+    }
   }
 }
