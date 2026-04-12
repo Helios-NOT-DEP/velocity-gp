@@ -37,6 +37,7 @@ interface RosterPlayerRecord {
     readonly id: string;
     readonly email: string;
     readonly displayName: string;
+    readonly isHelios: boolean;
     readonly phoneE164: string | null;
   };
   readonly team: {
@@ -114,6 +115,7 @@ function mapRosterRow(player: RosterPlayerRecord): AdminRosterRow {
     eventId: player.eventId,
     workEmail: player.user.email,
     displayName: player.user.displayName,
+    isHelios: player.user.isHelios,
     phoneE164: player.user.phoneE164,
     teamId: player.team?.id ?? null,
     teamName: player.team?.name ?? null,
@@ -241,6 +243,7 @@ export async function listAdminRoster(
             id: true,
             email: true,
             displayName: true,
+            isHelios: true,
             phoneE164: true,
           },
         },

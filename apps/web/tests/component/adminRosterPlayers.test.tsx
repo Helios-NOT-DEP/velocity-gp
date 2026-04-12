@@ -58,6 +58,7 @@ describe('AdminPlayers roster workflows', () => {
                 eventId: 'event-1',
                 workEmail: 'player1@velocitygp.dev',
                 displayName: 'Player One',
+                isHelios: false,
                 phoneE164: null,
                 teamId: null,
                 teamName: null,
@@ -97,6 +98,15 @@ describe('AdminPlayers roster workflows', () => {
         buildJsonResponse({
           success: true,
           data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
             playerId: 'player-1',
             eventId: 'event-1',
             previousTeamId: null,
@@ -122,6 +132,7 @@ describe('AdminPlayers roster workflows', () => {
                 eventId: 'event-1',
                 workEmail: 'player1@velocitygp.dev',
                 displayName: 'Player One',
+                isHelios: false,
                 phoneE164: null,
                 teamId: 'team-2',
                 teamName: 'Nova',
@@ -156,6 +167,15 @@ describe('AdminPlayers roster workflows', () => {
             unassignedCount: 0,
           },
         })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
       );
 
     render(<AdminPlayers />);
@@ -169,10 +189,10 @@ describe('AdminPlayers roster workflows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(6);
+      expect(fetchMock).toHaveBeenCalledTimes(8);
     });
 
-    const [assignmentCallUrl, assignmentCallOptions] = fetchMock.mock.calls[3] as [
+    const [assignmentCallUrl, assignmentCallOptions] = fetchMock.mock.calls[4] as [
       string,
       RequestInit,
     ];
@@ -180,6 +200,152 @@ describe('AdminPlayers roster workflows', () => {
     expect((assignmentCallOptions.headers as Record<string, string>)['x-user-id']).toBe('admin-1');
     expect((assignmentCallOptions.headers as Record<string, string>)['x-user-role']).toBe('admin');
     expect(JSON.parse(String(assignmentCallOptions.body))).toEqual({ teamId: 'team-2' });
+  });
+
+  it('assigns and revokes Helios role from roster rows', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    window.fetch = fetchMock as typeof window.fetch;
+
+    fetchMock
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            id: 'event-1',
+            name: 'Velocity GP Finals',
+            startDate: '2026-04-07T10:00:00.000Z',
+            endDate: '2026-04-07T18:00:00.000Z',
+            status: 'ACTIVE',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [
+              {
+                playerId: 'player-1',
+                userId: 'user-1',
+                eventId: 'event-1',
+                workEmail: 'player1@velocitygp.dev',
+                displayName: 'Player One',
+                isHelios: false,
+                phoneE164: null,
+                teamId: null,
+                teamName: null,
+                teamStatus: null,
+                assignmentStatus: 'UNASSIGNED',
+                joinedAt: '2026-04-07T10:00:00.000Z',
+                updatedAt: '2026-04-07T10:00:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            teams: [],
+            unassignedCount: 1,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            userId: 'user-1',
+            isHelios: true,
+            updatedAt: '2026-04-07T10:05:00.000Z',
+            auditId: 'audit-helios-assigned',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [
+              {
+                playerId: 'player-1',
+                userId: 'user-1',
+                eventId: 'event-1',
+                workEmail: 'player1@velocitygp.dev',
+                displayName: 'Player One',
+                isHelios: true,
+                phoneE164: null,
+                teamId: null,
+                teamName: null,
+                teamStatus: null,
+                assignmentStatus: 'UNASSIGNED',
+                joinedAt: '2026-04-07T10:00:00.000Z',
+                updatedAt: '2026-04-07T10:05:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            teams: [],
+            unassignedCount: 1,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [
+              {
+                id: 'audit-helios-assigned',
+                eventId: 'event-1',
+                actorUserId: 'admin-1',
+                actionType: 'HELIOS_ASSIGNED',
+                targetType: 'USER',
+                targetId: 'user-1',
+                details: {},
+                createdAt: '2026-04-07T10:05:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      );
+
+    render(<AdminPlayers />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Player One')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(8);
+      expect(screen.getByRole('button', { name: 'Revoke' })).toBeTruthy();
+    });
+
+    const [heliosCallUrl, heliosCallOptions] = fetchMock.mock.calls[4] as [string, RequestInit];
+    expect(heliosCallUrl).toContain('/admin/users/user-1/helios-role');
+    expect(heliosCallOptions.method).toBe('POST');
+    expect(JSON.parse(String(heliosCallOptions.body))).toEqual({ isHelios: true });
   });
 
   it('parses CSV upload and renders preview validation rows', async () => {
@@ -215,6 +381,15 @@ describe('AdminPlayers roster workflows', () => {
           data: {
             teams: [],
             unassignedCount: 0,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
           },
         })
       )
