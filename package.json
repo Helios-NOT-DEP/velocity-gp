@@ -8,7 +8,7 @@
     "apps/*"
   ],
   "scripts": {
-    "prepare": "husky",
+    "prepare": "node .husky/install.mjs",
     "build": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/api && npm run build --workspace=@velocity-gp/web",
     "build:api": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api",
     "build:web": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/web",
