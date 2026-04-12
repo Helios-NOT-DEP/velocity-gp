@@ -382,7 +382,9 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
           <p className="text-xs text-gray-400">Latest admin audit: {latestAuditSummary}</p>
         ) : null}
 
-        {importFileName ? <p className="text-xs text-gray-400">Loaded file: {importFileName}</p> : null}
+        {importFileName ? (
+          <p className="text-xs text-gray-400">Loaded file: {importFileName}</p>
+        ) : null}
         {importError ? (
           <p className="text-sm text-red-300 rounded-lg border border-red-500/40 bg-red-500/10 p-2">
             {importError}
@@ -397,8 +399,8 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
         {importPreview ? (
           <div className="space-y-3">
             <p className="text-sm text-gray-300">
-              Preview summary: {importPreview.summary.total} rows, {importPreview.summary.valid} valid,{' '}
-              {importPreview.summary.invalid} invalid.
+              Preview summary: {importPreview.summary.total} rows, {importPreview.summary.valid}{' '}
+              valid, {importPreview.summary.invalid} invalid.
             </p>
             <div className="max-h-56 overflow-auto rounded-lg border border-gray-800">
               <table className="w-full text-sm">
@@ -419,7 +421,9 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                       <td className="px-3 py-2">{row.rowNumber}</td>
                       <td className="px-3 py-2 font-mono text-xs">{row.normalizedWorkEmail}</td>
                       <td className="px-3 py-2">{row.action}</td>
-                      <td className="px-3 py-2 text-xs text-red-300">{row.errors.join('; ') || '—'}</td>
+                      <td className="px-3 py-2 text-xs text-red-300">
+                        {row.errors.join('; ') || '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -540,7 +544,9 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSavingContact, setIsSavingContact] = useState(false);
-  const [detail, setDetail] = useState<Awaited<ReturnType<typeof getAdminPlayerDetail>> | null>(null);
+  const [detail, setDetail] = useState<Awaited<ReturnType<typeof getAdminPlayerDetail>> | null>(
+    null
+  );
   const [scanHistory, setScanHistory] = useState<readonly AdminPlayerScanHistoryItem[]>([]);
   const [workEmailDraft, setWorkEmailDraft] = useState('');
   const [phoneDraft, setPhoneDraft] = useState('');
@@ -711,7 +717,9 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
                   <tbody>
                     {scanHistory.map((scan) => (
                       <tr key={scan.scanId} className="border-t border-gray-800">
-                        <td className="px-3 py-2 font-mono text-xs">{formatScanOutcome(scan.outcome)}</td>
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {formatScanOutcome(scan.outcome)}
+                        </td>
                         <td className="px-3 py-2">{new Date(scan.scannedAt).toLocaleString()}</td>
                         <td className="px-3 py-2">{scan.qrCodeLabel ?? scan.qrPayload}</td>
                         <td className="px-3 py-2">{scan.pointsAwarded}</td>
@@ -737,5 +745,7 @@ export default function AdminPlayers() {
     return <PlayerDetailView playerId={playerId} onBack={() => navigate('/admin/players')} />;
   }
 
-  return <PlayerListView onOpenDetail={(nextPlayerId) => navigate(`/admin/players/${nextPlayerId}`)} />;
+  return (
+    <PlayerListView onOpenDetail={(nextPlayerId) => navigate(`/admin/players/${nextPlayerId}`)} />
+  );
 }

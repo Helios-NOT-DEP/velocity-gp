@@ -1410,7 +1410,9 @@ describe('velocity gp backend', () => {
     expect(detailResponse.body.data.teamId).toBe(fixtureIds.teamId);
 
     const contactResponse = await request(app)
-      .patch(`${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/contact`)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/contact`
+      )
       .set('x-user-id', fixtureIds.adminUserId)
       .set('x-user-role', 'admin')
       .send({

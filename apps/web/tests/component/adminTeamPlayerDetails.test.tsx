@@ -297,9 +297,9 @@ describe('Admin team/player detail routes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/teams/team-1/score'))).toBe(
-        true
-      );
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes('/teams/team-1/score'))
+      ).toBe(true);
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger Pit' }));
@@ -542,8 +542,8 @@ describe('Admin team/player detail routes', () => {
 
     await waitFor(() => {
       expect(
-        fetchMock.mock.calls.some(
-          ([url]) => String(url).includes('/admin/events/event-1/players/player-1/contact')
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes('/admin/events/event-1/players/player-1/contact')
         )
       ).toBe(true);
     });

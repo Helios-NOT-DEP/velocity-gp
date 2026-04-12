@@ -243,7 +243,11 @@ adminRouter.get(
 
     response.json(
       successResponse(
-        await listAdminPlayerScanHistory(eventId, playerId, request.query as { limit?: number; cursor?: string }),
+        await listAdminPlayerScanHistory(
+          eventId,
+          playerId,
+          request.query as { limit?: number; cursor?: string }
+        ),
         { requestId: response.locals.requestId }
       )
     );

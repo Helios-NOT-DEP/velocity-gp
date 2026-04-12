@@ -1,6 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { AdminRosterRow, GetAdminTeamDetailResponse, ListAdminRosterTeamsResponse } from '@velocity-gp/api-contract';
-import { ArrowLeft, Loader2, Pencil, RefreshCcw, Save, Square, Trash2, Users, X } from 'lucide-react';
+import type {
+  AdminRosterRow,
+  GetAdminTeamDetailResponse,
+  ListAdminRosterTeamsResponse,
+} from '@velocity-gp/api-contract';
+import {
+  ArrowLeft,
+  Loader2,
+  Pencil,
+  RefreshCcw,
+  Save,
+  Square,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import {
   deleteAdminTeam,
