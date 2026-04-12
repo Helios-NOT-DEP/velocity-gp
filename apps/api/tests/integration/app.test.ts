@@ -230,6 +230,11 @@ describe('velocity gp backend', () => {
         eventId: fixtureIds.eventId,
       },
     });
+    await prisma.hazardMultiplierRule.deleteMany({
+      where: {
+        eventId: fixtureIds.eventId,
+      },
+    });
     await prisma.event.deleteMany({
       where: {
         id: fixtureIds.eventId,
@@ -1322,13 +1327,14 @@ describe('velocity gp backend', () => {
       )
       .set('x-user-id', fixtureIds.adminUserId)
       .set('x-user-role', 'admin')
-      .send({ hazardWeightOverride: 80 });
+      .send({ hazardWeightOverride: 80, hazardRatioOverride: 7 });
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.eventId).toBe(fixtureIds.eventId);
     expect(response.body.data.qrCodeId).toBe(fixtureIds.qrCodeId);
     expect(response.body.data.hazardWeightOverride).toBe(80);
+    expect(response.body.data.hazardRatioOverride).toBe(7);
 
     const [qrCode, audit] = await Promise.all([
       prisma.qRCode.findUnique({
@@ -1336,6 +1342,7 @@ describe('velocity gp backend', () => {
           id: fixtureIds.qrCodeId,
         },
         select: {
+          hazardRatioOverride: true,
           hazardWeightOverride: true,
         },
       }),
@@ -1348,6 +1355,7 @@ describe('velocity gp backend', () => {
       }),
     ]);
 
+    expect(qrCode?.hazardRatioOverride).toBe(7);
     expect(qrCode?.hazardWeightOverride).toBe(80);
     expect(audit).not.toBeNull();
   });
@@ -1365,6 +1373,180 @@ describe('velocity gp backend', () => {
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('reads and updates global hazard settings through admin endpoints', async () => {
+    const beforeResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/hazard-settings`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(beforeResponse.status).toBe(200);
+    expect(beforeResponse.body.success).toBe(true);
+    expect(beforeResponse.body.data.globalHazardRatio).toBe(99);
+
+    const updateResponse = await request(app)
+      .patch(`${apiPrefix}/admin/events/${fixtureIds.eventId}/hazard-settings`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ globalHazardRatio: 23, reason: 'balance tuning' });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.success).toBe(true);
+    expect(updateResponse.body.data.globalHazardRatio).toBe(23);
+
+    const persisted = await prisma.eventConfig.findUnique({
+      where: {
+        eventId: fixtureIds.eventId,
+      },
+      select: {
+        globalHazardRatio: true,
+      },
+    });
+    expect(persisted?.globalHazardRatio).toBe(23);
+  });
+
+  it('creates, updates, lists, and deletes scheduled hazard multiplier rules', async () => {
+    const createResponse = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/hazard-multipliers`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        name: 'Lunch Rush',
+        startsAt: '2026-04-06T12:00:00.000Z',
+        endsAt: '2026-04-06T13:00:00.000Z',
+        ratioMultiplier: 0.5,
+      });
+
+    expect(createResponse.status).toBe(200);
+    expect(createResponse.body.success).toBe(true);
+    const ruleId = String(createResponse.body.data.rule.id);
+
+    const listResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/hazard-multipliers`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body.success).toBe(true);
+    expect(
+      (listResponse.body.data.rules as Array<{ id: string }>).some((item) => item.id === ruleId)
+    ).toBe(true);
+
+    const updateResponse = await request(app)
+      .patch(`${apiPrefix}/admin/events/${fixtureIds.eventId}/hazard-multipliers/${ruleId}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ ratioMultiplier: 0.7 });
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.success).toBe(true);
+    expect(updateResponse.body.data.rule.ratioMultiplier).toBeCloseTo(0.7, 5);
+
+    const deleteResponse = await request(app)
+      .delete(`${apiPrefix}/admin/events/${fixtureIds.eventId}/hazard-multipliers/${ruleId}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body.success).toBe(true);
+  });
+
+  it('previews and applies QR import rows with row-level errors', async () => {
+    const previewResponse = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/import/preview`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        rows: [
+          {
+            label: `Import QR ${token}`,
+            value: 110,
+            zone: 'South Wing',
+            hazardRatioOverride: 4,
+            hazardWeightOverride: 20,
+          },
+          {
+            label: `App QR ${token}`,
+            value: 120,
+          },
+        ],
+      });
+
+    expect(previewResponse.status).toBe(200);
+    expect(previewResponse.body.success).toBe(true);
+    expect(previewResponse.body.data.summary.total).toBe(2);
+    expect(previewResponse.body.data.summary.invalid).toBe(1);
+    expect(previewResponse.body.data.rows[1].errors.length).toBeGreaterThan(0);
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          qrImageURL: 'https://cdn.velocitygp.app/qr/imported-code.png',
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }
+      )
+    );
+
+    try {
+      const applyResponse = await request(app)
+        .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/import/apply`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({
+          rows: [
+            {
+              label: `Import QR ${token}`,
+              value: 110,
+              zone: 'South Wing',
+              hazardRatioOverride: 4,
+              hazardWeightOverride: 20,
+            },
+          ],
+        });
+
+      expect(applyResponse.status).toBe(200);
+      expect(applyResponse.body.success).toBe(true);
+      expect(applyResponse.body.data.summary.created).toBe(1);
+      expect((applyResponse.body.data.createdQrCodeIds as string[]).length).toBe(1);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('exports QR assets as a ZIP payload with manifest', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes('/webhook/')) {
+        return new Response(
+          JSON.stringify({ qrImageURL: 'https://cdn.velocitygp.app/qr/export-ready.png' }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        );
+      }
+      return new Response('PNGDATA', {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    });
+
+    try {
+      const response = await request(app)
+        .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/qr-codes/export`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({});
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.mimeType).toBe('application/zip');
+      expect(typeof response.body.data.archiveBase64).toBe('string');
+      expect(response.body.data.archiveBase64.length).toBeGreaterThan(100);
+    } finally {
+      fetchSpy.mockRestore();
     }
   });
 

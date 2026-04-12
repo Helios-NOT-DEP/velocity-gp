@@ -1,7 +1,17 @@
 import type {
+  CreateHazardMultiplierRuleRequest,
+  CreateHazardMultiplierRuleResponse,
+  DeleteHazardMultiplierRuleResponse,
+  GetEventHazardSettingsResponse,
+  HazardMultiplierRule,
   ListAdminAuditsResponse,
+  ListHazardMultiplierRulesResponse,
   ManualPitControlRequest,
   ManualPitControlResponse,
+  UpdateEventHazardSettingsRequest,
+  UpdateEventHazardSettingsResponse,
+  UpdateHazardMultiplierRuleRequest,
+  UpdateHazardMultiplierRuleResponse,
   UpdateHeliosRoleRequest,
   UpdateHeliosRoleResponse,
   UpdateQrHazardRandomizerRequest,
@@ -38,6 +48,81 @@ function parsePitStopExpiresAt(value: string | undefined): Date | null {
   }
 
   return parsed;
+}
+
+function toIso(value: Date): string {
+  return value.toISOString();
+}
+
+function parseIsoDate(value: string, fieldName: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ValidationError(`Invalid ${fieldName} timestamp.`, {
+      [fieldName]: value,
+    });
+  }
+  return parsed;
+}
+
+function toHazardMultiplierRuleRecord(row: {
+  id: string;
+  eventId: string;
+  name: string;
+  startsAt: Date;
+  endsAt: Date;
+  ratioMultiplier: number;
+  createdAt: Date;
+  updatedAt: Date;
+}): HazardMultiplierRule {
+  return {
+    id: row.id,
+    eventId: row.eventId,
+    name: row.name,
+    startsAt: toIso(row.startsAt),
+    endsAt: toIso(row.endsAt),
+    ratioMultiplier: row.ratioMultiplier,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
+  };
+}
+
+async function ensureNoMultiplierOverlap(
+  tx: Prisma.TransactionClient,
+  input: {
+    eventId: string;
+    startsAt: Date;
+    endsAt: Date;
+    excludeRuleId?: string;
+  }
+): Promise<void> {
+  const overlappingRule = await tx.hazardMultiplierRule.findFirst({
+    where: {
+      eventId: input.eventId,
+      deletedAt: null,
+      ...(input.excludeRuleId ? { id: { not: input.excludeRuleId } } : {}),
+      startsAt: {
+        lt: input.endsAt,
+      },
+      endsAt: {
+        gt: input.startsAt,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+    },
+  });
+
+  if (overlappingRule) {
+    throw new ValidationError('Hazard multiplier rule overlaps an existing time window.', {
+      overlappingRuleId: overlappingRule.id,
+      overlappingRuleName: overlappingRule.name,
+      overlappingStartsAt: overlappingRule.startsAt.toISOString(),
+      overlappingEndsAt: overlappingRule.endsAt.toISOString(),
+    });
+  }
 }
 
 /**
@@ -117,6 +202,367 @@ export async function updateRaceControl(
 
     incrementCounter('admin.race_control.updated', { state: result.state });
     return result;
+  });
+}
+
+export async function getEventHazardSettings(
+  eventId: string
+): Promise<GetEventHazardSettingsResponse> {
+  const config = await prisma.eventConfig.findUnique({
+    where: {
+      eventId,
+    },
+    select: {
+      eventId: true,
+      globalHazardRatio: true,
+      updatedAt: true,
+    },
+  });
+
+  if (!config) {
+    throw new ValidationError('Event configuration does not exist.', { eventId });
+  }
+
+  return {
+    eventId: config.eventId,
+    globalHazardRatio: config.globalHazardRatio,
+    updatedAt: config.updatedAt.toISOString(),
+  };
+}
+
+export async function updateEventHazardSettings(
+  eventId: string,
+  request: UpdateEventHazardSettingsRequest,
+  context: AdminActionContext = {}
+): Promise<UpdateEventHazardSettingsResponse> {
+  return withTraceSpan(
+    'admin.hazard_settings.update',
+    { eventId, globalHazardRatio: request.globalHazardRatio },
+    async () => {
+      const result = await prisma.$transaction(async (tx) => {
+        const actorId = await resolveActorUserId(tx, context.actorUserId);
+        const existing = await tx.eventConfig.findUnique({
+          where: {
+            eventId,
+          },
+          select: {
+            eventId: true,
+            globalHazardRatio: true,
+          },
+        });
+
+        if (!existing) {
+          throw new ValidationError('Event configuration does not exist.', { eventId });
+        }
+
+        const updated = await tx.eventConfig.update({
+          where: {
+            eventId,
+          },
+          data: {
+            globalHazardRatio: request.globalHazardRatio,
+          },
+          select: {
+            eventId: true,
+            globalHazardRatio: true,
+            updatedAt: true,
+          },
+        });
+
+        const audit = await tx.adminActionAudit.create({
+          data: {
+            eventId,
+            actorUserId: actorId,
+            actionType: 'EVENT_HAZARD_SETTINGS_UPDATED',
+            targetType: 'EVENT_CONFIG',
+            targetId: eventId,
+            details: {
+              previousGlobalHazardRatio: existing.globalHazardRatio,
+              nextGlobalHazardRatio: updated.globalHazardRatio,
+              reason: request.reason,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        return {
+          eventId: updated.eventId,
+          globalHazardRatio: updated.globalHazardRatio,
+          updatedAt: updated.updatedAt.toISOString(),
+          auditId: audit.id,
+        };
+      });
+
+      incrementCounter('admin.hazard_settings.updated', {
+        globalHazardRatio: result.globalHazardRatio,
+      });
+      return result;
+    }
+  );
+}
+
+export async function listHazardMultiplierRules(
+  eventId: string
+): Promise<ListHazardMultiplierRulesResponse> {
+  const rules = await prisma.hazardMultiplierRule.findMany({
+    where: {
+      eventId,
+      deletedAt: null,
+    },
+    orderBy: [{ startsAt: 'asc' }, { createdAt: 'asc' }],
+    select: {
+      id: true,
+      eventId: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+      ratioMultiplier: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return {
+    eventId,
+    rules: rules.map(toHazardMultiplierRuleRecord),
+  };
+}
+
+export async function createHazardMultiplierRule(
+  eventId: string,
+  request: CreateHazardMultiplierRuleRequest,
+  context: AdminActionContext = {}
+): Promise<CreateHazardMultiplierRuleResponse> {
+  return withTraceSpan('admin.hazard_multiplier.create', { eventId }, async () => {
+    const startsAt = parseIsoDate(request.startsAt, 'startsAt');
+    const endsAt = parseIsoDate(request.endsAt, 'endsAt');
+    if (startsAt.getTime() >= endsAt.getTime()) {
+      throw new ValidationError('endsAt must be later than startsAt.', {
+        startsAt: request.startsAt,
+        endsAt: request.endsAt,
+      });
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const actorId = await resolveActorUserId(tx, context.actorUserId);
+      await ensureNoMultiplierOverlap(tx, { eventId, startsAt, endsAt });
+
+      const created = await tx.hazardMultiplierRule.create({
+        data: {
+          eventId,
+          name: request.name.trim(),
+          startsAt,
+          endsAt,
+          ratioMultiplier: request.ratioMultiplier,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          name: true,
+          startsAt: true,
+          endsAt: true,
+          ratioMultiplier: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId: actorId,
+          actionType: 'HAZARD_MULTIPLIER_CREATED',
+          targetType: 'HAZARD_MULTIPLIER_RULE',
+          targetId: created.id,
+          details: {
+            name: created.name,
+            startsAt: toIso(created.startsAt),
+            endsAt: toIso(created.endsAt),
+            ratioMultiplier: created.ratioMultiplier,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        rule: toHazardMultiplierRuleRecord(created),
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+export async function updateHazardMultiplierRule(
+  eventId: string,
+  ruleId: string,
+  request: UpdateHazardMultiplierRuleRequest,
+  context: AdminActionContext = {}
+): Promise<UpdateHazardMultiplierRuleResponse> {
+  return withTraceSpan('admin.hazard_multiplier.update', { eventId, ruleId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorId = await resolveActorUserId(tx, context.actorUserId);
+      const existing = await tx.hazardMultiplierRule.findFirst({
+        where: {
+          id: ruleId,
+          eventId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          name: true,
+          startsAt: true,
+          endsAt: true,
+          ratioMultiplier: true,
+        },
+      });
+
+      if (!existing) {
+        throw new ValidationError('Hazard multiplier rule does not exist for this event.', {
+          eventId,
+          ruleId,
+        });
+      }
+
+      const nextStartsAt = request.startsAt
+        ? parseIsoDate(request.startsAt, 'startsAt')
+        : existing.startsAt;
+      const nextEndsAt = request.endsAt ? parseIsoDate(request.endsAt, 'endsAt') : existing.endsAt;
+      if (nextStartsAt.getTime() >= nextEndsAt.getTime()) {
+        throw new ValidationError('endsAt must be later than startsAt.', {
+          startsAt: nextStartsAt.toISOString(),
+          endsAt: nextEndsAt.toISOString(),
+        });
+      }
+
+      await ensureNoMultiplierOverlap(tx, {
+        eventId,
+        startsAt: nextStartsAt,
+        endsAt: nextEndsAt,
+        excludeRuleId: existing.id,
+      });
+
+      const updated = await tx.hazardMultiplierRule.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          name: request.name?.trim() ?? existing.name,
+          startsAt: nextStartsAt,
+          endsAt: nextEndsAt,
+          ratioMultiplier: request.ratioMultiplier ?? existing.ratioMultiplier,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          name: true,
+          startsAt: true,
+          endsAt: true,
+          ratioMultiplier: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId: actorId,
+          actionType: 'HAZARD_MULTIPLIER_UPDATED',
+          targetType: 'HAZARD_MULTIPLIER_RULE',
+          targetId: existing.id,
+          details: {
+            previous: {
+              name: existing.name,
+              startsAt: toIso(existing.startsAt),
+              endsAt: toIso(existing.endsAt),
+              ratioMultiplier: existing.ratioMultiplier,
+            },
+            next: {
+              name: updated.name,
+              startsAt: toIso(updated.startsAt),
+              endsAt: toIso(updated.endsAt),
+              ratioMultiplier: updated.ratioMultiplier,
+            },
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        rule: toHazardMultiplierRuleRecord(updated),
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+export async function deleteHazardMultiplierRule(
+  eventId: string,
+  ruleId: string,
+  context: AdminActionContext = {}
+): Promise<DeleteHazardMultiplierRuleResponse> {
+  return withTraceSpan('admin.hazard_multiplier.delete', { eventId, ruleId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorId = await resolveActorUserId(tx, context.actorUserId);
+      const existing = await tx.hazardMultiplierRule.findFirst({
+        where: {
+          id: ruleId,
+          eventId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!existing) {
+        throw new ValidationError('Hazard multiplier rule does not exist for this event.', {
+          eventId,
+          ruleId,
+        });
+      }
+
+      const deletedAt = new Date();
+      await tx.hazardMultiplierRule.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          deletedAt,
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId: actorId,
+          actionType: 'HAZARD_MULTIPLIER_DELETED',
+          targetType: 'HAZARD_MULTIPLIER_RULE',
+          targetId: existing.id,
+          details: {
+            name: existing.name,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        id: existing.id,
+        eventId,
+        deletedAt: deletedAt.toISOString(),
+        auditId: audit.id,
+      };
+    });
   });
 }
 
@@ -428,7 +874,12 @@ export async function updateQrHazardRandomizer(
 ): Promise<UpdateQrHazardRandomizerResponse> {
   return withTraceSpan(
     'admin.qr_hazard_randomizer.update',
-    { eventId, qrCodeId, hazardWeightOverride: request.hazardWeightOverride ?? -1 },
+    {
+      eventId,
+      qrCodeId,
+      hazardRatioOverride: request.hazardRatioOverride ?? -1,
+      hazardWeightOverride: request.hazardWeightOverride ?? -1,
+    },
     async () => {
       const result = await prisma.$transaction(async (tx) => {
         const actorId = await resolveActorUserId(tx, context.actorUserId);
@@ -442,6 +893,7 @@ export async function updateQrHazardRandomizer(
           select: {
             id: true,
             eventId: true,
+            hazardRatioOverride: true,
             hazardWeightOverride: true,
           },
         });
@@ -458,11 +910,17 @@ export async function updateQrHazardRandomizer(
             id: qrCode.id,
           },
           data: {
-            hazardWeightOverride: request.hazardWeightOverride,
+            ...(Object.prototype.hasOwnProperty.call(request, 'hazardRatioOverride')
+              ? { hazardRatioOverride: request.hazardRatioOverride ?? null }
+              : {}),
+            ...(Object.prototype.hasOwnProperty.call(request, 'hazardWeightOverride')
+              ? { hazardWeightOverride: request.hazardWeightOverride ?? null }
+              : {}),
           },
           select: {
             id: true,
             eventId: true,
+            hazardRatioOverride: true,
             hazardWeightOverride: true,
             updatedAt: true,
           },
@@ -476,6 +934,8 @@ export async function updateQrHazardRandomizer(
             targetType: 'QR_CODE',
             targetId: qrCode.id,
             details: {
+              previousHazardRatioOverride: qrCode.hazardRatioOverride,
+              nextHazardRatioOverride: updatedQrCode.hazardRatioOverride,
               previousHazardWeightOverride: qrCode.hazardWeightOverride,
               nextHazardWeightOverride: updatedQrCode.hazardWeightOverride,
             },
@@ -488,6 +948,7 @@ export async function updateQrHazardRandomizer(
         return {
           eventId: updatedQrCode.eventId,
           qrCodeId: updatedQrCode.id,
+          hazardRatioOverride: updatedQrCode.hazardRatioOverride,
           hazardWeightOverride: updatedQrCode.hazardWeightOverride,
           updatedAt: updatedQrCode.updatedAt.toISOString(),
           auditId: audit.id,
@@ -495,6 +956,7 @@ export async function updateQrHazardRandomizer(
       });
 
       incrementCounter('admin.qr_hazard_randomizer.updated', {
+        ratioMode: result.hazardRatioOverride === null ? 'event_default' : 'per_qr',
         overrideMode: result.hazardWeightOverride === null ? 'fallback' : 'weighted',
       });
       return result;

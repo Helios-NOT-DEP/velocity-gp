@@ -28,7 +28,12 @@ export type AdminActionType =
   | 'ROSTER_ASSIGNED'
   | 'ROSTER_REASSIGNED'
   | 'ROSTER_UNASSIGNED'
-  | 'EMAIL_RETURN_FLAGGED';
+  | 'EMAIL_RETURN_FLAGGED'
+  | 'EVENT_HAZARD_SETTINGS_UPDATED'
+  | 'QR_IMPORT_APPLIED'
+  | 'HAZARD_MULTIPLIER_CREATED'
+  | 'HAZARD_MULTIPLIER_UPDATED'
+  | 'HAZARD_MULTIPLIER_DELETED';
 
 /**
  * Request payload for modifying the global status of an event.
@@ -88,6 +93,71 @@ export interface UpdateHeliosRoleResponse {
   readonly userId: string;
   readonly isHelios: boolean;
   readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+export interface GetEventHazardSettingsResponse {
+  readonly eventId: string;
+  readonly globalHazardRatio: number;
+  readonly updatedAt: string;
+}
+
+export interface UpdateEventHazardSettingsRequest {
+  readonly globalHazardRatio: number;
+  readonly reason?: string;
+}
+
+export interface UpdateEventHazardSettingsResponse {
+  readonly eventId: string;
+  readonly globalHazardRatio: number;
+  readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+export interface HazardMultiplierRule {
+  readonly id: string;
+  readonly eventId: string;
+  readonly name: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly ratioMultiplier: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface ListHazardMultiplierRulesResponse {
+  readonly eventId: string;
+  readonly rules: readonly HazardMultiplierRule[];
+}
+
+export interface CreateHazardMultiplierRuleRequest {
+  readonly name: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly ratioMultiplier: number;
+}
+
+export interface CreateHazardMultiplierRuleResponse {
+  readonly rule: HazardMultiplierRule;
+  readonly auditId: string;
+}
+
+export interface UpdateHazardMultiplierRuleRequest {
+  readonly name?: string;
+  readonly startsAt?: string;
+  readonly endsAt?: string;
+  readonly ratioMultiplier?: number;
+}
+
+export interface UpdateHazardMultiplierRuleResponse {
+  readonly rule: HazardMultiplierRule;
+  readonly auditId: string;
+}
+
+export interface DeleteHazardMultiplierRuleResponse {
+  readonly id: string;
+  readonly eventId: string;
+  readonly deletedAt: string;
   readonly auditId: string;
 }
 
