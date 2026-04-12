@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,10 @@ import { prisma } from '../../src/db/client.js';
 import { setEmailDispatcherForTests } from '../../src/services/emailDispatchService.js';
 import { createMagicLinkToken, createSessionToken } from '../../src/services/authTokens.js';
 import { AUTH_SESSION_COOKIE_NAME } from '../../src/services/authSessionToken.js';
+
+const apiPackageVersion = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+) as { version: string };
 
 describe('velocity gp backend', () => {
   const app = createApp();
@@ -256,6 +261,20 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.service).toBe('velocity-gp-bff');
+    expect(response.body.data.version).toBe(apiPackageVersion.version);
+  });
+
+  it('returns readiness information', async () => {
+    const response = await request(app).get('/ready');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.status).toBe('ready');
+    expect(response.body.data.version).toBe(apiPackageVersion.version);
+    expect(response.body.data.checks).toMatchObject({
+      api: true,
+      databaseConfigured: expect.any(Boolean),
+    });
   });
 
   it('serves placeholder race state data', async () => {

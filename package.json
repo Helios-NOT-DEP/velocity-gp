@@ -8,6 +8,7 @@
     "apps/*"
   ],
   "scripts": {
+    "prepare": "husky",
     "build": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/api && npm run build --workspace=@velocity-gp/web",
     "build:api": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api",
     "build:web": "npm run build --workspace=@velocity-gp/api-contract && npm run build --workspace=@velocity-gp/api-client && npm run build --workspace=@velocity-gp/ui && npm run build --workspace=@velocity-gp/web",
@@ -30,7 +31,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
-    "bump": "npm version patch --no-git-tag-version"
+    "bump": "npm version patch --no-git-tag-version",
+    "version:bump:changed": "node scripts/prepush-version-bump.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -40,6 +42,7 @@
     "@vitest/coverage-v8": "^4.1.2",
     "concurrently": "^9.2.1",
     "eslint": "^10.1.0",
+    "husky": "^9.1.7",
     "prettier": "^3.8.1",
     "typescript": "^6.0.2"
   }
