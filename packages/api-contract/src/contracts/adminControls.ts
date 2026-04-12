@@ -35,7 +35,10 @@ export type AdminActionType =
   | 'HAZARD_MULTIPLIER_CREATED'
   | 'HAZARD_MULTIPLIER_UPDATED'
   | 'HAZARD_MULTIPLIER_DELETED'
-  | 'USER_CAPABILITIES_UPDATED';
+  | 'USER_CAPABILITIES_UPDATED'
+  | 'TEAM_SCORE_UPDATED'
+  | 'TEAM_SOFT_DELETED'
+  | 'PLAYER_CONTACT_UPDATED';
 
 /**
  * Request payload for modifying the global status of an event.

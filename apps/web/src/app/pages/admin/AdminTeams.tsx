@@ -1,11 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { AdminRosterRow, ListAdminRosterTeamsResponse } from '@velocity-gp/api-contract';
-import { Loader2, RefreshCcw, Users } from 'lucide-react';
+import type { AdminRosterRow, GetAdminTeamDetailResponse, ListAdminRosterTeamsResponse } from '@velocity-gp/api-contract';
+import { ArrowLeft, Loader2, Pencil, RefreshCcw, Save, Square, Trash2, Users, X } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router';
 import {
+  deleteAdminTeam,
+  getAdminTeamDetail,
   getCurrentEventId,
   listAdminRoster,
   listAdminRosterTeams,
   updateAdminRosterAssignment,
+  updateAdminTeamPitControl,
+  updateAdminTeamScore,
 } from '@/services/admin/roster';
 
 const UNASSIGNED_OPTION = '__UNASSIGNED__';
@@ -23,7 +28,32 @@ function statusBadgeClass(status: 'PENDING' | 'ACTIVE' | 'IN_PIT'): string {
   return 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30';
 }
 
-export default function AdminTeams() {
+function formatPitTimer(pitStopExpiresAt: string | null): string {
+  if (!pitStopExpiresAt) {
+    return 'None';
+  }
+
+  const expiresAtMs = Date.parse(pitStopExpiresAt);
+  if (Number.isNaN(expiresAtMs)) {
+    return 'Invalid';
+  }
+
+  const diff = expiresAtMs - Date.now();
+  if (diff <= 0) {
+    return 'Expired';
+  }
+
+  const totalSeconds = Math.floor(diff / 1_000);
+  const minutes = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+
+  return `${minutes}:${seconds}`;
+}
+
+function TeamListView(props: { onOpenDetail: (teamId: string) => void }) {
+  const { onOpenDetail } = props;
   const [eventId, setEventId] = useState<string | null>(null);
   const [teamOptions, setTeamOptions] = useState<ListAdminRosterTeamsResponse | null>(null);
   const [rosterRows, setRosterRows] = useState<readonly AdminRosterRow[]>([]);
@@ -31,14 +61,12 @@ export default function AdminTeams() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({});
   const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
-  // TODO(figma-sync): Add team detail interactions (score edits, pit-stop controls, member ranking view) that exist in Figma Admin but are not present in this assignment-focused page. | Figma source: src/app/pages/Admin.tsx Teams tab + team detail view | Impact: admin flow
 
   const loadTeams = async (overrideEventId?: string) => {
     setIsLoading(true);
     setLoadError(null);
 
     try {
-      // Keep team summary + roster rows in sync by loading both from the same event snapshot.
       const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
       const [nextTeamOptions, nextRoster] = await Promise.all([
         listAdminRosterTeams(resolvedEventId),
@@ -63,7 +91,6 @@ export default function AdminTeams() {
   }, []);
 
   const teamMembers = useMemo(() => {
-    // Build a quick team->members lookup map for table rendering.
     const grouped = new Map<string, AdminRosterRow[]>();
     for (const row of rosterRows) {
       if (!row.teamId) {
@@ -194,7 +221,6 @@ export default function AdminTeams() {
 
           {teams.map((team) => {
             const members = teamMembers.get(team.teamId) ?? [];
-            // TODO(figma-sync): Introduce selectable team drill-down state to mirror the Figma Admin team detail transition from list card to full team panel. | Figma source: src/app/pages/Admin.tsx selectedTeamId workflow | Impact: admin flow
             return (
               <article
                 key={team.teamId}
@@ -202,7 +228,13 @@ export default function AdminTeams() {
               >
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <h3 className="font-['Space_Grotesk'] text-lg md:text-xl">{team.teamName}</h3>
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(team.teamId)}
+                      className="font-['Space_Grotesk'] text-lg md:text-xl hover:text-[#00D4FF] text-left"
+                    >
+                      {team.teamName}
+                    </button>
                     <p className="text-xs text-gray-400 font-mono">{team.teamId}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -214,6 +246,13 @@ export default function AdminTeams() {
                     <span className="text-sm text-gray-300 inline-flex items-center gap-1">
                       <Users className="w-4 h-4" /> {team.memberCount}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(team.teamId)}
+                      className="px-2 py-1 rounded border border-gray-700 hover:border-[#00D4FF] text-xs"
+                    >
+                      Detail
+                    </button>
                   </div>
                 </div>
 
@@ -280,4 +319,295 @@ export default function AdminTeams() {
       )}
     </section>
   );
+}
+
+function TeamDetailView(props: { teamId: string; onBack: () => void }) {
+  const { teamId, onBack } = props;
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<GetAdminTeamDetailResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [scoreDraft, setScoreDraft] = useState('0');
+  const [isEditingScore, setIsEditingScore] = useState(false);
+  const [isSavingScore, setIsSavingScore] = useState(false);
+  const [isUpdatingPit, setIsUpdatingPit] = useState(false);
+  const [isDeletingTeam, setIsDeletingTeam] = useState(false);
+
+  const loadDetail = async (overrideEventId?: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
+      const response = await getAdminTeamDetail(resolvedEventId, teamId);
+      setEventId(resolvedEventId);
+      setDetail(response);
+      setScoreDraft(String(response.score));
+      setIsEditingScore(false);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Unable to load team detail.');
+      setDetail(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadDetail();
+  }, [teamId]);
+
+  async function handleSaveScore() {
+    if (!eventId || !detail) {
+      return;
+    }
+
+    const parsed = Number.parseInt(scoreDraft, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError('Score must be a non-negative integer.');
+      return;
+    }
+
+    setIsSavingScore(true);
+    setError(null);
+    try {
+      await updateAdminTeamScore(eventId, teamId, {
+        score: parsed,
+      });
+      await loadDetail(eventId);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save team score.');
+    } finally {
+      setIsSavingScore(false);
+    }
+  }
+
+  async function handlePitAction(action: 'ENTER_PIT' | 'CLEAR_PIT') {
+    if (!eventId) {
+      return;
+    }
+
+    setIsUpdatingPit(true);
+    setError(null);
+    try {
+      await updateAdminTeamPitControl(eventId, teamId, {
+        action,
+      });
+      await loadDetail(eventId);
+    } catch (pitError) {
+      setError(pitError instanceof Error ? pitError.message : 'Unable to update pit control.');
+    } finally {
+      setIsUpdatingPit(false);
+    }
+  }
+
+  async function handleDeleteTeam() {
+    if (!eventId) {
+      return;
+    }
+
+    const confirmed = globalThis.confirm(
+      'Delete this team? Members will be unassigned and the team will be hidden from admin lists.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeletingTeam(true);
+    setError(null);
+    try {
+      await deleteAdminTeam(eventId, teamId);
+      onBack();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete team.');
+      setIsDeletingTeam(false);
+    }
+  }
+
+  return (
+    <section className="space-y-6">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm text-gray-300 hover:text-white"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Teams
+      </button>
+
+      {error ? (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+          {error}
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading team detail…
+        </div>
+      ) : detail ? (
+        <>
+          <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="font-['Space_Grotesk'] text-2xl md:text-3xl">{detail.teamName}</h2>
+                <p className="text-xs text-gray-400 font-mono">{detail.teamId}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`px-2 py-1 rounded text-xs font-mono ${statusBadgeClass(detail.teamStatus)}`}
+                >
+                  {detail.teamStatus}
+                </span>
+                <span className="px-2 py-1 rounded border border-gray-700 text-xs text-gray-300">
+                  Rank #{detail.rank}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Score</p>
+                <p className="text-2xl font-semibold text-[#39FF14]">{detail.score}</p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Pit Timer</p>
+                <p className="text-2xl font-semibold">{formatPitTimer(detail.pitStopExpiresAt)}</p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Members</p>
+                <p className="text-2xl font-semibold">{detail.memberCount}</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-800 bg-black/30 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold">Adjust Score</p>
+                {!isEditingScore ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingScore(true)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-700 hover:border-[#00D4FF] text-xs"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                ) : null}
+              </div>
+
+              {isEditingScore ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    value={scoreDraft}
+                    onChange={(event) => setScoreDraft(event.target.value)}
+                    className="w-40 px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+                  />
+                  <button
+                    type="button"
+                    disabled={isSavingScore}
+                    onClick={() => void handleSaveScore()}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded bg-[#00D4FF] text-black font-semibold disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSavingScore ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingScore}
+                    onClick={() => {
+                      setScoreDraft(String(detail.score));
+                      setIsEditingScore(false);
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded border border-gray-700 hover:border-gray-500 text-sm"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-lg border border-gray-800 bg-black/30 p-3 space-y-3">
+              <p className="font-semibold">Pit Controls</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isUpdatingPit}
+                  onClick={() => void handlePitAction('ENTER_PIT')}
+                  className="px-3 py-2 rounded bg-[#FACC15] text-black font-semibold disabled:opacity-50"
+                >
+                  {isUpdatingPit ? 'Updating…' : 'Trigger Pit'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isUpdatingPit}
+                  onClick={() => void handlePitAction('CLEAR_PIT')}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded bg-[#39FF14] text-black font-semibold disabled:opacity-50"
+                >
+                  <Square className="w-4 h-4" />
+                  Clear Pit
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+              <button
+                type="button"
+                disabled={isDeletingTeam}
+                onClick={() => void handleDeleteTeam()}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded bg-red-600 text-white font-semibold disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {isDeletingTeam ? 'Deleting…' : 'Delete Team'}
+              </button>
+            </div>
+          </article>
+
+          <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6">
+            <h3 className="font-['Space_Grotesk'] text-lg md:text-xl mb-3">Ranked Members</h3>
+            {detail.members.length === 0 ? (
+              <p className="text-sm text-gray-400">No team members are currently assigned.</p>
+            ) : (
+              <div className="overflow-auto rounded-lg border border-gray-800">
+                <table className="w-full text-sm">
+                  <thead className="bg-black/40 text-gray-300">
+                    <tr>
+                      <th className="text-left px-3 py-2">Rank</th>
+                      <th className="text-left px-3 py-2">Member</th>
+                      <th className="text-left px-3 py-2">Email</th>
+                      <th className="text-left px-3 py-2">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.members.map((member) => (
+                      <tr key={member.playerId} className="border-t border-gray-800">
+                        <td className="px-3 py-2">#{member.rank}</td>
+                        <td className="px-3 py-2">{member.displayName}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{member.workEmail}</td>
+                        <td className="px-3 py-2">{member.individualScore}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </article>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+export default function AdminTeams() {
+  const navigate = useNavigate();
+  const { teamId } = useParams<{ teamId?: string }>();
+
+  if (teamId) {
+    return <TeamDetailView teamId={teamId} onBack={() => navigate('/admin/teams')} />;
+  }
+
+  return <TeamListView onOpenDetail={(nextTeamId) => navigate(`/admin/teams/${nextTeamId}`)} />;
 }

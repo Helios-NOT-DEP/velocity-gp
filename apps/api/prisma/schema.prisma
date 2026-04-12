@@ -92,6 +92,9 @@ enum AdminActionType {
     HAZARD_MULTIPLIER_UPDATED
     HAZARD_MULTIPLIER_DELETED
     USER_CAPABILITIES_UPDATED
+    TEAM_SCORE_UPDATED
+    TEAM_SOFT_DELETED
+    PLAYER_CONTACT_UPDATED
 }
 
 enum EmailProvider {
@@ -185,6 +188,7 @@ model Team {
     score            Int        @default(0)
     status           TeamStatus @default(PENDING)
     pitStopExpiresAt DateTime?
+    deletedAt        DateTime?
     createdAt        DateTime   @default(now())
     updatedAt        DateTime   @updatedAt
 
@@ -198,6 +202,7 @@ model Team {
     @@unique([eventId, name])
     @@index([eventId])
     @@index([eventId, status])
+    @@index([eventId, deletedAt])
 }
 
 model Player {

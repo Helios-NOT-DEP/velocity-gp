@@ -208,4 +208,36 @@ describe('admin route guards', () => {
     const activeLink = screen.getAllByRole('link', { name: 'QR Codes' })[0];
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
+
+  it('supports admin team detail deep links', async () => {
+    renderWithRoute('/admin/teams/team-123', {
+      userId: 'admin-1',
+      role: 'admin',
+      isAuthenticated: true,
+      email: 'admin@example.com',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Back to Teams' })).toBeTruthy();
+    });
+
+    const activeLink = screen.getAllByRole('link', { name: 'Teams' })[0];
+    expect(activeLink.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('supports admin player detail deep links', async () => {
+    renderWithRoute('/admin/players/player-123', {
+      userId: 'admin-1',
+      role: 'admin',
+      isAuthenticated: true,
+      email: 'admin@example.com',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Back to Players' })).toBeTruthy();
+    });
+
+    const activeLink = screen.getAllByRole('link', { name: 'Players' })[0];
+    expect(activeLink.getAttribute('aria-current')).toBe('page');
+  });
 });

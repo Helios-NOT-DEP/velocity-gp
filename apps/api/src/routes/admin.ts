@@ -22,7 +22,10 @@ import {
   qrImportPreviewSchema,
   rosterImportApplySchema,
   rosterImportPreviewSchema,
+  adminPlayerScanHistoryQuerySchema,
   setAdminQRCodeStatusSchema,
+  updateAdminPlayerContactSchema,
+  updateAdminTeamScoreSchema,
   updateEventHazardSettingsSchema,
   updateHazardMultiplierRuleSchema,
   updateRosterAssignmentSchema,
@@ -57,9 +60,15 @@ import {
 } from '../services/adminQrCodeService.js';
 import {
   applyRosterImport,
+  deleteAdminTeam,
+  getAdminPlayerDetail,
+  getAdminTeamDetail,
+  listAdminPlayerScanHistory,
   listAdminRoster,
   listAdminRosterTeams,
   previewRosterImport,
+  updateAdminPlayerContact,
+  updateAdminTeamScore,
   updateRosterAssignment,
 } from '../services/rosterService.js';
 
@@ -130,6 +139,112 @@ adminRouter.patch(
         {
           requestId: response.locals.requestId,
         }
+      )
+    );
+  })
+);
+
+adminRouter.get(
+  '/admin/events/:eventId/teams/:teamId/detail',
+  validate(adminEventTeamParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const teamId = String(request.params.teamId);
+
+    response.json(
+      successResponse(await getAdminTeamDetail(eventId, teamId), {
+        requestId: response.locals.requestId,
+      })
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/teams/:teamId/score',
+  validate(adminEventTeamParamsSchema, 'params'),
+  validate(updateAdminTeamScoreSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const teamId = String(request.params.teamId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await updateAdminTeamScore(eventId, teamId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.delete(
+  '/admin/events/:eventId/teams/:teamId',
+  validate(adminEventTeamParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const teamId = String(request.params.teamId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await deleteAdminTeam(eventId, teamId, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.get(
+  '/admin/events/:eventId/players/:playerId/detail',
+  validate(adminEventRosterPlayerParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const playerId = String(request.params.playerId);
+
+    response.json(
+      successResponse(await getAdminPlayerDetail(eventId, playerId), {
+        requestId: response.locals.requestId,
+      })
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/players/:playerId/contact',
+  validate(adminEventRosterPlayerParamsSchema, 'params'),
+  validate(updateAdminPlayerContactSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const playerId = String(request.params.playerId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await updateAdminPlayerContact(eventId, playerId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.get(
+  '/admin/events/:eventId/players/:playerId/scan-history',
+  validate(adminEventRosterPlayerParamsSchema, 'params'),
+  validate(adminPlayerScanHistoryQuerySchema, 'query'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const playerId = String(request.params.playerId);
+
+    response.json(
+      successResponse(
+        await listAdminPlayerScanHistory(eventId, playerId, request.query as { limit?: number; cursor?: string }),
+        { requestId: response.locals.requestId }
       )
     );
   })

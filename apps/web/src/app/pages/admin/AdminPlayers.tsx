@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
+  AdminPlayerScanHistoryItem,
   ListAdminRosterQuery,
   ListAdminRosterResponse,
   ListAdminRosterTeamsResponse,
@@ -7,15 +8,19 @@ import type {
   RosterImportPreviewResponse,
   RosterImportRowInput,
 } from '@velocity-gp/api-contract';
-import { Loader2, RefreshCcw, Upload, Users } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCcw, Save, Upload, Users } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router';
 import { listAdminAudits, updateHeliosRole } from '@/services/admin/control';
 import {
   applyAdminRosterImport,
+  getAdminPlayerDetail,
   getCurrentEventId,
+  listAdminPlayerScanHistory,
   listAdminRoster,
   listAdminRosterTeams,
   parseRosterCsvFile,
   previewAdminRosterImport,
+  updateAdminPlayerContact,
   updateAdminRosterAssignment,
 } from '@/services/admin/roster';
 
@@ -51,7 +56,26 @@ function assignmentLabel(value: AssignmentFilter): string {
   return 'Unassigned';
 }
 
-export default function AdminPlayers() {
+function formatScanOutcome(outcome: AdminPlayerScanHistoryItem['outcome']): string {
+  if (outcome === 'HAZARD_PIT') {
+    return 'HAZARD';
+  }
+
+  return outcome;
+}
+
+function formatJoinedDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '—';
+  }
+
+  return parsed.toLocaleDateString();
+}
+
+function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
+  const { onOpenDetail } = props;
+
   const [eventId, setEventId] = useState<string | null>(null);
   const [roster, setRoster] = useState<ListAdminRosterResponse | null>(null);
   const [teamOptions, setTeamOptions] = useState<ListAdminRosterTeamsResponse | null>(null);
@@ -75,7 +99,6 @@ export default function AdminPlayers() {
   const [importResultMessage, setImportResultMessage] = useState<string | null>(null);
   const [isPreviewingImport, setIsPreviewingImport] = useState(false);
   const [isApplyingImport, setIsApplyingImport] = useState(false);
-  // TODO(figma-sync): Add player detail drill-down parity (contact editing and per-player scan history) from the Figma Admin players workflow. | Figma source: src/app/pages/Admin.tsx Players tab + selectedPlayerId detail view | Impact: admin flow
 
   const refreshAuditSummary = async (targetEventId: string) => {
     try {
@@ -101,7 +124,6 @@ export default function AdminPlayers() {
     setLoadError(null);
 
     try {
-      // Resolve event once, then hydrate roster + team options in parallel for one UI refresh.
       const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
       const trimmedSearch = appliedSearch.trim();
       const rosterQuery: ListAdminRosterQuery = {
@@ -133,19 +155,11 @@ export default function AdminPlayers() {
   }, [appliedSearch, assignmentFilter, teamFilter]);
 
   const rosterRows = roster?.items ?? [];
-  // Team options drive assignment dropdowns and summary counters in the same screen.
   const teamSelectOptions = useMemo(() => teamOptions?.teams ?? [], [teamOptions]);
 
-  async function handleSubmitSearch(event: React.FormEvent<globalThis.HTMLFormElement>) {
+  function handleSubmitSearch(event: React.FormEvent<globalThis.HTMLFormElement>) {
     event.preventDefault();
     setAppliedSearch(searchInput);
-  }
-
-  async function handleChangeAssignment(playerId: string, nextValue: string) {
-    setAssignmentDrafts((existing) => ({
-      ...existing,
-      [playerId]: nextValue,
-    }));
   }
 
   async function handleSaveAssignment(playerId: string, existingTeamId: string | null) {
@@ -368,9 +382,7 @@ export default function AdminPlayers() {
           <p className="text-xs text-gray-400">Latest admin audit: {latestAuditSummary}</p>
         ) : null}
 
-        {importFileName ? (
-          <p className="text-xs text-gray-400">Loaded file: {importFileName}</p>
-        ) : null}
+        {importFileName ? <p className="text-xs text-gray-400">Loaded file: {importFileName}</p> : null}
         {importError ? (
           <p className="text-sm text-red-300 rounded-lg border border-red-500/40 bg-red-500/10 p-2">
             {importError}
@@ -385,8 +397,8 @@ export default function AdminPlayers() {
         {importPreview ? (
           <div className="space-y-3">
             <p className="text-sm text-gray-300">
-              Preview summary: {importPreview.summary.total} rows, {importPreview.summary.valid}{' '}
-              valid, {importPreview.summary.invalid} invalid.
+              Preview summary: {importPreview.summary.total} rows, {importPreview.summary.valid} valid,{' '}
+              {importPreview.summary.invalid} invalid.
             </p>
             <div className="max-h-56 overflow-auto rounded-lg border border-gray-800">
               <table className="w-full text-sm">
@@ -407,9 +419,7 @@ export default function AdminPlayers() {
                       <td className="px-3 py-2">{row.rowNumber}</td>
                       <td className="px-3 py-2 font-mono text-xs">{row.normalizedWorkEmail}</td>
                       <td className="px-3 py-2">{row.action}</td>
-                      <td className="px-3 py-2 text-xs text-red-300">
-                        {row.errors.join('; ') || '—'}
-                      </td>
+                      <td className="px-3 py-2 text-xs text-red-300">{row.errors.join('; ') || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -443,7 +453,6 @@ export default function AdminPlayers() {
               </thead>
               <tbody>
                 {rosterRows.map((row) => {
-                  // TODO(figma-sync): Extend roster rows with score/rank metadata expected by Figma player cards and detail stats before implementing designed player ranking UI. | Figma source: src/app/pages/Admin.tsx Players list (score-ranked cards) | Impact: admin flow
                   const selectedTeamId =
                     assignmentDrafts[row.playerId] ?? row.teamId ?? UNASSIGNED_OPTION;
                   const hasChanges =
@@ -453,7 +462,13 @@ export default function AdminPlayers() {
                   return (
                     <tr key={row.playerId} className="border-t border-gray-800 align-top">
                       <td className="px-3 py-2">
-                        <p className="font-semibold">{row.displayName}</p>
+                        <button
+                          type="button"
+                          onClick={() => onOpenDetail(row.playerId)}
+                          className="font-semibold text-left hover:text-[#00D4FF]"
+                        >
+                          {row.displayName}
+                        </button>
                         <p className="text-xs text-gray-500">{row.playerId}</p>
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{row.workEmail}</td>
@@ -482,7 +497,10 @@ export default function AdminPlayers() {
                           aria-label={`Assign team for ${row.displayName}`}
                           value={selectedTeamId}
                           onChange={(event) =>
-                            void handleChangeAssignment(row.playerId, event.target.value)
+                            setAssignmentDrafts((existing) => ({
+                              ...existing,
+                              [row.playerId]: event.target.value,
+                            }))
                           }
                           className="px-2 py-1 rounded bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
                         >
@@ -514,4 +532,210 @@ export default function AdminPlayers() {
       </article>
     </section>
   );
+}
+
+function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
+  const { playerId, onBack } = props;
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [detail, setDetail] = useState<Awaited<ReturnType<typeof getAdminPlayerDetail>> | null>(null);
+  const [scanHistory, setScanHistory] = useState<readonly AdminPlayerScanHistoryItem[]>([]);
+  const [workEmailDraft, setWorkEmailDraft] = useState('');
+  const [phoneDraft, setPhoneDraft] = useState('');
+
+  const loadDetail = async (overrideEventId?: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
+      const [nextDetail, nextScanHistory] = await Promise.all([
+        getAdminPlayerDetail(resolvedEventId, playerId),
+        listAdminPlayerScanHistory(resolvedEventId, playerId, {
+          limit: 100,
+        }),
+      ]);
+
+      setEventId(resolvedEventId);
+      setDetail(nextDetail);
+      setScanHistory(nextScanHistory.items);
+      setWorkEmailDraft(nextDetail.workEmail);
+      setPhoneDraft(nextDetail.phoneE164 ?? '');
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Unable to load player detail.');
+      setDetail(null);
+      setScanHistory([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadDetail();
+  }, [playerId]);
+
+  async function handleSaveContact() {
+    if (!eventId || !detail) {
+      return;
+    }
+
+    setIsSavingContact(true);
+    setError(null);
+    try {
+      await updateAdminPlayerContact(eventId, playerId, {
+        workEmail: workEmailDraft,
+        phoneE164: phoneDraft.trim().length > 0 ? phoneDraft.trim() : null,
+      });
+      await loadDetail(eventId);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save contact details.');
+    } finally {
+      setIsSavingContact(false);
+    }
+  }
+
+  return (
+    <section className="space-y-6">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm text-gray-300 hover:text-white"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Players
+      </button>
+
+      {error ? (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+          {error}
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading player detail…
+        </div>
+      ) : detail ? (
+        <>
+          <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6 space-y-4">
+            <div>
+              <h2 className="font-['Space_Grotesk'] text-2xl md:text-3xl">{detail.displayName}</h2>
+              <p className="text-xs text-gray-400 font-mono">{detail.playerId}</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Individual Score</p>
+                <p className="text-2xl font-semibold text-[#39FF14]">{detail.individualScore}</p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Global Rank</p>
+                <p className="text-2xl font-semibold">
+                  {detail.globalRank !== null ? `#${detail.globalRank}` : '—'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Team Rank</p>
+                <p className="text-2xl font-semibold">
+                  {detail.teamRank !== null ? `#${detail.teamRank}` : '—'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Team Points</p>
+                <p className="text-2xl font-semibold">{detail.teamScore ?? '—'}</p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Joined</p>
+                <p className="text-2xl font-semibold">{formatJoinedDate(detail.joinedAt)}</p>
+              </div>
+            </div>
+
+            <div className="text-sm text-gray-300">
+              Team: {detail.teamName ? `${detail.teamName} (${detail.teamId})` : 'Unassigned'}
+            </div>
+          </article>
+
+          <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6 space-y-4">
+            <h3 className="font-['Space_Grotesk'] text-lg md:text-xl">Contact</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs text-gray-400">Work Email</span>
+                <input
+                  type="email"
+                  value={workEmailDraft}
+                  onChange={(event) => setWorkEmailDraft(event.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-gray-400">Phone (E.164)</span>
+                <input
+                  type="text"
+                  value={phoneDraft}
+                  onChange={(event) => setPhoneDraft(event.target.value)}
+                  placeholder="+14155550123"
+                  className="w-full px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              disabled={isSavingContact}
+              onClick={() => void handleSaveContact()}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-[#00D4FF] text-black font-semibold disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {isSavingContact ? 'Saving…' : 'Save Contact'}
+            </button>
+          </article>
+
+          <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6">
+            <h3 className="font-['Space_Grotesk'] text-lg md:text-xl mb-3">Scan History</h3>
+            {scanHistory.length === 0 ? (
+              <p className="text-sm text-gray-400">No scans recorded for this player yet.</p>
+            ) : (
+              <div className="overflow-auto rounded-lg border border-gray-800">
+                <table className="w-full text-sm">
+                  <thead className="bg-black/40 text-gray-300">
+                    <tr>
+                      <th className="text-left px-3 py-2">Outcome</th>
+                      <th className="text-left px-3 py-2">Timestamp</th>
+                      <th className="text-left px-3 py-2">QR Label</th>
+                      <th className="text-left px-3 py-2">Points</th>
+                      <th className="text-left px-3 py-2">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scanHistory.map((scan) => (
+                      <tr key={scan.scanId} className="border-t border-gray-800">
+                        <td className="px-3 py-2 font-mono text-xs">{formatScanOutcome(scan.outcome)}</td>
+                        <td className="px-3 py-2">{new Date(scan.scannedAt).toLocaleString()}</td>
+                        <td className="px-3 py-2">{scan.qrCodeLabel ?? scan.qrPayload}</td>
+                        <td className="px-3 py-2">{scan.pointsAwarded}</td>
+                        <td className="px-3 py-2">{scan.message ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </article>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+export default function AdminPlayers() {
+  const navigate = useNavigate();
+  const { playerId } = useParams<{ playerId?: string }>();
+
+  if (playerId) {
+    return <PlayerDetailView playerId={playerId} onBack={() => navigate('/admin/players')} />;
+  }
+
+  return <PlayerListView onOpenDetail={(nextPlayerId) => navigate(`/admin/players/${nextPlayerId}`)} />;
 }

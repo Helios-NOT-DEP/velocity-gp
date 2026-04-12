@@ -128,6 +128,14 @@ export const adminEndpoints = {
   /** Forcibly places or clears a team from a PIT penalty sequence. */
   manualPitControl: (eventId: string, teamId: string) =>
     `/admin/events/${eventId}/teams/${teamId}/pit-control`,
+  /** Returns team-level detail data for admin drill-down views. */
+  getTeamDetail: (eventId: string, teamId: string) =>
+    `/admin/events/${eventId}/teams/${teamId}/detail`,
+  /** Overrides a team's score directly from the admin detail screen. */
+  updateTeamScore: (eventId: string, teamId: string) =>
+    `/admin/events/${eventId}/teams/${teamId}/score`,
+  /** Soft-deletes a team from active admin operations. */
+  deleteTeam: (eventId: string, teamId: string) => `/admin/events/${eventId}/teams/${teamId}`,
   /** Retrieves the full participant registry for an event. */
   listRoster: (eventId: string) => `/admin/events/${eventId}/roster`,
   /** Retrieves a bulk list of all teams constructed for the roster. */
@@ -135,6 +143,15 @@ export const adminEndpoints = {
   /** Forcibly re-assigns a player to a new team or role. */
   updateRosterAssignment: (eventId: string, playerId: string) =>
     `/admin/events/${eventId}/roster/players/${playerId}/assignment`,
+  /** Returns player-level detail data for admin drill-down views. */
+  getPlayerDetail: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/detail`,
+  /** Updates admin-managed player contact information. */
+  updatePlayerContact: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/contact`,
+  /** Lists scan history rows for a specific player in an event. */
+  listPlayerScanHistory: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/scan-history`,
   /** Validates a CSV/JSON bulk roster import payload without committing it. */
   previewRosterImport: (eventId: string) => `/admin/events/${eventId}/roster/import/preview`,
   /** Commits a bulk roster import payload to the database. */
