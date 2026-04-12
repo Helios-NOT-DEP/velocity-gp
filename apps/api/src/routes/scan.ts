@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -17,15 +17,15 @@ const scanRateLimiter = rateLimit({
   keyGenerator: (request) => {
     const authContext = resolveRequestAuthContext(request);
     if (!authContext) {
-      return `ip:${request.ip ?? 'unknown'}`;
+      return `ip:${ipKeyGenerator(request)}`;
     }
 
-    if (authContext.role === 'player') {
+    if (authContext.capabilities.player && !authContext.capabilities.admin) {
       // Prefer stable player identity so scan traffic is isolated per participant.
       return `player:${authContext.playerId ?? authContext.userId}`;
     }
 
-    return `${authContext.role}:${authContext.userId}`;
+    return `${authContext.role ?? 'capability'}:${authContext.userId}`;
   },
 });
 
@@ -46,7 +46,8 @@ scanRouter.post(
     // check only applies when playerId is available.
     if (
       authContext &&
-      authContext.role === 'player' &&
+      authContext.capabilities.player &&
+      !authContext.capabilities.admin &&
       authContext.playerId &&
       authContext.playerId !== request.body.playerId
     ) {

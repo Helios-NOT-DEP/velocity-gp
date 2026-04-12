@@ -91,6 +91,7 @@ enum AdminActionType {
     HAZARD_MULTIPLIER_CREATED
     HAZARD_MULTIPLIER_UPDATED
     HAZARD_MULTIPLIER_DELETED
+    USER_CAPABILITIES_UPDATED
 }
 
 enum EmailProvider {
@@ -103,6 +104,9 @@ model User {
     displayName         String
     phoneE164           String?
     role                UserRole @default(PLAYER)
+    canAdmin            Boolean  @default(false)
+    canPlayer           Boolean  @default(true)
+    isHeliosMember      Boolean  @default(false)
     isHelios            Boolean  @default(false)
     hasReturnEmailIssue Boolean  @default(false)
     createdAt           DateTime @default(now())

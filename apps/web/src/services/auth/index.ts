@@ -15,5 +15,11 @@ export {
   AUTH_SESSION_UPDATED_EVENT,
 } from './authClient';
 export type { AuthCredentials, AuthUser } from './authClient';
-export type { AuthSession, AuthRole, AuthAssignmentStatus } from './authTypes';
-export { anonymousSession, isAdminSession, isAuthenticatedSession } from './authTypes';
+export type { AuthSession, AuthRole, AuthAssignmentStatus, AuthCapabilities } from './authTypes';
+export {
+  anonymousSession,
+  hasPlayerCapability,
+  isAdminSession,
+  isAuthenticatedSession,
+  isHeliosMemberSession,
+} from './authTypes';

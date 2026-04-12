@@ -59,6 +59,16 @@ export const updateHeliosRoleSchema = z.object({
   reason: z.string().min(2).optional(),
 });
 
+/** Canonical user capability mutation schema. */
+export const updateUserCapabilitiesSchema = z.object({
+  capabilities: z.object({
+    admin: z.boolean(),
+    player: z.boolean(),
+    heliosMember: z.boolean(),
+  }),
+  reason: z.string().min(2).optional(),
+});
+
 /**
  * Strict numeric enforcement preventing users from setting impossible hazard weights.
  * Locks between 0-100 to represent proper probability spread.

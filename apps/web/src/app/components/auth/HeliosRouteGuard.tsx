@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
-import { getSession, hasPlayerCapability, isAuthenticatedSession, anonymousSession } from '@/services/auth';
-import type { AuthSession } from '@/services/auth';
+import {
+  anonymousSession,
+  getSession,
+  isAuthenticatedSession,
+  isHeliosMemberSession,
+  type AuthSession,
+} from '@/services/auth';
 
 interface Props {
   children: React.ReactNode;
 }
 
-export default function ProtectedRouteGuard({ children }: Props) {
+export default function HeliosRouteGuard({ children }: Props) {
   const [session, setSession] = useState<AuthSession>(anonymousSession);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,7 +42,7 @@ export default function ProtectedRouteGuard({ children }: Props) {
         className="min-h-screen bg-[#040A16] text-white flex items-center justify-center"
         style={{ fontFamily: 'var(--font-body)' }}
       >
-        <p className="text-sm tracking-wide text-blue-200/80">Loading access…</p>
+        <p className="text-sm tracking-wide text-blue-200/80">Loading Helios access…</p>
       </main>
     );
   }
@@ -46,12 +51,8 @@ export default function ProtectedRouteGuard({ children }: Props) {
     return <Navigate to="/" replace />;
   }
 
-  if (!hasPlayerCapability(session)) {
-    if (session.capabilities?.admin || session.role === 'admin') {
-      return <Navigate to="/admin/game-control" replace />;
-    }
-
-    return <Navigate to="/" replace />;
+  if (!isHeliosMemberSession(session)) {
+    return <Navigate to="/race" replace />;
   }
 
   return <>{children}</>;

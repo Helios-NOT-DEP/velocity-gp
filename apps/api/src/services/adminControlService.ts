@@ -14,6 +14,8 @@ import type {
   UpdateHazardMultiplierRuleResponse,
   UpdateHeliosRoleRequest,
   UpdateHeliosRoleResponse,
+  UpdateUserCapabilitiesRequest,
+  UpdateUserCapabilitiesResponse,
   UpdateQrHazardRandomizerRequest,
   UpdateQrHazardRandomizerResponse,
   UpdateRaceControlRequest,
@@ -134,6 +136,22 @@ function jsonDetailsToRecord(value: Prisma.JsonValue | null): Record<string, unk
   }
 
   return value as Record<string, unknown>;
+}
+
+function deriveLegacyRoleFromCapabilities(input: {
+  admin: boolean;
+  player: boolean;
+  heliosMember: boolean;
+}): 'ADMIN' | 'HELIOS' | 'PLAYER' {
+  if (input.player && input.heliosMember) {
+    return 'HELIOS';
+  }
+
+  if (input.player) {
+    return 'PLAYER';
+  }
+
+  return 'ADMIN';
 }
 
 /**
@@ -770,16 +788,21 @@ export async function manualPitControl(
 }
 
 /**
- * Assigns or revokes Helios role for a user and records an admin audit entry.
+ * Updates account capabilities and records an admin audit entry.
  */
-export async function updateHeliosRole(
+export async function updateUserCapabilities(
   userId: string,
-  request: UpdateHeliosRoleRequest,
+  request: UpdateUserCapabilitiesRequest,
   context: AdminActionContext = {}
-): Promise<UpdateHeliosRoleResponse> {
+): Promise<UpdateUserCapabilitiesResponse> {
   return withTraceSpan(
-    'admin.helios_role.update',
-    { userId, isHelios: request.isHelios },
+    'admin.user_capabilities.update',
+    {
+      userId,
+      admin: request.capabilities.admin,
+      player: request.capabilities.player,
+      heliosMember: request.capabilities.heliosMember,
+    },
     async () => {
       const result = await prisma.$transaction(async (tx) => {
         const actorId = await resolveActorUserId(tx, context.actorUserId);
@@ -789,7 +812,12 @@ export async function updateHeliosRole(
             id: userId,
           },
           select: {
+            id: true,
+            canAdmin: true,
+            canPlayer: true,
+            isHeliosMember: true,
             role: true,
+            isHelios: true,
           },
         });
 
@@ -797,23 +825,29 @@ export async function updateHeliosRole(
           throw new ValidationError('User does not exist.', { userId });
         }
 
-        const nextRole = request.isHelios
-          ? 'HELIOS'
-          : currentUser.role === 'HELIOS'
-            ? 'PLAYER'
-            : currentUser.role;
+        const nextCapabilities = {
+          admin: request.capabilities.admin,
+          player: request.capabilities.player,
+          heliosMember: request.capabilities.heliosMember,
+        };
+        const nextLegacyRole = deriveLegacyRoleFromCapabilities(nextCapabilities);
 
         const updatedUser = await tx.user.update({
           where: {
             id: userId,
           },
           data: {
-            isHelios: request.isHelios,
-            role: nextRole,
+            canAdmin: nextCapabilities.admin,
+            canPlayer: nextCapabilities.player,
+            isHeliosMember: nextCapabilities.heliosMember,
+            role: nextLegacyRole,
+            isHelios: nextCapabilities.heliosMember,
           },
           select: {
             id: true,
-            isHelios: true,
+            canAdmin: true,
+            canPlayer: true,
+            isHeliosMember: true,
             updatedAt: true,
           },
         });
@@ -833,15 +867,35 @@ export async function updateHeliosRole(
           });
         }
 
+        const heliosChanged =
+          currentUser.isHeliosMember !== nextCapabilities.heliosMember ||
+          currentUser.isHelios !== nextCapabilities.heliosMember ||
+          currentUser.role === 'HELIOS' ||
+          nextLegacyRole === 'HELIOS';
+
+        const actionType = heliosChanged
+          ? nextCapabilities.heliosMember
+            ? 'HELIOS_ASSIGNED'
+            : 'HELIOS_REVOKED'
+          : 'USER_CAPABILITIES_UPDATED';
+
         const audit = await tx.adminActionAudit.create({
           data: {
             eventId: latestEvent.id,
             actorUserId: actorId,
-            actionType: request.isHelios ? 'HELIOS_ASSIGNED' : 'HELIOS_REVOKED',
+            actionType,
             targetType: 'USER',
             targetId: userId,
             details: {
               reason: request.reason,
+              previousCapabilities: {
+                admin: currentUser.canAdmin,
+                player: currentUser.canPlayer,
+                heliosMember: currentUser.isHeliosMember || currentUser.isHelios,
+              },
+              nextCapabilities,
+              previousRole: currentUser.role,
+              nextRole: nextLegacyRole,
             },
           },
           select: {
@@ -851,16 +905,68 @@ export async function updateHeliosRole(
 
         return {
           userId: updatedUser.id,
-          isHelios: updatedUser.isHelios,
+          capabilities: {
+            admin: updatedUser.canAdmin,
+            player: updatedUser.canPlayer,
+            heliosMember: updatedUser.isHeliosMember,
+          },
           updatedAt: updatedUser.updatedAt.toISOString(),
           auditId: audit.id,
         };
       });
 
-      incrementCounter('admin.helios_role.updated', { isHelios: result.isHelios });
+      incrementCounter('admin.user_capabilities.updated', result.capabilities);
       return result;
     }
   );
+}
+
+/**
+ * Compatibility wrapper for legacy Helios toggle endpoint.
+ */
+export async function updateHeliosRole(
+  userId: string,
+  request: UpdateHeliosRoleRequest,
+  context: AdminActionContext = {}
+): Promise<UpdateHeliosRoleResponse> {
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      canAdmin: true,
+      canPlayer: true,
+      isHeliosMember: true,
+      role: true,
+      isHelios: true,
+    },
+  });
+
+  if (!currentUser) {
+    throw new ValidationError('User does not exist.', { userId });
+  }
+
+  const previousPlayerCapability =
+    currentUser.canPlayer || currentUser.role === 'PLAYER' || currentUser.role === 'HELIOS';
+  const update = await updateUserCapabilities(
+    userId,
+    {
+      capabilities: {
+        admin: currentUser.canAdmin || currentUser.role === 'ADMIN',
+        player: request.isHelios ? true : previousPlayerCapability,
+        heliosMember: request.isHelios,
+      },
+      reason: request.reason,
+    },
+    context
+  );
+
+  incrementCounter('admin.helios_role.updated', { isHelios: request.isHelios });
+  return {
+    userId: update.userId,
+    isHelios: update.capabilities.heliosMember,
+    capabilities: update.capabilities,
+    updatedAt: update.updatedAt,
+    auditId: update.auditId,
+  };
 }
 
 /**

@@ -37,8 +37,8 @@ export interface GameState {
     email: string;
     teamId: string | null;
     isHelios: boolean;
-    eventId?: string;
-    playerId?: string;
+    eventId?: string | null;
+    playerId?: string | null;
   } | null;
   teams: Team[];
   currentTeam: Team | null;
@@ -152,14 +152,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const becomeHelios = () => {
+    // Compatibility no-op: Helios entitlement is server-driven via session capabilities.
     trackAnalyticsEvent('helios_role_enabled', {
       player_name: gameState.currentUser?.name ?? 'unknown',
+      source: 'noop-legacy-action',
     });
-
-    setGameState((prev) => ({
-      ...prev,
-      currentUser: prev.currentUser ? { ...prev.currentUser, isHelios: true } : null,
-    }));
   };
 
   const createTeam = (teamName: string, carImage: string, keywords: string[]) => {
@@ -420,7 +417,7 @@ function resolveCurrentUserFromSession(session: AuthSession): GameState['current
     name: session.displayName ?? session.email ?? 'Player',
     email: session.email ?? '',
     teamId: session.teamId ?? null,
-    isHelios: session.role === 'helios',
+    isHelios: session.capabilities?.heliosMember === true || session.role === 'helios',
     eventId: session.eventId,
     playerId: session.playerId,
   };

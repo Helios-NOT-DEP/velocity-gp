@@ -27,6 +27,7 @@ import {
   updateHazardMultiplierRuleSchema,
   updateRosterAssignmentSchema,
   updateQrHazardRandomizerSchema,
+  updateUserCapabilitiesSchema,
   updateHeliosRoleSchema,
   updateRaceControlSchema,
 } from '@velocity-gp/api-contract/schemas';
@@ -40,6 +41,7 @@ import {
   updateEventHazardSettings,
   updateHazardMultiplierRule,
   updateQrHazardRandomizer,
+  updateUserCapabilities,
   updateHeliosRole,
   updateRaceControl,
 } from '../services/adminControlService.js';
@@ -448,6 +450,27 @@ adminRouter.delete(
           actorUserId: authContext?.userId,
         }),
         { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/users/:userId/capabilities',
+  validate(adminUserParamsSchema, 'params'),
+  validate(updateUserCapabilitiesSchema),
+  asyncHandler(async (request, response) => {
+    const userId = String(request.params.userId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await updateUserCapabilities(userId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        {
+          requestId: response.locals.requestId,
+        }
       )
     );
   })

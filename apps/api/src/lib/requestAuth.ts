@@ -18,8 +18,9 @@ export function resolveRequestAuthContext(request: Request): RequestAuthContext 
       const claims = verifySessionToken(bearerToken);
       return {
         userId: claims.userId,
-        playerId: claims.playerId,
+        playerId: claims.playerId ?? undefined,
         role: claims.role,
+        capabilities: claims.capabilities ?? capabilitiesFromRole(claims.role),
       };
     } catch {
       // Fall back to legacy headers for compatibility in tests/local tooling.
@@ -39,8 +40,9 @@ export function resolveRequestAuthContext(request: Request): RequestAuthContext 
 
       return {
         userId: claims.userId,
-        playerId: claims.playerId,
+        playerId: claims.playerId ?? undefined,
         role: claims.role,
+        capabilities: claims.capabilities ?? capabilitiesFromRole(claims.role),
       };
     } catch {
       // Fall back to legacy headers for compatibility in tests/local tooling.
@@ -67,6 +69,7 @@ function resolveLegacyHeaderAuthContext(request: Request): RequestAuthContext | 
   return {
     userId,
     role: roleValue,
+    capabilities: capabilitiesFromRole(roleValue),
   };
 }
 
@@ -80,4 +83,12 @@ export function getRequestAuthContext(response: Response): RequestAuthContext | 
 
 function isAuthRole(value: string): value is AuthRole {
   return value === 'admin' || value === 'helios' || value === 'player';
+}
+
+function capabilitiesFromRole(role: AuthRole) {
+  return {
+    admin: role === 'admin',
+    player: role === 'player' || role === 'helios',
+    heliosMember: role === 'helios',
+  };
 }

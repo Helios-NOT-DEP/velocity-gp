@@ -172,6 +172,8 @@ export const adminEndpoints = {
     `/admin/events/${eventId}/qr-codes/${qrCodeId}`,
   /** Toggles HELIOS (staff) privileges for a given user account. */
   updateHeliosRole: (userId: string) => `/admin/users/${userId}/helios-role`,
+  /** Canonical endpoint for updating account capabilities. */
+  updateUserCapabilities: (userId: string) => `/admin/users/${userId}/capabilities`,
   /** Retrieves the centralized log of all administrative actions taken during the event. */
   listAuditEntries: (eventId: string) => `/admin/events/${eventId}/audits`,
 };

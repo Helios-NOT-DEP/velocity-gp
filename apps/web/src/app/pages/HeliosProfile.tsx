@@ -4,18 +4,21 @@ import { useGame } from '../context/GameContext';
 import { Zap, Shield, ArrowLeft } from 'lucide-react';
 
 export default function HeliosProfile() {
-  const { gameState, becomeHelios } = useGame();
+  const { gameState } = useGame();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Ensure profile visit upgrades context role for Helios-specific UI affordances.
     if (gameState.currentUser && !gameState.currentUser.isHelios) {
-      becomeHelios();
+      navigate('/race', { replace: true });
     }
-  }, [gameState.currentUser, becomeHelios]);
+  }, [gameState.currentUser, navigate]);
 
   if (!gameState.currentUser) {
     navigate('/');
+    return null;
+  }
+
+  if (!gameState.currentUser.isHelios) {
     return null;
   }
 
