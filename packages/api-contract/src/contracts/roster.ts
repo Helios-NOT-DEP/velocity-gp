@@ -30,6 +30,7 @@ export interface AdminRosterRow {
   readonly eventId: string;
   readonly workEmail: string;
   readonly displayName: string;
+  readonly isHelios: boolean;
   readonly phoneE164: string | null;
   readonly teamId: string | null;
   readonly teamName: string | null;
