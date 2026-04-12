@@ -15,7 +15,7 @@ export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   body?: unknown;
-  params?: object;
+  params?: QueryParams;
 }
 
 interface ApiErrorPayload {
