@@ -2,6 +2,7 @@ import type {
   CreateHazardMultiplierRuleRequest,
   CreateHazardMultiplierRuleResponse,
   DeleteHazardMultiplierRuleResponse,
+  GetRaceControlResponse,
   GetEventHazardSettingsResponse,
   HazardMultiplierRule,
   ListAdminAuditsResponse,
@@ -134,6 +135,32 @@ function jsonDetailsToRecord(value: Prisma.JsonValue | null): Record<string, unk
   }
 
   return value as Record<string, unknown>;
+}
+
+/**
+ * Reads race control state for one event.
+ */
+export async function getRaceControl(eventId: string): Promise<GetRaceControlResponse> {
+  const config = await prisma.eventConfig.findUnique({
+    where: {
+      eventId,
+    },
+    select: {
+      eventId: true,
+      raceControlState: true,
+      updatedAt: true,
+    },
+  });
+
+  if (!config) {
+    throw new ValidationError('Event configuration does not exist.', { eventId });
+  }
+
+  return {
+    eventId: config.eventId,
+    state: config.raceControlState,
+    updatedAt: config.updatedAt.toISOString(),
+  };
 }
 
 /**
@@ -818,7 +845,10 @@ export async function updateHeliosRole(
           },
         });
 
-        const latestEvent = await tx.event.findFirst({
+        const activeEvent = await tx.event.findFirst({
+          where: {
+            status: 'ACTIVE',
+          },
           orderBy: {
             updatedAt: 'desc',
           },
@@ -827,7 +857,7 @@ export async function updateHeliosRole(
           },
         });
 
-        if (!latestEvent) {
+        if (!activeEvent) {
           throw new ValidationError('Cannot create audit entry without an event context.', {
             userId,
           });
@@ -835,7 +865,7 @@ export async function updateHeliosRole(
 
         const audit = await tx.adminActionAudit.create({
           data: {
-            eventId: latestEvent.id,
+            eventId: activeEvent.id,
             actorUserId: actorId,
             actionType: request.isHelios ? 'HELIOS_ASSIGNED' : 'HELIOS_REVOKED',
             targetType: 'USER',

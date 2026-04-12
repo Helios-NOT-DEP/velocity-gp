@@ -4,14 +4,17 @@ import {
   AlertTriangle,
   Loader2,
   Pause,
+  Play,
   Plus,
   RotateCcw,
   Save,
+  Shield,
   Trash2,
   TrendingUp,
 } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { adminDemoQrCodes } from '../../admin/adminViewData';
+import { getRaceControl, listAdminAudits, updateRaceControl } from '@/services/admin/control';
 import {
   createHazardMultiplierRule,
   deleteHazardMultiplierRule,
@@ -21,7 +24,7 @@ import {
   updateHazardMultiplierRule,
 } from '@/services/admin/qrCodes';
 import { getCurrentEventId } from '@/services/admin/roster';
-import type { HazardMultiplierRule } from '@/services/api';
+import type { AdminAuditEntry, HazardMultiplierRule, RaceControlState } from '@/services/api';
 
 function toLocalDateTimeInputValue(date: Date): string {
   const offsetMs = date.getTimezoneOffset() * 60_000;
@@ -36,11 +39,30 @@ function oneHourFromNowIso(): string {
   return toLocalDateTimeInputValue(new Date(Date.now() + 60 * 60 * 1000));
 }
 
+function formatAction(actionType: string): string {
+  return actionType
+    .split('_')
+    .map((token) => token.charAt(0) + token.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function formatTarget(audit: AdminAuditEntry): string {
+  if (!audit.targetId) {
+    return audit.targetType;
+  }
+  return `${audit.targetType}:${audit.targetId}`;
+}
+
 export default function AdminGameControl() {
   const { gameState } = useGame();
   const activePenalties = gameState.teams.filter((team) => team.inPitStop).length;
 
   const [eventId, setEventId] = useState<string | null>(null);
+  const [raceControlState, setRaceControlState] = useState<RaceControlState>('ACTIVE');
+  const [isUpdatingRaceControl, setIsUpdatingRaceControl] = useState(false);
+  const [auditEntries, setAuditEntries] = useState<AdminAuditEntry[]>([]);
+  const [isLoadingAudits, setIsLoadingAudits] = useState(false);
+
   const [globalHazardRatio, setGlobalHazardRatio] = useState<number>(15);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -63,13 +85,25 @@ export default function AdminGameControl() {
   }, [rules]);
 
   async function hydrate(nextEventId: string) {
-    const [settings, multiplierRules] = await Promise.all([
+    const [raceControl, settings, multiplierRules] = await Promise.all([
+      getRaceControl(nextEventId),
       getEventHazardSettings(nextEventId),
       listHazardMultiplierRules(nextEventId),
     ]);
 
+    setRaceControlState(raceControl.state);
     setGlobalHazardRatio(settings.globalHazardRatio);
     setRules([...multiplierRules.rules]);
+  }
+
+  async function hydrateAudits(nextEventId: string) {
+    setIsLoadingAudits(true);
+    try {
+      const response = await listAdminAudits(nextEventId, { limit: 10 });
+      setAuditEntries(response.items);
+    } finally {
+      setIsLoadingAudits(false);
+    }
   }
 
   useEffect(() => {
@@ -84,7 +118,7 @@ export default function AdminGameControl() {
 
         setEventId(nextEventId);
         setIsLoadingRules(true);
-        await hydrate(nextEventId);
+        await Promise.all([hydrate(nextEventId), hydrateAudits(nextEventId)]);
       } catch {
         if (!mounted) {
           return;
@@ -106,6 +140,28 @@ export default function AdminGameControl() {
   }, []);
 
   const isDemoMode = eventId === null;
+  const isRacePaused = raceControlState === 'PAUSED';
+
+  async function handleToggleRaceControl() {
+    if (!eventId) {
+      return;
+    }
+
+    setIsUpdatingRaceControl(true);
+    setSettingsError(null);
+    try {
+      const nextState: RaceControlState = raceControlState === 'PAUSED' ? 'ACTIVE' : 'PAUSED';
+      const response = await updateRaceControl(eventId, {
+        state: nextState,
+      });
+      setRaceControlState(response.state);
+      await hydrateAudits(eventId);
+    } catch {
+      setSettingsError('Unable to update race control state.');
+    } finally {
+      setIsUpdatingRaceControl(false);
+    }
+  }
 
   async function handleSaveHazardSettings() {
     if (!eventId) {
@@ -118,6 +174,7 @@ export default function AdminGameControl() {
       await updateEventHazardSettings(eventId, {
         globalHazardRatio,
       });
+      await hydrateAudits(eventId);
     } catch {
       setSettingsError('Unable to save global hazard ratio.');
     } finally {
@@ -140,7 +197,7 @@ export default function AdminGameControl() {
         endsAt: new Date(draftRuleEndsAt).toISOString(),
         ratioMultiplier: Number.parseFloat(draftRuleMultiplier),
       });
-      await hydrate(eventId);
+      await Promise.all([hydrate(eventId), hydrateAudits(eventId)]);
     } catch {
       setSettingsError('Unable to create multiplier rule (check for overlapping windows).');
     } finally {
@@ -158,7 +215,7 @@ export default function AdminGameControl() {
 
     try {
       await deleteHazardMultiplierRule(eventId, ruleId);
-      await hydrate(eventId);
+      await Promise.all([hydrate(eventId), hydrateAudits(eventId)]);
     } catch {
       setSettingsError('Unable to delete multiplier rule.');
     } finally {
@@ -178,7 +235,7 @@ export default function AdminGameControl() {
       await updateHazardMultiplierRule(eventId, ruleId, {
         ratioMultiplier: Math.max(0.1, Number((currentValue + delta).toFixed(2))),
       });
-      await hydrate(eventId);
+      await Promise.all([hydrate(eventId), hydrateAudits(eventId)]);
     } catch {
       setSettingsError('Unable to update multiplier rule.');
     } finally {
@@ -204,12 +261,28 @@ export default function AdminGameControl() {
           </div>
           <button
             type="button"
-            className="w-full py-3 px-4 rounded-lg font-['DM_Sans'] font-medium flex items-center justify-center gap-2 bg-[#FF3939] text-white"
+            onClick={() => {
+              void handleToggleRaceControl();
+            }}
+            disabled={isDemoMode || isUpdatingRaceControl}
+            className={`w-full py-3 px-4 rounded-lg font-['DM_Sans'] font-medium flex items-center justify-center gap-2 disabled:opacity-50 ${
+              isRacePaused ? 'bg-[#39FF14] text-black' : 'bg-[#FF3939] text-white'
+            }`}
           >
-            <Pause className="w-5 h-5" />
-            Pause Game
+            {isUpdatingRaceControl ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isRacePaused ? (
+              <Play className="w-5 h-5" />
+            ) : (
+              <Pause className="w-5 h-5" />
+            )}
+            {isRacePaused ? 'Resume Game' : 'Pause Game'}
           </button>
-          <p className="text-sm text-gray-400 mt-3 text-center">All teams can scan QR codes</p>
+          <p className="text-sm text-gray-400 mt-3 text-center">
+            {isRacePaused
+              ? 'Scanning disabled for all teams while race control is paused.'
+              : 'Scanning enabled for all teams while race control is active.'}
+          </p>
         </article>
 
         <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-6">
@@ -240,16 +313,44 @@ export default function AdminGameControl() {
           </div>
           <button
             type="button"
-            className="w-full py-3 px-4 bg-transparent border-2 border-[#FF3939] text-[#FF3939] rounded-lg font-['DM_Sans'] font-medium flex items-center justify-center gap-2"
+            disabled
+            className="w-full py-3 px-4 bg-transparent border-2 border-[#FF3939] text-[#FF3939] rounded-lg font-['DM_Sans'] font-medium flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <RotateCcw className="w-5 h-5" />
             Reset All Scores
           </button>
           <p className="text-sm text-[#FF8A8A] text-center mt-3">
-            #TODO(#26): Wire confirmation and audit trail for reset workflow.
+            Score reset confirmation flow is tracked separately from issue #26.
           </p>
         </article>
       </div>
+
+      <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-['Space_Grotesk'] text-xl">Recent Admin Audits</h3>
+          <Shield className="w-5 h-5 text-[#00D4FF]" />
+        </div>
+        {isLoadingAudits ? (
+          <div className="text-sm text-gray-400 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading audits...
+          </div>
+        ) : auditEntries.length === 0 ? (
+          <p className="text-sm text-gray-500">No audit entries yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {auditEntries.map((audit) => (
+              <div key={audit.id} className="rounded-lg border border-gray-700 bg-black/30 p-3">
+                <p className="text-sm text-white">{formatAction(audit.actionType)}</p>
+                <p className="text-xs text-gray-400">
+                  {new Date(audit.createdAt).toLocaleString()} | actor {audit.actorUserId} | target{' '}
+                  {formatTarget(audit)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </article>
 
       <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-6 space-y-4">
         <h3 className="font-['Space_Grotesk'] text-xl">Global Hazard Ratio</h3>

@@ -45,6 +45,15 @@ export interface UpdateRaceControlRequest {
 }
 
 /**
+ * Current race-control snapshot for an event used to hydrate admin UI state.
+ */
+export interface GetRaceControlResponse {
+  readonly eventId: string;
+  readonly state: RaceControlState;
+  readonly updatedAt: string;
+}
+
+/**
  * The standardized response to successfully updating global race control state.
  * Returns the audit log ID for reference bridging.
  */

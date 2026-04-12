@@ -7,6 +7,7 @@ import type {
   RosterImportRowInput,
 } from '@velocity-gp/api-contract';
 import { Loader2, RefreshCcw, Upload, Users } from 'lucide-react';
+import { listAdminAudits, updateHeliosRole } from '@/services/admin/control';
 import {
   applyAdminRosterImport,
   getCurrentEventId,
@@ -63,6 +64,8 @@ export default function AdminPlayers() {
 
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({});
   const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
+  const [savingHeliosUserId, setSavingHeliosUserId] = useState<string | null>(null);
+  const [latestAuditSummary, setLatestAuditSummary] = useState<string | null>(null);
 
   const [importRows, setImportRows] = useState<readonly RosterImportRowInput[] | null>(null);
   const [importFileName, setImportFileName] = useState<string | null>(null);
@@ -72,6 +75,25 @@ export default function AdminPlayers() {
   const [isPreviewingImport, setIsPreviewingImport] = useState(false);
   const [isApplyingImport, setIsApplyingImport] = useState(false);
   // TODO(figma-sync): Add player detail drill-down parity (contact editing and per-player scan history) from the Figma Admin players workflow. | Figma source: src/app/pages/Admin.tsx Players tab + selectedPlayerId detail view | Impact: admin flow
+
+  const refreshAuditSummary = async (targetEventId: string) => {
+    try {
+      const audits = await listAdminAudits(targetEventId, { limit: 1 });
+      const latestAudit = audits.items[0] ?? null;
+      if (!latestAudit) {
+        setLatestAuditSummary(null);
+        return;
+      }
+
+      setLatestAuditSummary(
+        `${latestAudit.actionType} by ${latestAudit.actorUserId} at ${new Date(
+          latestAudit.createdAt
+        ).toLocaleString()}`
+      );
+    } catch {
+      setLatestAuditSummary(null);
+    }
+  };
 
   const loadRoster = async (overrideEventId?: string) => {
     setIsLoading(true);
@@ -94,6 +116,7 @@ export default function AdminPlayers() {
       setRoster(nextRoster);
       setTeamOptions(nextTeamOptions);
       setAssignmentDrafts({});
+      await refreshAuditSummary(resolvedEventId);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to load roster data.');
     } finally {
@@ -140,6 +163,25 @@ export default function AdminPlayers() {
       setLoadError(error instanceof Error ? error.message : 'Unable to update assignment.');
     } finally {
       setSavingPlayerId(null);
+    }
+  }
+
+  async function handleToggleHeliosRole(userId: string, isHelios: boolean) {
+    if (!eventId) {
+      return;
+    }
+
+    setSavingHeliosUserId(userId);
+    setLoadError(null);
+    try {
+      await updateHeliosRole(userId, {
+        isHelios: !isHelios,
+      });
+      await Promise.all([loadRoster(eventId), refreshAuditSummary(eventId)]);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Unable to update Helios role.');
+    } finally {
+      setSavingHeliosUserId(null);
     }
   }
 
@@ -318,6 +360,10 @@ export default function AdminPlayers() {
           </button>
         </div>
 
+        {latestAuditSummary ? (
+          <p className="text-xs text-gray-400">Latest admin audit: {latestAuditSummary}</p>
+        ) : null}
+
         {importFileName ? (
           <p className="text-xs text-gray-400">Loaded file: {importFileName}</p>
         ) : null}
@@ -384,6 +430,7 @@ export default function AdminPlayers() {
                 <tr>
                   <th className="text-left px-3 py-2">Player</th>
                   <th className="text-left px-3 py-2">Work Email</th>
+                  <th className="text-left px-3 py-2">Helios</th>
                   <th className="text-left px-3 py-2">Phone</th>
                   <th className="text-left px-3 py-2">Assignment</th>
                   <th className="text-left px-3 py-2">Team</th>
@@ -406,6 +453,24 @@ export default function AdminPlayers() {
                         <p className="text-xs text-gray-500">{row.playerId}</p>
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{row.workEmail}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          disabled={savingHeliosUserId === row.userId}
+                          onClick={() => void handleToggleHeliosRole(row.userId, row.isHelios)}
+                          className={`px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 ${
+                            row.isHelios
+                              ? 'bg-[#39FF14]/20 border border-[#39FF14]/40 text-[#39FF14]'
+                              : 'bg-black/40 border border-gray-700 text-gray-300'
+                          }`}
+                        >
+                          {savingHeliosUserId === row.userId
+                            ? 'Saving…'
+                            : row.isHelios
+                              ? 'Revoke'
+                              : 'Assign'}
+                        </button>
+                      </td>
                       <td className="px-3 py-2">{row.phoneE164 ?? '—'}</td>
                       <td className="px-3 py-2">{row.assignmentStatus}</td>
                       <td className="px-3 py-2">
