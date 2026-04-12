@@ -88,9 +88,10 @@ function toOptionalIsoDateTime(value: string | undefined): string | null {
     return null;
   }
 
-  const parsed = new Date(value.trim());
+  const normalized = value.trim();
+  const parsed = new Date(normalized);
   if (Number.isNaN(parsed.getTime())) {
-    return value;
+    return normalized;
   }
 
   return parsed.toISOString();

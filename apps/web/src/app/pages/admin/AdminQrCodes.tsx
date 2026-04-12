@@ -337,12 +337,17 @@ export default function AdminQrCodes() {
     setRowErrors((existing) => ({ ...existing, [id]: null }));
 
     try {
-      const response = await updateAdminQrHazardOverrides(eventId, id, {
-        hazardWeightOverride:
-          mode === 'fallback-weight' ? null : clampHazardWeight(draftWeights[id] ?? 0),
-        hazardRatioOverride:
-          mode === 'fallback-ratio' ? null : clampHazardRatio(draftRatios[id] ?? 1),
-      });
+      const request =
+        mode === 'fallback-weight'
+          ? { hazardWeightOverride: null }
+          : mode === 'fallback-ratio'
+            ? { hazardRatioOverride: null }
+            : {
+                hazardWeightOverride: clampHazardWeight(draftWeights[id] ?? 0),
+                hazardRatioOverride: clampHazardRatio(draftRatios[id] ?? 1),
+              };
+
+      const response = await updateAdminQrHazardOverrides(eventId, id, request);
 
       setQrCodes((existing) =>
         existing.map((code) =>
@@ -368,8 +373,7 @@ export default function AdminQrCodes() {
     }
   }
 
-  // eslint-disable-next-line no-undef
-  async function handleCsvUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleCsvUpload(event: React.ChangeEvent<globalThis.HTMLInputElement>) {
     if (!event.target.files || event.target.files.length === 0 || !eventId) {
       return;
     }

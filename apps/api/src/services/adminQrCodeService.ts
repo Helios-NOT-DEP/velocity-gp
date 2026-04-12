@@ -442,12 +442,12 @@ export async function applyQrImport(
         continue;
       }
 
+      processed += 1;
+
       if (row.action === 'unchanged') {
         unchanged += 1;
         continue;
       }
-
-      processed += 1;
       const createdRecord = await createAdminQRCode(
         eventId,
         {

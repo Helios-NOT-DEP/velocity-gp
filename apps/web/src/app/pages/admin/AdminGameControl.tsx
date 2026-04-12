@@ -23,8 +23,17 @@ import {
 import { getCurrentEventId } from '@/services/admin/roster';
 import type { HazardMultiplierRule } from '@/services/api';
 
+function toLocalDateTimeInputValue(date: Date): string {
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
 function nowIso(): string {
-  return new Date().toISOString().slice(0, 16);
+  return toLocalDateTimeInputValue(new Date());
+}
+
+function oneHourFromNowIso(): string {
+  return toLocalDateTimeInputValue(new Date(Date.now() + 60 * 60 * 1000));
 }
 
 export default function AdminGameControl() {
@@ -40,7 +49,7 @@ export default function AdminGameControl() {
   const [isSavingRule, setIsSavingRule] = useState(false);
   const [draftRuleName, setDraftRuleName] = useState('Prime Time Boost');
   const [draftRuleStartsAt, setDraftRuleStartsAt] = useState(nowIso());
-  const [draftRuleEndsAt, setDraftRuleEndsAt] = useState(nowIso());
+  const [draftRuleEndsAt, setDraftRuleEndsAt] = useState(oneHourFromNowIso());
   const [draftRuleMultiplier, setDraftRuleMultiplier] = useState('0.75');
 
   const activeRuleId = useMemo(() => {

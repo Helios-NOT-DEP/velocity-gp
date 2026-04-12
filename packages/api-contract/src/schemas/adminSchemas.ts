@@ -132,30 +132,59 @@ export const updateEventHazardSettingsSchema = z.object({
   reason: z.string().trim().min(2).optional(),
 });
 
+function parsePossiblyInvalidInteger(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.trunc(value) : Number.NaN;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return Number.NaN;
+    }
+
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+
+  return Number.NaN;
+}
+
 const qrImportRowSchema = z
   .object({
-    label: z.string().trim().min(1),
-    value: z.number().int().positive(),
-    zone: z.string().trim().min(1).nullable().optional(),
-    activationStartsAt: z.string().datetime().nullable().optional(),
-    activationEndsAt: z.string().datetime().nullable().optional(),
-    hazardRatioOverride: z.number().int().min(1).max(10_000).nullable().optional(),
-    hazardWeightOverride: z.number().int().min(0).max(100).nullable().optional(),
+    label: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value.trim() : '')),
+    value: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .transform((value) => parsePossiblyInvalidInteger(value)),
+    zone: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value : null)),
+    activationStartsAt: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value.trim() : null)),
+    activationEndsAt: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((value) => (typeof value === 'string' ? value.trim() : null)),
+    hazardRatioOverride: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .transform((value) => {
+        if (value === null || value === undefined || value === '') {
+          return null;
+        }
+        return parsePossiblyInvalidInteger(value);
+      }),
+    hazardWeightOverride: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .transform((value) => {
+        if (value === null || value === undefined || value === '') {
+          return null;
+        }
+        return parsePossiblyInvalidInteger(value);
+      }),
   })
-  .refine(
-    (value) => {
-      if (!value.activationStartsAt || !value.activationEndsAt) {
-        return true;
-      }
-      return (
-        new Date(value.activationStartsAt).getTime() < new Date(value.activationEndsAt).getTime()
-      );
-    },
-    {
-      message: 'activationEndsAt must be later than activationStartsAt.',
-      path: ['activationEndsAt'],
-    }
-  );
+  .strict();
 
 export const qrImportPreviewSchema = z.object({
   rows: z.array(qrImportRowSchema).min(1).max(5_000),
