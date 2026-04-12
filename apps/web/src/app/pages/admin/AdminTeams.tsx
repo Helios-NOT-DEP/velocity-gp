@@ -9,6 +9,7 @@ import {
 } from '@/services/admin/roster';
 
 const UNASSIGNED_OPTION = '__UNASSIGNED__';
+const ADMIN_ROSTER_MAX_LIMIT = 200;
 
 function statusBadgeClass(status: 'PENDING' | 'ACTIVE' | 'IN_PIT'): string {
   if (status === 'IN_PIT') {
@@ -42,7 +43,7 @@ export default function AdminTeams() {
       const [nextTeamOptions, nextRoster] = await Promise.all([
         listAdminRosterTeams(resolvedEventId),
         listAdminRoster(resolvedEventId, {
-          limit: 500,
+          limit: ADMIN_ROSTER_MAX_LIMIT,
         }),
       ]);
 

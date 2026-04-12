@@ -69,4 +69,27 @@ describe('ApiClient', () => {
       status: 400,
     });
   });
+
+  it('omits undefined and null query params from request URLs', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      json: vi.fn().mockResolvedValue({ ok: true }),
+      ok: true,
+      status: 200,
+    } as unknown as Response);
+
+    const client = new ApiClient('http://localhost:3000/api');
+
+    await client.get('/admin/events/current/roster', {
+      q: 'max',
+      assignmentStatus: undefined,
+      teamId: null,
+      limit: 100,
+    });
+
+    const requestUrl = new URL(fetchMock.mock.calls[0]?.[0] as string);
+    expect(requestUrl.searchParams.get('q')).toBe('max');
+    expect(requestUrl.searchParams.get('limit')).toBe('100');
+    expect(requestUrl.searchParams.has('assignmentStatus')).toBe(false);
+    expect(requestUrl.searchParams.has('teamId')).toBe(false);
+  });
 });

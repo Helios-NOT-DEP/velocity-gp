@@ -1224,6 +1224,29 @@ describe('velocity gp backend', () => {
     expect(response.body.data.role).toBe('admin');
   });
 
+  it('keeps non-admin event routes unaffected by admin middleware enforcement', async () => {
+    const unauthenticatedResponse = await request(app).get(`${apiPrefix}/events/current`);
+    const playerHeaderResponse = await request(app)
+      .get(`${apiPrefix}/events/current`)
+      .set('x-user-id', fixtureIds.playerUserId)
+      .set('x-user-role', 'player');
+    const adminHeaderResponse = await request(app)
+      .get(`${apiPrefix}/events/current`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(unauthenticatedResponse.status).toBe(200);
+    expect(playerHeaderResponse.status).toBe(200);
+    expect(adminHeaderResponse.status).toBe(200);
+
+    expect(unauthenticatedResponse.body.success).toBe(true);
+    expect(playerHeaderResponse.body.success).toBe(true);
+    expect(adminHeaderResponse.body.success).toBe(true);
+
+    expect(playerHeaderResponse.body.data.id).toBe(unauthenticatedResponse.body.data.id);
+    expect(adminHeaderResponse.body.data.id).toBe(unauthenticatedResponse.body.data.id);
+  });
+
   it('updates user capabilities through the unified admin endpoint', async () => {
     try {
       const response = await request(app)
