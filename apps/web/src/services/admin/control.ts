@@ -10,7 +10,9 @@ import type {
 import { adminEndpoints, apiClient } from '@/services/api';
 
 export async function getRaceControl(eventId: string): Promise<GetRaceControlResponse> {
-  const response = await apiClient.get<GetRaceControlResponse>(adminEndpoints.getRaceControl(eventId));
+  const response = await apiClient.get<GetRaceControlResponse>(
+    adminEndpoints.getRaceControl(eventId)
+  );
 
   if (!response.ok) {
     throw new Error(`Unable to load race control state (${response.status}).`);
