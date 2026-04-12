@@ -514,7 +514,7 @@ export async function listAdminAudits(
 
   const audits = await prisma.adminActionAudit.findMany({
     where: { eventId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     // Fetch one extra to determine if there is a next page.
     take: limit + 1,
     ...(options.cursor

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -10,10 +11,15 @@ import { getRequestAuthContext } from '../lib/requestAuth.js';
 import { ForbiddenError } from '../utils/appError.js';
 
 export const scanRouter = Router();
+const scanRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
 
 // Canonical scan ingestion endpoint; legacy scan path remains in hazard router.
 scanRouter.post(
   '/events/:eventId/scans',
+  scanRateLimiter,
   requirePlayer,
   validate(eventScanParamsSchema, 'params'),
   validate(submitScanSchema),
@@ -26,23 +32,19 @@ scanRouter.post(
     if (
       authContext &&
       authContext.role === 'player' &&
-      authContext.userId !== request.body.playerId
+      authContext.playerId !== request.body.playerId
     ) {
       throw new ForbiddenError('You may only submit scans for your own player account.', {
-        sessionUserId: authContext.userId,
+        sessionPlayerId: authContext.playerId,
         requestedPlayerId: request.body.playerId,
       });
     }
 
     const result = await submitScan({ eventId, request: request.body });
 
-    // Map scan outcomes to semantically appropriate HTTP status codes.
-    // 200: scan was processed and resulted in a state change (points awarded or pit applied).
-    // 422: request was valid but rejected by game logic — clients should read the outcome field.
-    const REJECTION_OUTCOMES = new Set(['DUPLICATE', 'BLOCKED', 'INVALID']);
-    const statusCode = REJECTION_OUTCOMES.has(result.outcome) ? 422 : 200;
-
-    response.status(statusCode).json(
+    // Scan submissions that are successfully processed should always return 200.
+    // Clients must use the outcome field to distinguish game-logic results.
+    response.status(200).json(
       successResponse(result, {
         requestId: response.locals.requestId,
       })

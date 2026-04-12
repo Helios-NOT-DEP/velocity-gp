@@ -18,6 +18,7 @@ export function resolveRequestAuthContext(request: Request): RequestAuthContext 
       const claims = verifySessionToken(bearerToken);
       return {
         userId: claims.userId,
+        playerId: claims.playerId,
         role: claims.role,
       };
     } catch {
@@ -38,6 +39,7 @@ export function resolveRequestAuthContext(request: Request): RequestAuthContext 
 
       return {
         userId: claims.userId,
+        playerId: claims.playerId,
         role: claims.role,
       };
     } catch {
