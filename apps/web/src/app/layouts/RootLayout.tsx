@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router';
 import BottomNav from '../components/ui/BottomNav';
-import { AUTH_SESSION_UPDATED_EVENT, anonymousSession, getSession, type AuthSession } from '@/services/auth';
+import {
+  AUTH_SESSION_UPDATED_EVENT,
+  anonymousSession,
+  getSession,
+  type AuthSession,
+} from '@/services/auth';
 
 export default function RootLayout() {
   const navigate = useNavigate();

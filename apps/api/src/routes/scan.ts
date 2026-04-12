@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -17,7 +17,10 @@ const scanRateLimiter = rateLimit({
   keyGenerator: (request) => {
     const authContext = resolveRequestAuthContext(request);
     if (!authContext) {
-      return `ip:${ipKeyGenerator(request)}`;
+      // Use the request IP as the rate-limit key when there's no auth context.
+      // `ipKeyGenerator` from express-rate-limit expects an IP string, not the
+      // full request object, so use `request.ip` which is the Express client IP.
+      return `ip:${request.ip}`;
     }
 
     if (authContext.capabilities.player && !authContext.capabilities.admin) {

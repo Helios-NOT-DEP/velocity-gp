@@ -279,7 +279,7 @@ async function loadAuthCandidateByClaims(claims: {
     return null;
   }
 
-  let activePlayer: ActivePlayerContext | null = null;
+  let activePlayer: ActivePlayerContext | null;
   if (claims.playerId && claims.eventId) {
     activePlayer = await loadActivePlayerContextByUserId(user.id, {
       playerId: claims.playerId,
@@ -412,7 +412,11 @@ export async function verifyMagicLink(
     }
 
     const session = buildSessionFromCandidate(candidate);
-    if (session.capabilities.player && !session.capabilities.admin && session.assignmentStatus === 'UNASSIGNED') {
+    if (
+      session.capabilities.player &&
+      !session.capabilities.admin &&
+      session.assignmentStatus === 'UNASSIGNED'
+    ) {
       incrementCounter('auth.magic_link.verify.unassigned.total');
       throw new AppError(
         403,
@@ -507,7 +511,9 @@ export async function getSessionFromAuthInputs(
         claims = verifySessionToken(tokenCandidate);
         if (tokenCandidate !== bearerToken && bearerToken) {
           // Keep cookie-auth resilient when stale local bearer storage lags behind valid cookie auth.
-          logger.debug('Session auth fell back to cookie token after bearer token verification failed');
+          logger.debug(
+            'Session auth fell back to cookie token after bearer token verification failed'
+          );
         }
         break;
       } catch {
@@ -530,7 +536,11 @@ export async function getSessionFromAuthInputs(
     }
 
     const session = buildSessionFromCandidate(candidate);
-    if (session.capabilities.player && !session.capabilities.admin && session.assignmentStatus === 'UNASSIGNED') {
+    if (
+      session.capabilities.player &&
+      !session.capabilities.admin &&
+      session.assignmentStatus === 'UNASSIGNED'
+    ) {
       throw new AppError(
         403,
         'AUTH_ASSIGNMENT_REQUIRED',

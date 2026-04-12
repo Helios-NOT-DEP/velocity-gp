@@ -146,7 +146,9 @@ function readSessionFromStorage(): AuthSession {
     return {
       userId,
       playerId:
-        parsed.playerId === null || typeof parsed.playerId === 'string' ? parsed.playerId : undefined,
+        parsed.playerId === null || typeof parsed.playerId === 'string'
+          ? parsed.playerId
+          : undefined,
       eventId:
         parsed.eventId === null || typeof parsed.eventId === 'string' ? parsed.eventId : undefined,
       teamId:

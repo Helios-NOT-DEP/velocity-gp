@@ -46,7 +46,8 @@ export function isAuthenticatedSession(session: AuthSession): boolean {
 
 export function isAdminSession(session: AuthSession): boolean {
   return (
-    isAuthenticatedSession(session) && (session.capabilities?.admin === true || session.role === 'admin')
+    isAuthenticatedSession(session) &&
+    (session.capabilities?.admin === true || session.role === 'admin')
   );
 }
 

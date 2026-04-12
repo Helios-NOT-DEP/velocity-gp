@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
-import { getSession, hasPlayerCapability, isAuthenticatedSession, anonymousSession } from '@/services/auth';
+import {
+  getSession,
+  hasPlayerCapability,
+  isAuthenticatedSession,
+  anonymousSession,
+} from '@/services/auth';
 import type { AuthSession } from '@/services/auth';
 
 interface Props {

@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { BarChart3, QrCode, Settings, User, Users } from 'lucide-react';
 import { adminSections } from '../admin/sections';
-import { AUTH_SESSION_UPDATED_EVENT, anonymousSession, getSession, type AuthSession } from '@/services/auth';
+import {
+  AUTH_SESSION_UPDATED_EVENT,
+  anonymousSession,
+  getSession,
+  type AuthSession,
+} from '@/services/auth';
 
 function desktopNavClassName(isActive: boolean) {
   if (isActive) {
