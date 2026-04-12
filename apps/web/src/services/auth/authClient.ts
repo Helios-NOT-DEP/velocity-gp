@@ -225,7 +225,28 @@ export async function verifyMagicLink(token: string): Promise<MagicLinkVerifyRes
   persistSession(normalizedSession, response.data.sessionToken);
 
   return response.data;
-  setItem(key: string, value: string): void;
+}
+
+/**
+ * Persist the player context after the magic-link callback resolves.
+ * Call this once the backend returns the player's team + event IDs so
+ * Garage.tsx and other routes can read them without prop-drilling.
+ */
+export function savePlayerSession(context: PlayerSessionContext): void {
+  const session: AuthSession = {
+    userId: context.userId,
+    email: context.email,
+    role: context.role,
+    isAuthenticated: true,
+    playerId: context.playerId,
+    teamId: context.teamId,
+    eventId: context.eventId,
+  };
+  const storage = getBrowserStorage();
+  if (storage) {
+    storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+    emitSessionUpdatedEvent();
+  }
 }
 
 export async function getSession(): Promise<AuthSession> {

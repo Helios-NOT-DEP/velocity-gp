@@ -92,7 +92,7 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
   }
 
   if (data.imageFileName) {
-    const base = (env.STORAGE_BASE_URL ?? '           ').replace(/\/$/, '');
+    const base = (env.STORAGE_BASE_URL ?? 'https://cdn.velocitygp.app').replace(/\/$/, '');
     const imageUrl = `${base}/${data.imageFileName}`;
     logger.info({ imageUrl }, '[n8nService] Constructed imageUrl from STORAGE_BASE_URL + imageFileName');
     return imageUrl;

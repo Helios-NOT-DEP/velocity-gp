@@ -104,6 +104,12 @@ enum TeamLogoStatus {
     FAILED      // n8n call failed; retriable on next approved submission
 }
 
+enum EmailProvider {
+    MAILTRAP
+    SENDGRID
+    RESEND
+}
+
 model User {
     id                  String   @id @default(cuid())
     email               String   @unique

@@ -1,5 +1,4 @@
 import type {
-  CreateTeamLogoRequest,
   JoinTeamRequest,
   PlayerProfile,
   Team,
@@ -11,10 +10,6 @@ import {
   placeholderTeam,
   withTeamStatus,
 } from './placeholderData.js';
-import { generateTeamLogo } from './n8nService.js';
-
-export function createTeam(request: CreateTeamLogoRequest): Team {
-  const logoUrl = generateTeamLogo({ description: request.description, teamName: request.teamname });
 
 /**
  * Team service used by route handlers for team lifecycle operations.
@@ -22,7 +17,7 @@ export function createTeam(request: CreateTeamLogoRequest): Team {
  * This module currently provides placeholder implementations while team
  * persistence and mutation flows are migrated to Prisma-backed services.
  */
-export function createTeam(request: CreateTeamRequest): Team {
+export function createTeam(request: { teamname: string }): Team {
   return {
     id: 'team-generated-placeholder',
     name: request.teamname,

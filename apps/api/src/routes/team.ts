@@ -8,52 +8,9 @@ import {
   joinTeamSchema,
   teamParamsSchema,
 } from '@velocity-gp/api-contract/schemas';
-import { generateTeamLogo } from '../services/n8nService.js';
 import { createTeam, getTeam, getTeamMembers, joinTeam } from '../services/teamService.js';
 
 export const teamRouter = Router();
-
-// Team management endpoints for creation, joining, and roster retrieval.
-teamRouter.post(
-  '/teams/logo',
-  asyncHandler(async (request, response, _next) => {
-    const { description, teamName } = request.body;
-
-    if (!description || !teamName) {
-      response.status(400).json({ error: 'description and teamName are required' });
-      return;
-    }
-
-    try {
-      const imageUrl = await generateTeamLogo({ description, teamName });
-      response.json({ imageUrl });
-    } catch (err) {
-      const details = err instanceof Error ? err.message : 'Unknown error';
-      response.status(500).json({ error: 'Failed to generate logo', details });
-    }
-  })
-);
-
-// POST /teams/logo - generate a team logo via N8N
-teamRouter.post(
-  '/teams/logo',
-  asyncHandler(async (request, response, _next) => {
-    const { description, teamName } = request.body;
-
-    if (!description || !teamName) {
-      response.status(400).json({ error: 'description and teamName are required' });
-      return;
-    }
-
-    try {
-      const imageUrl = await generateTeamLogo({ description, teamName });
-      response.json({ imageUrl });
-    } catch (err) {
-      const details = err instanceof Error ? err.message : 'Unknown error';
-      response.status(500).json({ error: 'Failed to generate logo', details });
-    }
-  })
-);
 
 // Team management endpoints for creation, joining, and roster retrieval.
 teamRouter.post(

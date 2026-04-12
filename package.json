@@ -45,6 +45,15 @@
   },
   "dependencies": {
     "docker": "^1.0.0",
+    "kuler": "^2.0.0",
+    "lodash.includes": "^4.3.0",
+    "lodash.isboolean": "^3.0.3",
+    "lodash.isinteger": "^4.0.4",
+    "lodash.isnumber": "^3.0.3",
+    "lodash.isplainobject": "^4.0.6",
+    "lodash.isstring": "^4.0.1",
+    "lodash.once": "^4.1.1",
+    "lodash.set": "^4.3.2",
     "node-fetch": "^3.3.2"
   }
 }
