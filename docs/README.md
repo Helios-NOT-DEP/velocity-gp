@@ -10,6 +10,7 @@ Quick navigation for all project documentation organized by theme.
 - **[Tech Stack Needed](./architecture/Tech%20Stack%20Needed.md)** — Planned infrastructure and backend architecture
 - **[RepoStructure](./architecture/RepoStructure.md)** — Repository organization and conventions
 - **[Admin QR Inventory Flow](./architecture/admin-qr-inventory-flow.md)** — Admin QR create/status/delete contract, n8n QR generation handshake, and soft-delete behavior
+- **[Admin Race Control + Helios + Audit Flow](./architecture/admin-race-control-helios-audit-flow.md)** — Global pause/resume, Helios role assignment, and event-scoped admin audit behavior for issue #26
 - **[Realtime Event Contract](./architecture/realtime-event-contract.md)** — Typed event envelope, channel boundaries, and ordering/idempotency rules for #50/#49
 - **[Team Activity Feed](./architecture/team-activity-feed.md)** — Race Hub team timeline model for onboarding + scan outcomes and polling delivery
 - **[Assignment and Identity Rulebook](./architecture/assignment-identity-rulebook.md)** — Canonical `workEmail` identity, assignment-state mapping, roster/admin rules, and auth-routing contract for #44/#12/#14
