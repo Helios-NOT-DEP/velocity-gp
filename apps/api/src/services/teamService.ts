@@ -1,4 +1,5 @@
 import type {
+  CreateTeamRequest,
   JoinTeamRequest,
   PlayerProfile,
   Team,
@@ -17,15 +18,15 @@ import {
  * This module currently provides placeholder implementations while team
  * persistence and mutation flows are migrated to Prisma-backed services.
  */
-export function createTeam(request: { teamname: string }): Team {
+export function createTeam(request: CreateTeamRequest): Team {
   return {
     id: 'team-generated-placeholder',
-    name: request.teamname,
-    eventId: '',
+    name: request.name,
+    eventId: request.eventId,
     status: 'PENDING',
     pitStopExpiresAt: null,
     members: [],
-    score: 0
+    score: 0,
   };
 }
 

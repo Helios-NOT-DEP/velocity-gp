@@ -114,8 +114,6 @@ enum TeamLogoStatus {
 
 enum EmailProvider {
     MAILTRAP
-    SENDGRID
-    RESEND
 }
 
 model User {

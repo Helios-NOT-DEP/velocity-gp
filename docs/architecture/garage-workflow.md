@@ -42,9 +42,14 @@ flowchart TD
 
     ATOMICFLIP -- "count=1 (won the race)" --> COLLECT["SELECT approved descriptions\nORDER BY createdAt ASC"]
 
-    COLLECT --> N8N["generateTeamLogo()\n→ POST n8n webhook\n→ OpenAI image generation\n→ upload to storage\n← returns imageUrl"]
+    %% Late-joiner re-generation path
+    RETURN_WAIT -- "logoStatus=READY &\napprovedCount > required\n(late joiner)" --> LATEFLIP["updateMany WHERE\nlogoStatus IN ('PENDING','FAILED','READY')\nSET logoStatus='GENERATING'"]
+    LATEFLIP -- "count=1" --> COLLECT
+    LATEFLIP -- "count=0" --> RETURN_WAIT
 
-    N8N -- "success" --> PERSIST["UPDATE team SET\nlogoUrl=imageUrl\nlogoStatus='READY'\nlogoGeneratedAt=now()"]
+    COLLECT --> N8N["generateTeamLogo()\n→ POST n8n webhook (JWT-signed HS512)\n→ OpenAI image generation\n→ upload to storage\n← returns imageUrl or imageFileName"]
+
+    N8N -- "success\n(imageUrl or\nSTORAGE_BASE_URL + imageFileName)" --> PERSIST["UPDATE team SET\nlogoUrl=imageUrl\nlogoStatus='READY'\nlogoGeneratedAt=now()"]
 
     N8N -- "failure" --> FAILED["UPDATE team SET\nlogoStatus='FAILED'\n(next approved submission retries)"]
 
@@ -98,12 +103,16 @@ packages/api-contract/
 
 apps/api/
   prisma/schema.prisma             ← GarageSubmission model + Team garage fields
+  src/config/env.ts                ← Garage env vars: N8N_IMAGE_API_URL, N8N_IMAGE_API_KEY,
+                                     OPENAI_API_KEY, STORAGE_BASE_URL, GARAGE_REQUIRED_PLAYER_COUNT
   src/services/moderationService.ts  ← OpenAI /v1/moderations call (keyword fallback in dev)
   src/services/garageService.ts      ← core business logic: submit, quota check, logo trigger
+  src/services/n8nService.ts         ← n8n webhook client for logo generation (JWT-signed, dev fallback)
   src/routes/garage.ts               ← POST /garage/submit,  GET /garage/team/:id/status
   src/routes/index.ts                ← garageRouter registered here
 
 apps/web/
+  src/hooks/usePlayerSession.ts         ← reads playerId/teamId/eventId from auth session (dev fallback)
   src/services/garage/garageService.ts  ← typed HTTP wrappers (submit, getTeamStatus)
   src/app/pages/Garage.tsx              ← UI state machine + render branches
 ```
@@ -115,7 +124,7 @@ apps/web/
 | Table | Purpose |
 |---|---|
 | `Team` | Holds `requiredPlayerCount`, `logoUrl`, `logoStatus`, `logoGeneratedAt` |
-| `GarageSubmission` | One row per (player, team) — `APPROVED` rows count toward quota |
+| `GarageSubmission` | One row per (player, team) — `APPROVED` rows count toward quota. Tracks `moderatedAt` timestamp for audit. |
 | `Player` | Looked up for `totalMembers` count |
 | `Event` | FK on GarageSubmission |
 
@@ -125,9 +134,10 @@ apps/web/
 
 Two players submitting at the same millisecond could both see `approvedCount >= requiredPlayerCount`.
 The logo generation race is resolved by a conditional `updateMany` that only flips `logoStatus` from
-`PENDING|FAILED → GENERATING`.  Prisma returns `count` of updated rows — only the winner (`count=1`)
-proceeds to call n8n.  The loser exits silently.  The winner's n8n call runs to completion and sets
-`logoStatus=READY`; subsequent polls on either player's client will see the result.
+`PENDING|FAILED → GENERATING` (or `PENDING|FAILED|READY → GENERATING` for late-joiner re-generation).
+Prisma returns `count` of updated rows — only the winner (`count=1`) proceeds to call n8n.  The loser
+exits silently.  The winner's n8n call is dispatched via `setImmediate()` (fire-and-forget) and runs
+to completion, setting `logoStatus=READY`; subsequent polls on either player's client will see the result.
 
 ---
 
