@@ -87,3 +87,8 @@ export interface RescueCompletionResponse {
   readonly completedAt: string;
   readonly status: Extract<RescueStatus, 'COMPLETED'>;
 }
+
+export interface CreateTeamLogoRequest {
+  readonly description: string;
+  readonly teamname: string;
+}

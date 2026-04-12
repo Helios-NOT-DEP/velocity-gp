@@ -1,13 +1,31 @@
 // Renamed from Login.tsx
 // Signup page implementation (migrated from Login.tsx)
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { Zap } from 'lucide-react';
 
+import { sendVerificationEmail, savePlayerSession } from '@/services/auth';
+
+// ── Dev-only defaults ─────────────────────────────────────────────────────────
+// Used by the "Skip to Garage" shortcut so the Garage page can be exercised
+// without going through a real magic-link flow during local development.
+// Remove (or guard with import.meta.env.DEV) once Auth.js is wired end-to-end.
+// These IDs must match the values in prisma/seed.ts.
+const DEV_PLAYER_SESSION = {
+  userId: 'user-player-lina',
+  email: 'lina@velocitygp.dev',
+  playerId: 'player-lina-active',
+  teamId: 'team-apex-comets',
+  eventId: 'event-velocity-active',
+  role: 'player',
+} as const;
+
 export default function Signup() {
-	const [fullName, setFullName] = useState('');	
-	const [phoneOrEmail, setPhoneOrEmail] = useState('');
-	const [errors, setErrors] = useState<{ fullName?: string; phoneOrEmail?: string }>({});
-	const [submitted, setSubmitted] = useState(false);
+  const navigate = useNavigate();
+  const [fullName, setFullName] = useState('');	
+  const [phoneOrEmail, setPhoneOrEmail] = useState('');
+  const [errors, setErrors] = useState<{ fullName?: string; phoneOrEmail?: string }>({});
+  const [submitted, setSubmitted] = useState(false);
 
 	const isValidEmail = (email: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.toLowerCase());
 	const isValidPhone = (phone: string) => /^\d{10}$/.test(phone);
@@ -23,23 +41,48 @@ export default function Signup() {
 		return newErrors;
 	};
 
-	const handleSubmit = (e: React.FormEvent) => {
-		e.preventDefault();
-		const validationErrors = validate();
-		setErrors(validationErrors);
-		if (Object.keys(validationErrors).length === 0) {
-			// TODO: Call signup service here
-			// await signupService({ fullName, phoneOrEmail });
-			setSubmitted(true);
-		}
-	};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validationErrors = validate();
+    setErrors(validationErrors);
+    if (Object.keys(validationErrors).length === 0) {
+      // Send magic-link email.
+      // TODO(auth): replace with Auth.js signIn('email', { email }) once configured.
+      // The `sendVerificationEmail` stub will be swapped for a real implementation
+      // when SendGrid + Auth.js are wired (see docs/Tech Stack Needed.md).
+      const emailOrPhone = phoneOrEmail.trim();
+      if (isValidEmail(emailOrPhone)) {
+        await sendVerificationEmail(emailOrPhone).catch(() => {
+          // Swallow stub error in dev — real implementation will surface errors properly.
+        });
+      }
+      setSubmitted(true);
+    }
+  };
 
-	const handleBackToSignup = () => {
-		setSubmitted(false);
-		setFullName('');
-		setPhoneOrEmail('');
-		setErrors({});
-	};
+  const handleBackToSignup = () => {
+    setSubmitted(false);
+    setFullName('');
+    setPhoneOrEmail('');
+    setErrors({});
+  };
+
+  /**
+   * Dev-only: skip the real magic-link flow by writing a seed player session
+   * directly into localStorage and navigating to the Garage page.
+   *
+   * This simulates what the /auth/callback route will do once Auth.js is live:
+   *   1. Auth.js resolves the magic-link token → returns userId + email
+   *   2. API call to GET /players/me?eventId=xxx → returns playerId + teamId
+   *   3. savePlayerSession() → persists all IDs to localStorage
+   *   4. navigate('/garage')
+   *
+   * Remove this function (and the button that calls it) when Auth.js is wired.
+   */
+  const handleDevSkipToGarage = () => {
+    savePlayerSession(DEV_PLAYER_SESSION);
+    navigate('/garage');
+  };
 
 	return (
 		<div
@@ -126,6 +169,16 @@ export default function Signup() {
 							>
 								Back to Signup
 							</button>
+							{/* DEV ONLY — remove once Auth.js magic-link callback is live */}
+							{import.meta.env.DEV && (
+								<button
+									onClick={handleDevSkipToGarage}
+									className="mt-4 ml-3 px-6 py-2 rounded-xl bg-orange-700 text-white font-medium hover:bg-orange-600 transition-all"
+									style={{ fontFamily: 'var(--font-body)' }}
+								>
+									[Dev] Skip to Garage
+								</button>
+							)}
 						</div>
 					)}
 				</div>

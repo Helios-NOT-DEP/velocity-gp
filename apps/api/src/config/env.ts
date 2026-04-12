@@ -70,6 +70,18 @@ const envSchema = z.object({
   PIT_RELEASE_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   PIT_RELEASE_WEBHOOK_URL: z.string().url().optional(),
   PIT_RELEASE_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(3_000),
+  N8N_IMAGE_API_URL: z.string().url().optional(),
+  N8N_IMAGE_API_KEY: z.string().optional(),
+  // Override the number of approved descriptions required before logo generation fires.
+  // Defaults to 2 (real team size). Set to 1 in dev to trigger generation from a single submission.
+  GARAGE_REQUIRED_PLAYER_COUNT: z.coerce.number().int().min(1).default(2),
+  // Base URL for the storage bucket — used to construct the public image URL
+  // from the imageFileName path returned by n8n.
+  // e.g. https://velocity-app.nyc3.digitaloceanspaces.com
+  STORAGE_BASE_URL: z.string().url().optional(),
+  // Used by moderationService to call the OpenAI Moderations endpoint.
+  // Optional — when absent the service falls back to a keyword blocklist (dev only).
+  OPENAI_API_KEY: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

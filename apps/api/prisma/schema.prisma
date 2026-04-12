@@ -74,6 +74,25 @@ enum AdminActionType {
     SCORE_RESET
 }
 
+// ── Garage workflow enums ────────────────────────────────────────────────────
+
+// Tracks each player's self-description through the moderation pipeline.
+// A player may retry after REJECTED; only APPROVED rows count toward completion.
+enum GarageSubmissionStatus {
+    PENDING   // Description received; moderation result not yet stored
+    APPROVED  // Passed moderation; counts toward the team quota
+    REJECTED  // Blocked by content policy; player must resubmit
+}
+
+// Tracks where the team's shared logo asset is in its lifecycle.
+// UI polls this field to decide which screen state to show.
+enum TeamLogoStatus {
+    PENDING     // No submission quota reached yet
+    GENERATING  // n8n job dispatched; waiting for OpenAI/storage
+    READY       // Logo URL is stored and stable
+    FAILED      // n8n call failed; retriable on next approved submission
+}
+
 model User {
     id          String             @id @default(cuid())
     email       String             @unique
@@ -112,6 +131,7 @@ model Event {
     rescues           Rescue[]
     teamTransitions   TeamStateTransition[]
     adminActionAudits AdminActionAudit[]
+    garageSubmissions GarageSubmission[]
 }
 
 model EventConfig {
@@ -128,20 +148,36 @@ model EventConfig {
 }
 
 model Team {
-    id               String     @id @default(cuid())
+    id               String         @id @default(cuid())
     name             String
     eventId          String
-    score            Int        @default(0)
-    status           TeamStatus @default(PENDING)
+    score            Int            @default(0)
+    status           TeamStatus     @default(PENDING)
     pitStopExpiresAt DateTime?
-    createdAt        DateTime   @default(now())
-    updatedAt        DateTime   @updatedAt
 
-    event            Event                 @relation(fields: [eventId], references: [id])
-    players          Player[]
-    scanRecords      ScanRecord[]
-    rescuesRequested Rescue[]             @relation("RescueRequestingTeam")
-    teamTransitions  TeamStateTransition[]
+    // ── Garage fields ──────────────────────────────────────────────────────────
+    // How many players must submit approved descriptions before logo generation
+    // fires. Set at seed/admin time so the system knows the target without
+    // relying on a live player count (which changes as players join).
+    requiredPlayerCount Int             @default(2)
+    // URL of the generated team logo, populated after n8n returns successfully.
+    logoUrl             String?
+    // Current state of the logo lifecycle. The UI polls this field.
+    logoStatus          TeamLogoStatus  @default(PENDING)
+    // Timestamp of the last successful logo generation (useful for cache-busting).
+    logoGeneratedAt     DateTime?
+    // ──────────────────────────────────────────────────────────────────────────
+
+    createdAt        DateTime       @default(now())
+    updatedAt        DateTime       @updatedAt
+
+    event                Event                 @relation(fields: [eventId], references: [id])
+    players              Player[]
+    scanRecords          ScanRecord[]
+    rescuesRequested     Rescue[]              @relation("RescueRequestingTeam")
+    teamTransitions      TeamStateTransition[]
+    // Each player's garage submission for this team
+    garageSubmissions    GarageSubmission[]
 
     @@unique([eventId, name])
     @@index([eventId])
@@ -163,10 +199,12 @@ model Player {
     user            User                  @relation(fields: [userId], references: [id])
     event           Event                 @relation(fields: [eventId], references: [id])
     team            Team?                 @relation(fields: [teamId], references: [id])
-    qrClaims        QRCodeClaim[]
-    scanRecords     ScanRecord[]
-    rescuesRequested Rescue[]             @relation("RescueRequestingPlayer")
-    teamTransitions TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
+    qrClaims           QRCodeClaim[]
+    scanRecords        ScanRecord[]
+    rescuesRequested   Rescue[]             @relation("RescueRequestingPlayer")
+    teamTransitions    TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
+    // A player may have one garage submission per team they belong to
+    garageSubmissions  GarageSubmission[]
 
     @@unique([eventId, userId])
     @@index([eventId])
@@ -297,4 +335,37 @@ model Rescue {
     @@index([eventId, initiatedAt])
     @@index([requestingPlayerId])
     @@index([requestingTeamId])
+}
+
+// ── Garage workflow model ───────────────────────────────────────────────────
+//
+// One row per (player, team) pair.  The @@unique constraint ensures a player
+// can only have one active submission slot per team — upsert replaces it on
+// retry so history is not accumulated (keeping the table small).
+//
+// Only rows with status=APPROVED are counted toward requiredPlayerCount.
+// Rejected rows remain for audit; the player's next attempt will overwrite them.
+model GarageSubmission {
+    id          String                 @id @default(cuid())
+    playerId    String
+    teamId      String
+    eventId     String
+    // The raw text the player submitted describing themselves
+    description String
+    // APPROVED rows are the only ones that count toward the logo trigger quota
+    status      GarageSubmissionStatus @default(PENDING)
+    // Set when moderation resolves (APPROVED or REJECTED)
+    moderatedAt DateTime?
+    createdAt   DateTime               @default(now())
+    updatedAt   DateTime               @updatedAt
+
+    player Player @relation(fields: [playerId], references: [id])
+    team   Team   @relation(fields: [teamId], references: [id])
+    event  Event  @relation(fields: [eventId], references: [id])
+
+    // One slot per player-team combination; upsert on retry
+    @@unique([playerId, teamId])
+    // Fast look-up for "how many approved for this team?"
+    @@index([teamId, status])
+    @@index([eventId])
 }

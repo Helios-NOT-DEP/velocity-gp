@@ -29,11 +29,17 @@ interface SeedSummary {
   readonly rescues: number;
   readonly teamStateTransitions: number;
   readonly adminActionAudits: number;
+  // Garage workflow
+  readonly garageSubmissions: number;
 }
 
 const now = new Date('2026-04-06T12:00:00.000Z');
 const minutes = (value: number) => 60_000 * value;
 const hours = (value: number) => 60 * minutes(value);
+
+// How many approved descriptions a team needs before logo generation fires.
+// Set GARAGE_REQUIRED_PLAYER_COUNT=1 in .env so a single submission triggers it during local testing.
+const garageRequiredCount = Number(process.env['GARAGE_REQUIRED_PLAYER_COUNT'] ?? 2);
 
 const ids = {
   users: {
@@ -81,6 +87,8 @@ async function clearDatabase(): Promise<void> {
   await prisma.rescue.deleteMany();
   await prisma.scanRecord.deleteMany();
   await prisma.qRCodeClaim.deleteMany();
+  // Garage submissions must be deleted before players/teams (FK constraint)
+  await prisma.garageSubmission.deleteMany();
   await prisma.player.deleteMany();
   await prisma.qRCode.deleteMany();
   await prisma.team.deleteMany();
@@ -212,6 +220,13 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         score: 1260,
         status: 'ACTIVE',
         pitStopExpiresAt: null,
+        // Garage: requires N approved descriptions before logo generation fires.
+        // Controlled by GARAGE_REQUIRED_PLAYER_COUNT env var (default 2).
+        // Set to 1 in .env to trigger generation from a single submission.
+        requiredPlayerCount: garageRequiredCount,
+        logoStatus: 'READY',
+        logoUrl: 'https://placehold.co/512x512/0B1E3B/00D4FF?text=Apex+Comets',
+        logoGeneratedAt: new Date(now.getTime() - minutes(90)),
       },
       {
         id: ids.teams.nova,
@@ -220,6 +235,11 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         score: 920,
         status: 'IN_PIT',
         pitStopExpiresAt: new Date(now.getTime() + minutes(11)),
+        // Garage: one submission in, one still pending — useful for testing WAITING state.
+        requiredPlayerCount: garageRequiredCount,
+        logoStatus: 'PENDING',
+        logoUrl: null,
+        logoGeneratedAt: null,
       },
       {
         id: ids.teams.drift,
@@ -228,6 +248,11 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         score: 1110,
         status: 'ACTIVE',
         pitStopExpiresAt: new Date(now.getTime() - minutes(4)),
+        // Garage: all descriptions in but logo generation not yet complete.
+        requiredPlayerCount: garageRequiredCount,
+        logoStatus: 'GENERATING',
+        logoUrl: null,
+        logoGeneratedAt: null,
       },
     ],
   });
@@ -671,6 +696,8 @@ async function getSeedSummary(): Promise<SeedSummary> {
     prisma.adminActionAudit.count(),
   ]);
 
+  const garageSubmissions = await prisma.garageSubmission.count();
+
   return {
     users,
     events,
@@ -683,7 +710,76 @@ async function getSeedSummary(): Promise<SeedSummary> {
     rescues,
     teamStateTransitions,
     adminActionAudits,
+    garageSubmissions,
   };
+}
+
+/**
+ * Seed garage submissions for local simulation.
+ *
+ * Scenarios seeded:
+ *   Apex Comets  — both members APPROVED + logo READY (see team.logoStatus above)
+ *   Nova Thunder — one player APPROVED, one not yet submitted (WAITING state sim)
+ *   Drift Runners — one player APPROVED, logo GENERATING (mid-flight sim)
+ *
+ * This lets a developer open the Garage page for each player and immediately
+ * see all three waiting-state scenarios without manual interaction.
+ */
+async function seedGarageSubmissions(): Promise<void> {
+  await prisma.garageSubmission.createMany({
+    data: [
+      // ── Apex Comets: both members approved, logo already ready ───────────
+      {
+        id: 'garage-lina-apex',
+        playerId: ids.players.lina,
+        teamId: ids.teams.apex,
+        eventId: ids.events.active,
+        description: 'Fast, bold, and always ahead of the curve',
+        status: 'APPROVED',
+        moderatedAt: new Date(now.getTime() - minutes(95)),
+        createdAt: new Date(now.getTime() - minutes(95)),
+        updatedAt: new Date(now.getTime() - minutes(95)),
+      },
+      {
+        id: 'garage-mason-apex',
+        playerId: ids.players.mason,
+        teamId: ids.teams.apex,
+        eventId: ids.events.active,
+        description: 'Relentless, creative, driven by innovation',
+        status: 'APPROVED',
+        moderatedAt: new Date(now.getTime() - minutes(92)),
+        createdAt: new Date(now.getTime() - minutes(92)),
+        updatedAt: new Date(now.getTime() - minutes(92)),
+      },
+
+      // ── Nova Thunder: one in, one still pending ────────────────────────
+      {
+        id: 'garage-noah-nova',
+        playerId: ids.players.noah,
+        teamId: ids.teams.nova,
+        eventId: ids.events.active,
+        description: 'Powerful, dynamic, unstoppable in every challenge',
+        status: 'APPROVED',
+        moderatedAt: new Date(now.getTime() - minutes(60)),
+        createdAt: new Date(now.getTime() - minutes(60)),
+        updatedAt: new Date(now.getTime() - minutes(60)),
+      },
+      // olivia has NOT submitted yet — her absence simulates the WAITING state
+
+      // ── Drift Runners: one player submitted, logo now GENERATING ──────
+      {
+        id: 'garage-parker-drift',
+        playerId: ids.players.parker,
+        teamId: ids.teams.drift,
+        eventId: ids.events.active,
+        description: 'Daring, sharp, always pushing the limit',
+        status: 'APPROVED',
+        moderatedAt: new Date(now.getTime() - minutes(5)),
+        createdAt: new Date(now.getTime() - minutes(5)),
+        updatedAt: new Date(now.getTime() - minutes(5)),
+      },
+    ],
+  });
 }
 
 async function main(): Promise<void> {
@@ -692,6 +788,7 @@ async function main(): Promise<void> {
   await seedEventsAndConfig();
   await seedTeamsPlayersAndQrCodes();
   await seedClaimsScansRescuesAndAudits();
+  await seedGarageSubmissions();
 
   const summary = await getSeedSummary();
   console.log('Seed complete:');

@@ -16,7 +16,17 @@ export function validate<T>(
       return;
     }
 
-    request[source] = result.data;
+    // Express 5 makes request.query a getter-only property on IncomingMessage,
+    // so direct assignment throws. Use defineProperty to safely override it.
+    if (source === 'query') {
+      Object.defineProperty(request, 'query', {
+        value: result.data,
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      request[source] = result.data;
+    }
     next();
   };
 }

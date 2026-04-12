@@ -1,5 +1,5 @@
 import type {
-  CreateTeamRequest,
+  CreateTeamLogoRequest,
   JoinTeamRequest,
   PlayerProfile,
   Team,
@@ -11,16 +11,20 @@ import {
   placeholderTeam,
   withTeamStatus,
 } from './placeholderData.js';
+import { generateTeamLogo } from './n8nService.js';
 
-export function createTeam(request: CreateTeamRequest): Team {
+export function createTeam(request: CreateTeamLogoRequest): Team {
+  const logoUrl = generateTeamLogo({ description: request.description, teamName: request.teamname });
+
   return {
     id: 'team-generated-placeholder',
-    name: request.name,
-    eventId: request.eventId,
+    name: request.teamname,
+    eventId: '',
     status: 'PENDING',
     pitStopExpiresAt: null,
     members: [],
-    score: 0,
+    score: 0//,
+    // logoUrl,
   };
 }
 
