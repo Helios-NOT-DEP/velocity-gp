@@ -12,6 +12,7 @@ const routeLabels: Record<string, string> = {
   '/pit-stop': 'pit-stop',
   '/helios': 'helios',
   '/leaderboard': 'leaderboard',
+  '/display': 'display-board',
   '/victory-lane': 'victory-lane',
 };
 

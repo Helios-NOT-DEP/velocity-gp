@@ -6,6 +6,7 @@ import RaceHub from './pages/RaceHub';
 import PitStop from './pages/PitStop';
 import HeliosProfile from './pages/HeliosProfile';
 import Leaderboard from './pages/Leaderboard';
+import DisplayBoard from './pages/DisplayBoard';
 import VictoryLane from './pages/VictoryLane';
 import WaitingAssignment from './pages/WaitingAssignment';
 import RootLayout from './layouts/RootLayout';
@@ -47,6 +48,11 @@ export const appRoutes: RouteObject[] = [
   {
     path: '/waiting-assignment',
     Component: WaitingAssignment,
+  },
+  // Venue display board is intentionally public and passive for large-format screens.
+  {
+    path: '/display',
+    Component: DisplayBoard,
   },
   // Team setup remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
