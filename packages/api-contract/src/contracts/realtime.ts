@@ -311,6 +311,7 @@ export const leaderboardChangedEventPayloadSchema = z.object({
       score: z.number().int(),
       memberCount: z.number().int().nonnegative(),
       status: teamStatusSchema,
+      pitStopExpiresAt: z.string().datetime().nullable().optional(),
     })
   ),
   changedAt: z.string().datetime(),

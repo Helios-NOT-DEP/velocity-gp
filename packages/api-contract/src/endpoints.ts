@@ -25,6 +25,8 @@ export const raceStateEndpoints = {
     `/events/${eventId}/players/${playerId}/race-state`,
   /** Retrieves the current top team standings and overall leaderboard for an event. */
   getLeaderboard: (eventId: string) => `/events/${eventId}/leaderboard`,
+  /** Retrieves display-focused transition events for venue storytelling states. */
+  getDisplayEvents: (eventId: string) => `/events/${eventId}/display-events`,
 };
 
 /**
