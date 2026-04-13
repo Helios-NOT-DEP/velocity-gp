@@ -195,7 +195,7 @@ export interface RescueCompletionResponse {
 
 export interface CreateTeamLogoRequest {
   readonly description: string;
-  readonly teamname: string;
+  readonly teamName: string;
 }
 
 /**
