@@ -19,6 +19,10 @@ import { useGame } from '@/app/context/GameContext';
 
 const mockUseGame = vi.mocked(useGame);
 
+const rescueLogPayload = {
+  rescues: [],
+};
+
 function buildJsonApiResponse(data: unknown, status = 200): Response {
   return new Response(
     JSON.stringify({
@@ -117,12 +121,16 @@ describe('HeliosProfile', () => {
   });
 
   it('shows loading state while fetching the QR asset', async () => {
-    const fetchMock = vi.fn().mockImplementation(
-      () =>
-        new Promise(() => {
-          // Never resolves — keeps the component in loading state.
-        })
-    );
+    const fetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(buildJsonApiResponse(rescueLogPayload));
+      }
+
+      return new Promise(() => {
+        // Never resolves — keeps the QR fetch in loading state.
+      });
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     mockUseGame.mockReturnValue({
@@ -149,19 +157,27 @@ describe('HeliosProfile', () => {
   });
 
   it('renders the QR image when the fetch succeeds', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      buildJsonApiResponse({
-        asset: {
-          id: 'qr-asset-1',
-          userId: 'helios-user-1',
-          payload: 'VG-SP-TESTPAYLOAD',
-          qrImageUrl: 'https://cdn.velocitygp.app/qr/superpower-test.png',
-          status: 'ACTIVE',
-          createdAt: '2026-04-12T00:00:00.000Z',
-          regeneratedAt: null,
-        },
-      })
-    );
+    const fetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(buildJsonApiResponse(rescueLogPayload));
+      }
+
+      return Promise.resolve(
+        buildJsonApiResponse({
+          asset: {
+            id: 'qr-asset-1',
+            userId: 'helios-user-1',
+            payload: 'VG-SP-TESTPAYLOAD',
+            qrImageUrl: 'https://cdn.velocitygp.app/qr/superpower-test.png',
+            status: 'ACTIVE',
+            createdAt: '2026-04-12T00:00:00.000Z',
+            regeneratedAt: null,
+          },
+        })
+      );
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     mockUseGame.mockReturnValue({
@@ -189,9 +205,15 @@ describe('HeliosProfile', () => {
   });
 
   it('shows an error banner when the QR fetch fails', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(buildJsonApiResponse({ message: 'Server error' }, 500));
+    const fetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(buildJsonApiResponse(rescueLogPayload));
+      }
+
+      return Promise.resolve(buildJsonApiResponse({ message: 'Server error' }, 500));
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     mockUseGame.mockReturnValue({
@@ -222,35 +244,50 @@ describe('HeliosProfile', () => {
   });
 
   it('regenerates the QR when the Regenerate button is clicked', async () => {
-    const qrFetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        buildJsonApiResponse({
-          asset: {
-            id: 'qr-asset-1',
-            userId: 'helios-user-1',
-            payload: 'VG-SP-ORIGINAL',
-            qrImageUrl: 'https://cdn.velocitygp.app/qr/original.png',
-            status: 'ACTIVE',
-            createdAt: '2026-04-12T00:00:00.000Z',
-            regeneratedAt: null,
-          },
-        })
-      )
-      .mockResolvedValueOnce(
-        buildJsonApiResponse({
-          asset: {
-            id: 'qr-asset-2',
-            userId: 'helios-user-1',
-            payload: 'VG-SP-REGEN',
-            qrImageUrl: 'https://cdn.velocitygp.app/qr/regenerated.png',
-            status: 'ACTIVE',
-            createdAt: '2026-04-12T01:00:00.000Z',
-            regeneratedAt: '2026-04-12T01:00:00.000Z',
-          },
-          revokedAssetId: 'qr-asset-1',
-        })
-      );
+    let hasReturnedInitialQr = false;
+    const qrFetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(buildJsonApiResponse(rescueLogPayload));
+      }
+
+      if (url.includes('/regenerate')) {
+        return Promise.resolve(
+          buildJsonApiResponse({
+            asset: {
+              id: 'qr-asset-2',
+              userId: 'helios-user-1',
+              payload: 'VG-SP-REGEN',
+              qrImageUrl: 'https://cdn.velocitygp.app/qr/regenerated.png',
+              status: 'ACTIVE',
+              createdAt: '2026-04-12T01:00:00.000Z',
+              regeneratedAt: '2026-04-12T01:00:00.000Z',
+            },
+            revokedAssetId: 'qr-asset-1',
+          })
+        );
+      }
+
+      if (!hasReturnedInitialQr) {
+        hasReturnedInitialQr = true;
+        return Promise.resolve(
+          buildJsonApiResponse({
+            asset: {
+              id: 'qr-asset-1',
+              userId: 'helios-user-1',
+              payload: 'VG-SP-ORIGINAL',
+              qrImageUrl: 'https://cdn.velocitygp.app/qr/original.png',
+              status: 'ACTIVE',
+              createdAt: '2026-04-12T00:00:00.000Z',
+              regeneratedAt: null,
+            },
+          })
+        );
+      }
+
+      return Promise.resolve(buildJsonApiResponse({ message: 'Unexpected call' }, 500));
+    });
     vi.stubGlobal('fetch', qrFetchMock);
 
     mockUseGame.mockReturnValue({
@@ -294,22 +331,37 @@ describe('HeliosProfile', () => {
       resolveRegen = resolve;
     });
 
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        buildJsonApiResponse({
-          asset: {
-            id: 'qr-asset-1',
-            userId: 'helios-user-1',
-            payload: 'VG-SP-ORIGINAL',
-            qrImageUrl: 'https://cdn.velocitygp.app/qr/original.png',
-            status: 'ACTIVE',
-            createdAt: '2026-04-12T00:00:00.000Z',
-            regeneratedAt: null,
-          },
-        })
-      )
-      .mockReturnValueOnce(regenPromise);
+    let hasReturnedInitialQr = false;
+    const fetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(buildJsonApiResponse(rescueLogPayload));
+      }
+
+      if (url.includes('/regenerate')) {
+        return regenPromise;
+      }
+
+      if (!hasReturnedInitialQr) {
+        hasReturnedInitialQr = true;
+        return Promise.resolve(
+          buildJsonApiResponse({
+            asset: {
+              id: 'qr-asset-1',
+              userId: 'helios-user-1',
+              payload: 'VG-SP-ORIGINAL',
+              qrImageUrl: 'https://cdn.velocitygp.app/qr/original.png',
+              status: 'ACTIVE',
+              createdAt: '2026-04-12T00:00:00.000Z',
+              regeneratedAt: null,
+            },
+          })
+        );
+      }
+
+      return Promise.resolve(buildJsonApiResponse({ message: 'Unexpected call' }, 500));
+    });
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -363,5 +415,174 @@ describe('HeliosProfile', () => {
     await waitFor(() => {
       expect(regenerateButton).toBeEnabled();
     });
+  });
+
+  it('renders rescue log empty state when no rescue entries exist', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(buildJsonApiResponse({ rescues: [] }));
+      }
+
+      return Promise.resolve(
+        buildJsonApiResponse({
+          asset: {
+            id: 'qr-asset-1',
+            userId: 'helios-user-1',
+            payload: 'VG-SP-TESTPAYLOAD',
+            qrImageUrl: 'https://cdn.velocitygp.app/qr/superpower-test.png',
+            status: 'ACTIVE',
+            createdAt: '2026-04-12T00:00:00.000Z',
+            regeneratedAt: null,
+          },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    mockUseGame.mockReturnValue({
+      gameState: heliosGameState,
+      login: vi.fn(),
+      becomeHelios: vi.fn(),
+      createTeam: vi.fn(),
+      addScan: vi.fn(),
+      triggerPitStop: vi.fn(),
+      clearPitStop: vi.fn(),
+      hydrateScanIdentity: vi.fn(),
+      applyScanOutcome: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/helios']}>
+        <HeliosProfile />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole('img', { name: /Superpower QR/i });
+    expect(await screen.findByText('No rescues logged yet.')).toBeInTheDocument();
+  });
+
+  it('renders rescue log entries in the activity log section', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(
+          buildJsonApiResponse({
+            rescues: [
+              {
+                id: 'rescue-2',
+                playerId: 'player-2',
+                eventId: 'event-1',
+                rescuerUserId: 'helios-user-1',
+                initiatedAt: '2026-04-12T01:00:00.000Z',
+                completedAt: '2026-04-12T01:01:00.000Z',
+                cooldownExpiresAt: '2026-04-12T01:04:00.000Z',
+                status: 'COMPLETED',
+                reason: null,
+              },
+              {
+                id: 'rescue-1',
+                playerId: 'player-1',
+                eventId: 'event-1',
+                rescuerUserId: 'helios-user-1',
+                initiatedAt: '2026-04-12T00:30:00.000Z',
+                completedAt: null,
+                cooldownExpiresAt: '2026-04-12T00:33:00.000Z',
+                status: 'REQUESTED',
+                reason: null,
+              },
+            ],
+          })
+        );
+      }
+
+      return Promise.resolve(
+        buildJsonApiResponse({
+          asset: {
+            id: 'qr-asset-1',
+            userId: 'helios-user-1',
+            payload: 'VG-SP-TESTPAYLOAD',
+            qrImageUrl: 'https://cdn.velocitygp.app/qr/superpower-test.png',
+            status: 'ACTIVE',
+            createdAt: '2026-04-12T00:00:00.000Z',
+            regeneratedAt: null,
+          },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    mockUseGame.mockReturnValue({
+      gameState: heliosGameState,
+      login: vi.fn(),
+      becomeHelios: vi.fn(),
+      createTeam: vi.fn(),
+      addScan: vi.fn(),
+      triggerPitStop: vi.fn(),
+      clearPitStop: vi.fn(),
+      hydrateScanIdentity: vi.fn(),
+      applyScanOutcome: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/helios']}>
+        <HeliosProfile />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole('img', { name: /Superpower QR/i });
+    expect(await screen.findByRole('log', { name: /Recent rescue activity/i })).toBeInTheDocument();
+    expect(screen.getByText('Player player-2')).toBeInTheDocument();
+    expect(screen.getByText('Player player-1')).toBeInTheDocument();
+  });
+
+  it('renders rescue log error state when rescue activity fetch fails', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: unknown) => {
+      const url = String(input);
+
+      if (url.includes('/rescue/log')) {
+        return Promise.resolve(buildJsonApiResponse({ message: 'Server error' }, 500));
+      }
+
+      return Promise.resolve(
+        buildJsonApiResponse({
+          asset: {
+            id: 'qr-asset-1',
+            userId: 'helios-user-1',
+            payload: 'VG-SP-TESTPAYLOAD',
+            qrImageUrl: 'https://cdn.velocitygp.app/qr/superpower-test.png',
+            status: 'ACTIVE',
+            createdAt: '2026-04-12T00:00:00.000Z',
+            regeneratedAt: null,
+          },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    mockUseGame.mockReturnValue({
+      gameState: heliosGameState,
+      login: vi.fn(),
+      becomeHelios: vi.fn(),
+      createTeam: vi.fn(),
+      addScan: vi.fn(),
+      triggerPitStop: vi.fn(),
+      clearPitStop: vi.fn(),
+      hydrateScanIdentity: vi.fn(),
+      applyScanOutcome: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/helios']}>
+        <HeliosProfile />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole('img', { name: /Superpower QR/i });
+    expect(
+      await screen.findByText('Could not load rescue activity. Please try again.')
+    ).toBeInTheDocument();
   });
 });

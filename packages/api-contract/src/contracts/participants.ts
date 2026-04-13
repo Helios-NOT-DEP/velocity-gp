@@ -126,7 +126,24 @@ export interface HeliosRescueFlow {
   readonly rescuerUserId: string;
   readonly initiatedAt: string;
   readonly completedAt: string | null;
+  readonly cooldownExpiresAt: string | null;
   readonly status: RescueStatus;
+  readonly reason: string | null;
+}
+
+/**
+ * Query payload for listing rescue history initiated by a specific Helios user.
+ */
+export interface RescueLogQuery {
+  readonly eventId?: string;
+  readonly limit?: number;
+}
+
+/**
+ * Response payload for Helios rescue activity log queries.
+ */
+export interface RescueLogResponse {
+  readonly rescues: readonly HeliosRescueFlow[];
 }
 
 /**

@@ -108,6 +108,8 @@ export const qrEndpoints = {
 export const rescueEndpoints = {
   /** Starts a rescue workflow handled by HELIOS staff or authorized players. */
   initiateRescue: '/rescue/initiate',
+  /** Lists recent rescue entries initiated by the authenticated rescuer. */
+  listRescueLog: '/rescue/log',
   /** Polls the status of an active rescue attempt for a player. */
   getRescueStatus: (playerId: string) => `/rescue/${playerId}/status`,
   /** Finalizes a rescue sequence, freeing the trapped player/team. */

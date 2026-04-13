@@ -7,7 +7,19 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import { requirePlayer } from '../middleware/requirePlayer.js';
 import { initiateRescueSchema, rescuePlayerParamsSchema } from '@velocity-gp/api-contract/schemas';
-import { completeRescue, getRescueStatus, initiateRescue } from '../services/rescueService.js';
+import {
+  completeRescue,
+  getRescueStatus,
+  initiateRescue,
+  listRescueLogByRescuer,
+} from '../services/rescueService.js';
+import { UnauthorizedError } from '../utils/appError.js';
+import { z } from 'zod';
+
+const rescueLogQuerySchema = z.object({
+  eventId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
 
 export const rescueRouter = Router();
 
@@ -46,6 +58,32 @@ rescueRouter.post(
         { requestId: response.locals.requestId }
       )
     );
+  })
+);
+
+rescueRouter.get(
+  '/rescue/log',
+  rescueRateLimiter,
+  requirePlayer,
+  validate(rescueLogQuerySchema, 'query'),
+  asyncHandler(async (request, response) => {
+    const authContext = resolveRequestAuthContext(request);
+    if (!authContext?.userId) {
+      throw new UnauthorizedError('Authentication is required.');
+    }
+
+    const eventId =
+      typeof request.query.eventId === 'string' && request.query.eventId.length > 0
+        ? request.query.eventId
+        : undefined;
+    const limit = typeof request.query.limit === 'number' ? request.query.limit : undefined;
+
+    const rescues = await listRescueLogByRescuer(authContext.userId, {
+      eventId,
+      limit,
+    });
+
+    response.json(successResponse({ rescues }, { requestId: response.locals.requestId }));
   })
 );
 

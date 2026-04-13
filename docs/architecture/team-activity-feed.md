@@ -19,6 +19,11 @@ This document defines the backend read model and API used to power the Race Hub 
   - Emitted for every scan settlement outcome (`SAFE`, `HAZARD_PIT`, `INVALID`, `DUPLICATE`, `BLOCKED`).
   - Includes QR identity (`qrCodeId`, `qrCodeLabel`, `qrPayload`) and outcome metadata (`pointsAwarded`, `errorCode`).
   - Idempotency key format: `scan:{scanRecordId}`.
+- `RESCUE_UPDATED`
+  - Emitted for rescue lifecycle updates (`REQUESTED`, `IN_PROGRESS`, `COMPLETED`, `REJECTED`).
+  - Includes rescue identity (`rescueId`, `playerId`, `rescuerUserId`) and status timestamps.
+  - Cooldown rejections use stable error semantics (`HELIOS_COOLDOWN_ACTIVE`) and may include cooldown expiry metadata for UI retry messaging.
+  - Idempotency key format: `rescue:{rescueId}:status:{status}`.
 
 ## Persistence Model
 
@@ -50,3 +55,9 @@ Data is stored in `TeamActivityEvent` with:
 - This feed is a persisted, team-scoped read model optimized for Race Hub UX.
 - It does not replace the canonical realtime event contract in `realtime-event-contract.md`.
 - Future push transport can map to this feed model, but the feed remains a durable audit-friendly source for recent team activity.
+
+## Rescue Cooldown and Helios Log Notes
+
+- Rescue cooldown is enforced per rescuer identity for a 3-minute window after a successful rescue request.
+- Cooldown violations are rejected with `HELIOS_COOLDOWN_ACTIVE` and are available for Helios-facing activity rendering.
+- Helios Profile surfaces a lightweight rescue activity trail sourced from rescue records scoped to the authenticated rescuer.

@@ -3,6 +3,17 @@ import { Navigate, useNavigate } from 'react-router';
 import { Loader2, RefreshCw, Zap, Shield, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { getSuperpowerQr, regenerateSuperpowerQr } from '@/services/helios';
+import { getRescueLog } from '@/services/rescue';
+import type { HeliosRescueFlow } from '@velocity-gp/api-contract';
+
+function formatRescueTimestamp(isoTimestamp: string): string {
+  const parsed = new Date(isoTimestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'Unknown time';
+  }
+
+  return parsed.toLocaleString();
+}
 
 export default function HeliosProfile() {
   const { gameState } = useGame();
@@ -12,8 +23,12 @@ export default function HeliosProfile() {
   const [isLoadingQr, setIsLoadingQr] = useState(true);
   const [qrError, setQrError] = useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [rescueLog, setRescueLog] = useState<HeliosRescueFlow[]>([]);
+  const [isRescueLogLoading, setIsRescueLogLoading] = useState(true);
+  const [rescueLogError, setRescueLogError] = useState<string | null>(null);
 
   const playerId = gameState.currentUser?.playerId ?? null;
+  const eventId = gameState.currentUser?.eventId ?? undefined;
 
   useEffect(() => {
     if (!playerId) return;
@@ -40,6 +55,30 @@ export default function HeliosProfile() {
       isMounted = false;
     };
   }, [playerId]);
+
+  useEffect(() => {
+    if (!playerId) return;
+
+    let isMounted = true;
+    setIsRescueLogLoading(true);
+    setRescueLogError(null);
+
+    getRescueLog({ eventId, limit: 10 })
+      .then((rescues) => {
+        if (!isMounted) return;
+        setRescueLog(rescues);
+        setIsRescueLogLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setRescueLogError('Could not load rescue activity. Please try again.');
+        setIsRescueLogLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [eventId, playerId]);
 
   const handleRegenerate = useCallback(async () => {
     if (!playerId || isRegenerating) return;
@@ -179,6 +218,58 @@ export default function HeliosProfile() {
               {gameState.teams.length}
             </p>
           </div>
+        </div>
+
+        {/* Rescue Log */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
+          <h2
+            className="text-xl font-bold text-white mb-4"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            Rescue Activity Log
+          </h2>
+
+          {isRescueLogLoading && (
+            <div className="flex items-center gap-2 text-gray-400 text-sm" role="status">
+              <Loader2 className="w-4 h-4 animate-spin" aria-label="Loading rescue activity" />
+              Loading rescue activity...
+            </div>
+          )}
+
+          {!isRescueLogLoading && rescueLogError && (
+            <div
+              className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4"
+              role="alert"
+            >
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+              <p className="text-red-400 text-sm">{rescueLogError}</p>
+            </div>
+          )}
+
+          {!isRescueLogLoading && !rescueLogError && rescueLog.length === 0 && (
+            <p className="text-gray-400 text-sm">No rescues logged yet.</p>
+          )}
+
+          {!isRescueLogLoading && !rescueLogError && rescueLog.length > 0 && (
+            <ul className="space-y-3" role="log" aria-label="Recent rescue activity">
+              {rescueLog.map((rescue) => (
+                <li
+                  key={rescue.id}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm text-white font-medium">Player {rescue.playerId}</p>
+                    <p className="text-xs text-gray-400">
+                      {formatRescueTimestamp(rescue.initiatedAt)}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                    {rescue.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Actions */}
