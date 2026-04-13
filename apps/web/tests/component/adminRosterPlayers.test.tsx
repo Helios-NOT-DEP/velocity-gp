@@ -3,6 +3,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import AdminPlayers from '@/app/pages/admin/AdminPlayers';
 import { AUTH_SESSION_STORAGE_KEY, type AuthSession } from '@/services/auth';
 
@@ -21,6 +22,14 @@ const adminSession: AuthSession = {
   isAuthenticated: true,
   email: 'admin@example.com',
 };
+
+function renderAdminPlayers() {
+  return render(
+    <MemoryRouter>
+      <AdminPlayers />
+    </MemoryRouter>
+  );
+}
 
 describe('AdminPlayers roster workflows', () => {
   beforeEach(() => {
@@ -178,7 +187,7 @@ describe('AdminPlayers roster workflows', () => {
         })
       );
 
-    render(<AdminPlayers />);
+    renderAdminPlayers();
 
     await waitFor(() => {
       expect(screen.getByText('Player One')).toBeTruthy();
@@ -329,7 +338,7 @@ describe('AdminPlayers roster workflows', () => {
         })
       );
 
-    render(<AdminPlayers />);
+    renderAdminPlayers();
 
     await waitFor(() => {
       expect(screen.getByText('Player One')).toBeTruthy();
@@ -435,7 +444,7 @@ describe('AdminPlayers roster workflows', () => {
         })
       );
 
-    render(<AdminPlayers />);
+    renderAdminPlayers();
 
     await waitFor(() => {
       expect(screen.getByText('Roster Import (CSV)')).toBeTruthy();

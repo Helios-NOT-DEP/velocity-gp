@@ -641,6 +641,7 @@ export async function manualPitControl(
           where: {
             id: teamId,
             eventId,
+            deletedAt: null,
           },
           select: {
             id: true,

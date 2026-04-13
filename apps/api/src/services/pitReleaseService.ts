@@ -52,6 +52,7 @@ export async function releaseTeamFromPitInTransaction(
     where: {
       id: input.teamId,
       eventId: input.eventId,
+      deletedAt: null,
     },
     select: {
       id: true,
@@ -169,6 +170,7 @@ export async function releaseExpiredTeamsFromPit(
       const candidates = await prisma.team.findMany({
         where: {
           status: 'IN_PIT',
+          deletedAt: null,
           pitStopExpiresAt: {
             lte: now,
           },

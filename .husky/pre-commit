@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
+pwd
 
 npm test
 npm run lint
 npm run format:fix
+
 git update-index --again

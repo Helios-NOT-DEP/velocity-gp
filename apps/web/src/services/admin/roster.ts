@@ -1,10 +1,21 @@
 import type {
+  DeleteAdminTeamResponse,
+  GetAdminPlayerDetailResponse,
+  GetAdminTeamDetailResponse,
+  ListAdminPlayerScanHistoryQuery,
+  ListAdminPlayerScanHistoryResponse,
   ListAdminRosterQuery,
   ListAdminRosterResponse,
   ListAdminRosterTeamsResponse,
+  ManualPitControlRequest,
+  ManualPitControlResponse,
   RosterImportApplyResponse,
   RosterImportPreviewResponse,
   RosterImportRowInput,
+  UpdateAdminPlayerContactRequest,
+  UpdateAdminPlayerContactResponse,
+  UpdateAdminTeamScoreRequest,
+  UpdateAdminTeamScoreResponse,
   UpdateRosterAssignmentResponse,
 } from '@velocity-gp/api-contract';
 
@@ -149,7 +160,8 @@ export async function listAdminRosterTeams(eventId: string): Promise<ListAdminRo
 export async function updateAdminRosterAssignment(
   eventId: string,
   playerId: string,
-  teamId: string | null
+  teamId: string | null,
+  reason?: string
 ): Promise<UpdateRosterAssignmentResponse> {
   // PATCH is used so callers can set team assignment to a specific team or null (unassign).
   const response = await apiClient.request<UpdateRosterAssignmentResponse>(
@@ -158,12 +170,138 @@ export async function updateAdminRosterAssignment(
       method: 'PATCH',
       body: {
         teamId,
+        ...(reason ? { reason } : {}),
       },
     }
   );
 
   if (!response.ok) {
     throw new Error(`Unable to update assignment (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function getAdminTeamDetail(
+  eventId: string,
+  teamId: string
+): Promise<GetAdminTeamDetailResponse> {
+  const response = await apiClient.get<GetAdminTeamDetailResponse>(
+    adminEndpoints.getTeamDetail(eventId, teamId)
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to load team detail (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function updateAdminTeamScore(
+  eventId: string,
+  teamId: string,
+  request: UpdateAdminTeamScoreRequest
+): Promise<UpdateAdminTeamScoreResponse> {
+  const response = await apiClient.request<UpdateAdminTeamScoreResponse>(
+    adminEndpoints.updateTeamScore(eventId, teamId),
+    {
+      method: 'PATCH',
+      body: request,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to update team score (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function updateAdminTeamPitControl(
+  eventId: string,
+  teamId: string,
+  request: ManualPitControlRequest
+): Promise<ManualPitControlResponse> {
+  const response = await apiClient.request<ManualPitControlResponse>(
+    adminEndpoints.manualPitControl(eventId, teamId),
+    {
+      method: 'POST',
+      body: request,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to update pit control (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function deleteAdminTeam(
+  eventId: string,
+  teamId: string
+): Promise<DeleteAdminTeamResponse> {
+  const response = await apiClient.request<DeleteAdminTeamResponse>(
+    adminEndpoints.deleteTeam(eventId, teamId),
+    {
+      method: 'DELETE',
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to delete team (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function getAdminPlayerDetail(
+  eventId: string,
+  playerId: string
+): Promise<GetAdminPlayerDetailResponse> {
+  const response = await apiClient.get<GetAdminPlayerDetailResponse>(
+    adminEndpoints.getPlayerDetail(eventId, playerId)
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to load player detail (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function updateAdminPlayerContact(
+  eventId: string,
+  playerId: string,
+  request: UpdateAdminPlayerContactRequest
+): Promise<UpdateAdminPlayerContactResponse> {
+  const response = await apiClient.request<UpdateAdminPlayerContactResponse>(
+    adminEndpoints.updatePlayerContact(eventId, playerId),
+    {
+      method: 'PATCH',
+      body: request,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to update player contact (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function listAdminPlayerScanHistory(
+  eventId: string,
+  playerId: string,
+  query: ListAdminPlayerScanHistoryQuery = {}
+): Promise<ListAdminPlayerScanHistoryResponse> {
+  const response = await apiClient.get<ListAdminPlayerScanHistoryResponse>(
+    adminEndpoints.listPlayerScanHistory(eventId, playerId),
+    query
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to load player scan history (${response.status}).`);
   }
 
   return response.data;

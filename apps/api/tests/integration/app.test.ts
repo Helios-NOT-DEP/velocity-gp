@@ -1192,6 +1192,345 @@ describe('velocity gp backend', () => {
     expect(importAudit).not.toBeNull();
   });
 
+  it('returns team detail with team rank and member rankings', async () => {
+    await Promise.all([
+      prisma.team.update({
+        where: {
+          id: fixtureIds.teamId,
+        },
+        data: {
+          deletedAt: null,
+          status: 'ACTIVE',
+          score: 1200,
+          pitStopExpiresAt: null,
+        },
+      }),
+      prisma.team.update({
+        where: {
+          id: fixtureIds.secondTeamId,
+        },
+        data: {
+          deletedAt: null,
+          status: 'ACTIVE',
+          score: 900,
+          pitStopExpiresAt: null,
+        },
+      }),
+      prisma.player.update({
+        where: {
+          id: fixtureIds.playerId,
+        },
+        data: {
+          teamId: fixtureIds.teamId,
+          individualScore: 340,
+        },
+      }),
+      prisma.player.update({
+        where: {
+          id: fixtureIds.unassignedPlayerId,
+        },
+        data: {
+          teamId: fixtureIds.teamId,
+          individualScore: 180,
+        },
+      }),
+    ]);
+
+    const response = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/detail`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.teamId).toBe(fixtureIds.teamId);
+    expect(response.body.data.rank).toBe(1);
+    expect(response.body.data.memberCount).toBeGreaterThanOrEqual(2);
+    expect(response.body.data.members[0].playerId).toBe(fixtureIds.playerId);
+    expect(response.body.data.members[0].rank).toBe(1);
+    expect(response.body.data.members[1].playerId).toBe(fixtureIds.unassignedPlayerId);
+    expect(response.body.data.members[1].rank).toBe(2);
+  });
+
+  it('updates team score and records TEAM_SCORE_UPDATED audits', async () => {
+    const response = await request(app)
+      .patch(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/score`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ score: 1777, reason: 'manual correction' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.teamId).toBe(fixtureIds.teamId);
+    expect(response.body.data.score).toBe(1777);
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const [team, audit] = await Promise.all([
+      prisma.team.findUnique({
+        where: {
+          id: fixtureIds.teamId,
+        },
+        select: {
+          score: true,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          targetId: fixtureIds.teamId,
+          actionType: 'TEAM_SCORE_UPDATED',
+        },
+      }),
+    ]);
+
+    expect(team?.score).toBe(1777);
+    expect(audit).not.toBeNull();
+  });
+
+  it('returns player detail, updates contact, and lists full scan-history outcomes', async () => {
+    const updatedEmail = `player-detail-${token}@velocitygp.dev`;
+    const updatedPhone = '+14155550199';
+    const now = Date.now();
+
+    await prisma.team.update({
+      where: {
+        id: fixtureIds.teamId,
+      },
+      data: {
+        deletedAt: null,
+      },
+    });
+
+    await prisma.player.updateMany({
+      where: {
+        eventId: fixtureIds.eventId,
+      },
+      data: {
+        individualScore: 10,
+      },
+    });
+
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.playerId,
+      },
+      data: {
+        teamId: fixtureIds.teamId,
+        individualScore: 500,
+      },
+    });
+
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.unassignedPlayerId,
+      },
+      data: {
+        teamId: fixtureIds.teamId,
+        individualScore: 250,
+      },
+    });
+
+    await prisma.scanRecord.deleteMany({
+      where: {
+        eventId: fixtureIds.eventId,
+        playerId: fixtureIds.playerId,
+      },
+    });
+
+    await prisma.scanRecord.createMany({
+      data: [
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'SAFE',
+          pointsAwarded: 120,
+          scannedPayload: `${fixtureIds.qrPayload}-SAFE`,
+          message: 'safe',
+          createdAt: new Date(now - 60_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'HAZARD_PIT',
+          pointsAwarded: 0,
+          scannedPayload: `${fixtureIds.qrPayload}-HAZARD`,
+          message: 'hazard',
+          createdAt: new Date(now - 45_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: null,
+          outcome: 'INVALID',
+          pointsAwarded: -1,
+          scannedPayload: 'invalid-payload',
+          message: 'invalid',
+          createdAt: new Date(now - 30_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'DUPLICATE',
+          pointsAwarded: 0,
+          scannedPayload: `${fixtureIds.qrPayload}-DUP`,
+          message: 'duplicate',
+          createdAt: new Date(now - 15_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'BLOCKED',
+          pointsAwarded: 0,
+          scannedPayload: `${fixtureIds.qrPayload}-BLOCK`,
+          message: 'blocked',
+          createdAt: new Date(now - 5_000),
+        },
+      ],
+    });
+
+    const detailResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/detail`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.success).toBe(true);
+    expect(detailResponse.body.data.playerId).toBe(fixtureIds.playerId);
+    expect(detailResponse.body.data.globalRank).toBe(1);
+    expect(detailResponse.body.data.teamRank).toBe(1);
+    expect(detailResponse.body.data.teamId).toBe(fixtureIds.teamId);
+
+    const contactResponse = await request(app)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/contact`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        workEmail: updatedEmail,
+        phoneE164: updatedPhone,
+        reason: 'detail-view edit',
+      });
+
+    expect(contactResponse.status).toBe(200);
+    expect(contactResponse.body.success).toBe(true);
+    expect(contactResponse.body.data.workEmail).toBe(updatedEmail);
+    expect(contactResponse.body.data.phoneE164).toBe(updatedPhone);
+    expect(contactResponse.body.data.auditId).toBeTruthy();
+
+    const scanHistoryResponse = await request(app)
+      .get(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/scan-history`
+      )
+      .query({ limit: 10 })
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(scanHistoryResponse.status).toBe(200);
+    expect(scanHistoryResponse.body.success).toBe(true);
+    expect(scanHistoryResponse.body.data.items).toHaveLength(5);
+    expect(scanHistoryResponse.body.data.items[0].outcome).toBe('BLOCKED');
+    expect(scanHistoryResponse.body.data.items[1].outcome).toBe('DUPLICATE');
+    expect(scanHistoryResponse.body.data.items[2].outcome).toBe('INVALID');
+    expect(scanHistoryResponse.body.data.items[3].outcome).toBe('HAZARD_PIT');
+    expect(scanHistoryResponse.body.data.items[4].outcome).toBe('SAFE');
+    expect(scanHistoryResponse.body.data.items[0].qrCodeLabel).toContain(`App QR ${token}`);
+  });
+
+  it('soft-deletes teams, unassigns members, and excludes deleted teams from admin roster surfaces', async () => {
+    const deletableTeamId = `team-delete-${token}`;
+    const deletableUserId = `user-delete-${token}`;
+    const deletablePlayerId = `player-delete-${token}`;
+
+    await prisma.user.create({
+      data: {
+        id: deletableUserId,
+        email: `team-delete-${token}@velocitygp.dev`,
+        displayName: 'Delete Candidate',
+        role: 'PLAYER',
+      },
+    });
+
+    await prisma.team.create({
+      data: {
+        id: deletableTeamId,
+        eventId: fixtureIds.eventId,
+        name: `Delete Team ${token}`,
+        status: 'IN_PIT',
+      },
+    });
+
+    await prisma.player.create({
+      data: {
+        id: deletablePlayerId,
+        userId: deletableUserId,
+        eventId: fixtureIds.eventId,
+        teamId: deletableTeamId,
+        status: 'IN_PIT',
+      },
+    });
+
+    const deleteResponse = await request(app)
+      .delete(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${deletableTeamId}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body.success).toBe(true);
+    expect(deleteResponse.body.data.teamId).toBe(deletableTeamId);
+    expect(deleteResponse.body.data.unassignedPlayerCount).toBe(1);
+
+    const [deletedTeam, affectedPlayer, rosterTeamsResponse, deletedDetailResponse] =
+      await Promise.all([
+        prisma.team.findUnique({
+          where: {
+            id: deletableTeamId,
+          },
+          select: {
+            deletedAt: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: deletablePlayerId,
+          },
+          select: {
+            teamId: true,
+            status: true,
+          },
+        }),
+        request(app)
+          .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/teams`)
+          .set('x-user-id', fixtureIds.adminUserId)
+          .set('x-user-role', 'admin'),
+        request(app)
+          .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${deletableTeamId}/detail`)
+          .set('x-user-id', fixtureIds.adminUserId)
+          .set('x-user-role', 'admin'),
+      ]);
+
+    expect(deletedTeam?.deletedAt).not.toBeNull();
+    expect(affectedPlayer?.teamId).toBeNull();
+    expect(affectedPlayer?.status).toBe('RACING');
+    expect(rosterTeamsResponse.status).toBe(200);
+    expect(
+      (rosterTeamsResponse.body.data.teams as Array<{ teamId: string }>).some(
+        (team) => team.teamId === deletableTeamId
+      )
+    ).toBe(false);
+    expect(deletedDetailResponse.status).toBe(400);
+    expect(deletedDetailResponse.body.success).toBe(false);
+  });
+
   it('rejects admin routes when authentication context is missing', async () => {
     const response = await request(app).get(`${apiPrefix}/admin/session`);
 

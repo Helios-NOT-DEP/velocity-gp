@@ -60,3 +60,26 @@ export const rosterImportPreviewSchema = z.object({
 export const rosterImportApplySchema = z.object({
   rows: z.array(rosterImportRowSchema).min(1).max(5_000),
 });
+
+/** Validates score overrides from the admin team detail view. */
+export const updateAdminTeamScoreSchema = z.object({
+  score: z.coerce.number().int().min(0),
+  reason: z.string().min(2).max(500).optional(),
+});
+
+const phoneE164StrictSchema = phoneE164Schema.regex(/^\+[1-9]\d{7,14}$/, {
+  message: 'phoneE164 must use E.164 format.',
+});
+
+/** Validates admin updates to player contact details. */
+export const updateAdminPlayerContactSchema = z.object({
+  workEmail: z.string().email(),
+  phoneE164: phoneE164StrictSchema.nullable(),
+  reason: z.string().min(2).max(500).optional(),
+});
+
+/** Validates query options for player scan-history pagination. */
+export const adminPlayerScanHistoryQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  cursor: z.string().min(1).optional(),
+});

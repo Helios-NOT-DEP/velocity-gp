@@ -7,6 +7,7 @@
 
 import type { PlayerAssignmentStatus } from './auth.js';
 import type { TeamStatus } from './participants.js';
+import type { ScanOutcome } from './scans.js';
 
 /**
  * Identifies the logical transformation calculated when a roster row
@@ -189,4 +190,137 @@ export interface ListAdminRosterQuery {
   readonly teamId?: string;
   readonly limit?: number;
   readonly cursor?: string;
+}
+
+/**
+ * Team-member projection used in the Admin team detail view.
+ */
+export interface AdminTeamDetailMember {
+  readonly playerId: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly workEmail: string;
+  readonly individualScore: number;
+  readonly joinedAt: string;
+  readonly rank: number;
+}
+
+/**
+ * Team-level payload returned by Admin team detail endpoints.
+ */
+export interface GetAdminTeamDetailResponse {
+  readonly eventId: string;
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly teamStatus: TeamStatus;
+  readonly score: number;
+  readonly rank: number;
+  readonly pitStopExpiresAt: string | null;
+  readonly keywords: readonly string[];
+  readonly memberCount: number;
+  readonly members: readonly AdminTeamDetailMember[];
+}
+
+/**
+ * Admin payload for manually overriding a team's score.
+ */
+export interface UpdateAdminTeamScoreRequest {
+  readonly score: number;
+  readonly reason?: string;
+}
+
+/**
+ * Response payload after a successful team score update.
+ */
+export interface UpdateAdminTeamScoreResponse {
+  readonly eventId: string;
+  readonly teamId: string;
+  readonly score: number;
+  readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+/**
+ * Response payload for soft-deleting a team from active admin surfaces.
+ */
+export interface DeleteAdminTeamResponse {
+  readonly eventId: string;
+  readonly teamId: string;
+  readonly deletedAt: string;
+  readonly unassignedPlayerCount: number;
+  readonly auditId: string;
+}
+
+/**
+ * Detailed payload returned for an Admin player detail screen.
+ */
+export interface GetAdminPlayerDetailResponse {
+  readonly eventId: string;
+  readonly playerId: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly workEmail: string;
+  readonly phoneE164: string | null;
+  readonly joinedAt: string;
+  readonly individualScore: number;
+  readonly globalRank: number | null;
+  readonly teamId: string | null;
+  readonly teamName: string | null;
+  readonly teamScore: number | null;
+  readonly teamRank: number | null;
+}
+
+/**
+ * Admin payload for editing player contact details.
+ */
+export interface UpdateAdminPlayerContactRequest {
+  readonly workEmail: string;
+  readonly phoneE164: string | null;
+  readonly reason?: string;
+}
+
+/**
+ * Response payload after a successful player-contact update.
+ */
+export interface UpdateAdminPlayerContactResponse {
+  readonly eventId: string;
+  readonly playerId: string;
+  readonly userId: string;
+  readonly workEmail: string;
+  readonly phoneE164: string | null;
+  readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+/**
+ * Single scan-history row for Admin player-detail views.
+ */
+export interface AdminPlayerScanHistoryItem {
+  readonly scanId: string;
+  readonly eventId: string;
+  readonly playerId: string;
+  readonly teamId: string | null;
+  readonly qrCodeId: string | null;
+  readonly qrCodeLabel: string | null;
+  readonly qrPayload: string;
+  readonly outcome: ScanOutcome;
+  readonly pointsAwarded: number;
+  readonly scannedAt: string;
+  readonly message: string | null;
+}
+
+/**
+ * Query options for Admin player scan-history listing.
+ */
+export interface ListAdminPlayerScanHistoryQuery {
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+/**
+ * Cursor-paginated scan history payload for Admin player detail views.
+ */
+export interface ListAdminPlayerScanHistoryResponse {
+  readonly items: readonly AdminPlayerScanHistoryItem[];
+  readonly nextCursor: string | null;
 }
