@@ -32,6 +32,7 @@ jobs:
       FRONTEND_MAGIC_LINK_ORIGIN: ${{ vars.FRONTEND_MAGIC_LINK_ORIGIN || 'https://dev.velocitygp.app' }}
       DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       DO_APP_ID: ${{ vars.DO_APP_ID }}
+      DB_CLUSTER_ID: ${{ vars.DB_CLUSTER_ID || '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,7 +67,7 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
-        
+
       - name: Get Action IP
         if: ${{ inputs.environment == 'prod' }}
         id: ip
@@ -96,8 +97,7 @@ jobs:
           SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
         run: |
-            npm run db:deploy
-
+          npm run db:deploy
 
       - name: Run Database Seed for dev
         if: ${{ inputs.environment == 'dev' && inputs.reseed_data == 'true' }}
@@ -110,8 +110,8 @@ jobs:
           SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
         run: |
-            npm run db:generate
-            npm run db:seed
+          npm run db:generate
+          npm run db:seed
       # - if: vars.DO_APP_ID == ' '
       #   name: Deploy App
       #   run: doctl apps create-deployment ${{ vars.DO_APP_ID }} --verbose --wait
