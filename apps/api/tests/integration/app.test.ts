@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,10 @@ import { prisma } from '../../src/db/client.js';
 import { setEmailDispatcherForTests } from '../../src/services/emailDispatchService.js';
 import { createMagicLinkToken, createSessionToken } from '../../src/services/authTokens.js';
 import { AUTH_SESSION_COOKIE_NAME } from '../../src/services/authSessionToken.js';
+
+const apiPackageVersion = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+) as { version: string };
 
 describe('velocity gp backend', () => {
   const app = createApp();
@@ -28,6 +33,8 @@ describe('velocity gp backend', () => {
     adminUserId: `user-admin-app-${token}`,
     qrCodeId: `qr-app-${token}`,
     qrPayload: `VG-APP-${token.toUpperCase()}`,
+    heliosUserId: `user-helios-app-${token}`,
+    heliosPlayerId: `player-helios-app-${token}`,
   };
 
   function buildMailtrapSignatureHeaders(payload: unknown): Record<string, string> {
@@ -85,6 +92,14 @@ describe('velocity gp backend', () => {
           displayName: 'Unassigned Fixture',
           role: 'PLAYER',
           isHelios: false,
+        },
+        {
+          id: fixtureIds.heliosUserId,
+          email: `helios-${token}@velocitygp.dev`,
+          displayName: 'Helios Fixture',
+          role: 'HELIOS',
+          isHelios: true,
+          isHeliosMember: true,
         },
       ],
     });
@@ -157,6 +172,19 @@ describe('velocity gp backend', () => {
       },
     });
 
+    await prisma.player.create({
+      data: {
+        id: fixtureIds.heliosPlayerId,
+        userId: fixtureIds.heliosUserId,
+        eventId: fixtureIds.eventId,
+        teamId: fixtureIds.teamId,
+        status: 'RACING',
+        individualScore: 0,
+        isFlaggedForReview: false,
+        joinedAt: now,
+      },
+    });
+
     await prisma.qRCode.create({
       data: {
         id: fixtureIds.qrCodeId,
@@ -215,6 +243,11 @@ describe('velocity gp backend', () => {
         eventId: fixtureIds.eventId,
       },
     });
+    await prisma.superpowerQRAsset.deleteMany({
+      where: {
+        userId: fixtureIds.heliosUserId,
+      },
+    });
     await prisma.qRCode.deleteMany({
       where: {
         eventId: fixtureIds.eventId,
@@ -256,6 +289,20 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.service).toBe('velocity-gp-bff');
+    expect(response.body.data.version).toBe(apiPackageVersion.version);
+  });
+
+  it('returns readiness information', async () => {
+    const response = await request(app).get('/ready');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.status).toBe('ready');
+    expect(response.body.data.version).toBe(apiPackageVersion.version);
+    expect(response.body.data.checks).toMatchObject({
+      api: true,
+      databaseConfigured: expect.any(Boolean),
+    });
   });
 
   it('serves placeholder race state data', async () => {
@@ -322,6 +369,7 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.outcome).toBe('INVALID');
     expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
+    expect(response.body.data.flaggedForReview).toBe(true);
   });
 
   it('records onboarding and scan events in the team activity feed endpoint', async () => {
@@ -490,6 +538,7 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.outcome).toBe('INVALID');
     expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
+    expect(response.body.data.flaggedForReview).toBe(true);
   });
 
   it('returns duplicate scan outcomes with HTTP 200 for successful processing', async () => {
@@ -600,6 +649,24 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.accepted).toBe(true);
     expect(typeof response.body.data.message).toBe('string');
+  });
+
+  it('accepts magic-link requests for admin users without active player assignment', async () => {
+    const adminEmail = `admin-${token}@velocitygp.dev`;
+
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        return;
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: adminEmail });
+
+    expect(response.status).toBe(202);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.accepted).toBe(true);
   });
 
   it('rejects Mailtrap webhook requests without a valid bearer token', async () => {
@@ -836,10 +903,13 @@ describe('velocity gp backend', () => {
     expect(cookieSessionResponse.status).toBe(200);
     expect(cookieSessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
 
-    const [sessionResponse, routingResponse] = await Promise.all([
+    const [sessionResponse, routingResponse, identityResponse] = await Promise.all([
       request(app).get(`${apiPrefix}/auth/session`).set('authorization', `Bearer ${sessionToken}`),
       request(app)
         .get(`${apiPrefix}/auth/routing-decision`)
+        .set('authorization', `Bearer ${sessionToken}`),
+      request(app)
+        .get(`${apiPrefix}/events/current/players/me`)
         .set('authorization', `Bearer ${sessionToken}`),
     ]);
 
@@ -847,6 +917,10 @@ describe('velocity gp backend', () => {
     expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
     expect(routingResponse.status).toBe(200);
     expect(routingResponse.body.data.redirectPath).toBe('/race');
+    expect(identityResponse.status).toBe(200);
+    expect(identityResponse.body.data.playerId).toBe(fixtureIds.playerId);
+    expect(identityResponse.body.data.teamStatus).toBe('ACTIVE');
+    expect(identityResponse.body.data.pitStopExpiresAt).toBeNull();
   });
 
   it('falls back to cookie auth when a stale bearer token is also present', async () => {
@@ -967,6 +1041,15 @@ describe('velocity gp backend', () => {
   });
 
   it('lists admin roster and supports assignment-status filtering', async () => {
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.unassignedPlayerId,
+      },
+      data: {
+        isFlaggedForReview: true,
+      },
+    });
+
     const allRosterResponse = await request(app)
       .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
       .set('x-user-id', fixtureIds.adminUserId)
@@ -975,6 +1058,7 @@ describe('velocity gp backend', () => {
     expect(allRosterResponse.status).toBe(200);
     expect(allRosterResponse.body.success).toBe(true);
     expect(allRosterResponse.body.data.items.length).toBeGreaterThanOrEqual(2);
+    expect(allRosterResponse.body.data.items[0]).toHaveProperty('isFlaggedForReview');
 
     const unassignedResponse = await request(app)
       .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
@@ -987,6 +1071,87 @@ describe('velocity gp backend', () => {
     expect(unassignedResponse.body.data.items).toHaveLength(1);
     expect(unassignedResponse.body.data.items[0].playerId).toBe(fixtureIds.unassignedPlayerId);
     expect(unassignedResponse.body.data.items[0].assignmentStatus).toBe('UNASSIGNED');
+
+    const flaggedResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
+      .query({ isFlaggedForReview: 'true' })
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(flaggedResponse.status).toBe(200);
+    expect(flaggedResponse.body.success).toBe(true);
+    expect(flaggedResponse.body.data.items.length).toBeGreaterThanOrEqual(1);
+    expect(
+      flaggedResponse.body.data.items.every(
+        (item: { isFlaggedForReview: boolean }) => item.isFlaggedForReview
+      )
+    ).toBe(true);
+    expect(
+      flaggedResponse.body.data.items.some(
+        (item: { playerId: string }) => item.playerId === fixtureIds.unassignedPlayerId
+      )
+    ).toBe(true);
+  });
+
+  it('resolves flagged players through admin review endpoint and records an audit row', async () => {
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.playerId,
+      },
+      data: {
+        isFlaggedForReview: true,
+      },
+    });
+
+    const response = await request(app)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/review-flag`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        decision: 'APPROVED',
+        reason: 'Confirmed accidental scan and completed review.',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.playerId).toBe(fixtureIds.playerId);
+    expect(response.body.data.isFlaggedForReview).toBe(false);
+    expect(response.body.data.decision).toBe('APPROVED');
+    expect(response.body.data.reason).toContain('completed review');
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const [player, audit] = await Promise.all([
+      prisma.player.findUnique({
+        where: {
+          id: fixtureIds.playerId,
+        },
+        select: {
+          isFlaggedForReview: true,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          actionType: 'PLAYER_REVIEW_FLAG_RESOLVED',
+          targetId: fixtureIds.playerId,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          details: true,
+        },
+      }),
+    ]);
+
+    expect(player?.isFlaggedForReview).toBe(false);
+    expect(audit).not.toBeNull();
+    expect(audit?.details).toMatchObject({
+      reviewResolution: true,
+      decision: 'APPROVED',
+    });
   });
 
   it('updates roster assignments and writes roster audit rows', async () => {
@@ -1155,6 +1320,347 @@ describe('velocity gp backend', () => {
     expect(importAudit).not.toBeNull();
   });
 
+  it('returns team detail with team rank and member rankings', async () => {
+    await Promise.all([
+      prisma.team.update({
+        where: {
+          id: fixtureIds.teamId,
+        },
+        data: {
+          deletedAt: null,
+          status: 'ACTIVE',
+          score: 1200,
+          pitStopExpiresAt: null,
+        },
+      }),
+      prisma.team.update({
+        where: {
+          id: fixtureIds.secondTeamId,
+        },
+        data: {
+          deletedAt: null,
+          status: 'ACTIVE',
+          score: 900,
+          pitStopExpiresAt: null,
+        },
+      }),
+      prisma.player.update({
+        where: {
+          id: fixtureIds.playerId,
+        },
+        data: {
+          teamId: fixtureIds.teamId,
+          individualScore: 340,
+        },
+      }),
+      prisma.player.update({
+        where: {
+          id: fixtureIds.unassignedPlayerId,
+        },
+        data: {
+          teamId: fixtureIds.teamId,
+          individualScore: 180,
+        },
+      }),
+    ]);
+
+    const response = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/detail`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.teamId).toBe(fixtureIds.teamId);
+    expect(response.body.data.rank).toBe(1);
+    expect(response.body.data.memberCount).toBeGreaterThanOrEqual(2);
+    expect(response.body.data.members[0].playerId).toBe(fixtureIds.playerId);
+    expect(response.body.data.members[0].rank).toBe(1);
+    expect(response.body.data.members[1].playerId).toBe(fixtureIds.unassignedPlayerId);
+    expect(response.body.data.members[1].rank).toBe(2);
+  });
+
+  it('updates team score and records TEAM_SCORE_UPDATED audits', async () => {
+    const response = await request(app)
+      .patch(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${fixtureIds.teamId}/score`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ score: 1777, reason: 'manual correction' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.teamId).toBe(fixtureIds.teamId);
+    expect(response.body.data.score).toBe(1777);
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const [team, audit] = await Promise.all([
+      prisma.team.findUnique({
+        where: {
+          id: fixtureIds.teamId,
+        },
+        select: {
+          score: true,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          targetId: fixtureIds.teamId,
+          actionType: 'TEAM_SCORE_UPDATED',
+        },
+      }),
+    ]);
+
+    expect(team?.score).toBe(1777);
+    expect(audit).not.toBeNull();
+  });
+
+  it('returns player detail, updates contact, and lists full scan-history outcomes', async () => {
+    const updatedEmail = `player-detail-${token}@velocitygp.dev`;
+    const updatedPhone = '+14155550199';
+    const now = Date.now();
+
+    await prisma.team.update({
+      where: {
+        id: fixtureIds.teamId,
+      },
+      data: {
+        deletedAt: null,
+      },
+    });
+
+    await prisma.player.updateMany({
+      where: {
+        eventId: fixtureIds.eventId,
+      },
+      data: {
+        individualScore: 10,
+      },
+    });
+
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.playerId,
+      },
+      data: {
+        teamId: fixtureIds.teamId,
+        individualScore: 500,
+        isFlaggedForReview: true,
+      },
+    });
+
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.unassignedPlayerId,
+      },
+      data: {
+        teamId: fixtureIds.teamId,
+        individualScore: 250,
+      },
+    });
+
+    await prisma.scanRecord.deleteMany({
+      where: {
+        eventId: fixtureIds.eventId,
+        playerId: fixtureIds.playerId,
+      },
+    });
+
+    await prisma.scanRecord.createMany({
+      data: [
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'SAFE',
+          pointsAwarded: 120,
+          scannedPayload: `${fixtureIds.qrPayload}-SAFE`,
+          message: 'safe',
+          createdAt: new Date(now - 60_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'HAZARD_PIT',
+          pointsAwarded: 0,
+          scannedPayload: `${fixtureIds.qrPayload}-HAZARD`,
+          message: 'hazard',
+          createdAt: new Date(now - 45_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: null,
+          outcome: 'INVALID',
+          pointsAwarded: -1,
+          scannedPayload: 'invalid-payload',
+          message: 'invalid',
+          createdAt: new Date(now - 30_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'DUPLICATE',
+          pointsAwarded: 0,
+          scannedPayload: `${fixtureIds.qrPayload}-DUP`,
+          message: 'duplicate',
+          createdAt: new Date(now - 15_000),
+        },
+        {
+          eventId: fixtureIds.eventId,
+          playerId: fixtureIds.playerId,
+          teamId: fixtureIds.teamId,
+          qrCodeId: fixtureIds.qrCodeId,
+          outcome: 'BLOCKED',
+          pointsAwarded: 0,
+          scannedPayload: `${fixtureIds.qrPayload}-BLOCK`,
+          message: 'blocked',
+          createdAt: new Date(now - 5_000),
+        },
+      ],
+    });
+
+    const detailResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/detail`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.success).toBe(true);
+    expect(detailResponse.body.data.playerId).toBe(fixtureIds.playerId);
+    expect(detailResponse.body.data.globalRank).toBe(1);
+    expect(detailResponse.body.data.teamRank).toBe(1);
+    expect(detailResponse.body.data.teamId).toBe(fixtureIds.teamId);
+    expect(detailResponse.body.data.isFlaggedForReview).toBe(true);
+
+    const contactResponse = await request(app)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/contact`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        workEmail: updatedEmail,
+        phoneE164: updatedPhone,
+        reason: 'detail-view edit',
+      });
+
+    expect(contactResponse.status).toBe(200);
+    expect(contactResponse.body.success).toBe(true);
+    expect(contactResponse.body.data.workEmail).toBe(updatedEmail);
+    expect(contactResponse.body.data.phoneE164).toBe(updatedPhone);
+    expect(contactResponse.body.data.auditId).toBeTruthy();
+
+    const scanHistoryResponse = await request(app)
+      .get(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/scan-history`
+      )
+      .query({ limit: 10 })
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(scanHistoryResponse.status).toBe(200);
+    expect(scanHistoryResponse.body.success).toBe(true);
+    expect(scanHistoryResponse.body.data.items).toHaveLength(5);
+    expect(scanHistoryResponse.body.data.items[0].outcome).toBe('BLOCKED');
+    expect(scanHistoryResponse.body.data.items[1].outcome).toBe('DUPLICATE');
+    expect(scanHistoryResponse.body.data.items[2].outcome).toBe('INVALID');
+    expect(scanHistoryResponse.body.data.items[3].outcome).toBe('HAZARD_PIT');
+    expect(scanHistoryResponse.body.data.items[4].outcome).toBe('SAFE');
+    expect(scanHistoryResponse.body.data.items[0].qrCodeLabel).toContain(`App QR ${token}`);
+  });
+
+  it('soft-deletes teams, unassigns members, and excludes deleted teams from admin roster surfaces', async () => {
+    const deletableTeamId = `team-delete-${token}`;
+    const deletableUserId = `user-delete-${token}`;
+    const deletablePlayerId = `player-delete-${token}`;
+
+    await prisma.user.create({
+      data: {
+        id: deletableUserId,
+        email: `team-delete-${token}@velocitygp.dev`,
+        displayName: 'Delete Candidate',
+        role: 'PLAYER',
+      },
+    });
+
+    await prisma.team.create({
+      data: {
+        id: deletableTeamId,
+        eventId: fixtureIds.eventId,
+        name: `Delete Team ${token}`,
+        status: 'IN_PIT',
+      },
+    });
+
+    await prisma.player.create({
+      data: {
+        id: deletablePlayerId,
+        userId: deletableUserId,
+        eventId: fixtureIds.eventId,
+        teamId: deletableTeamId,
+        status: 'IN_PIT',
+      },
+    });
+
+    const deleteResponse = await request(app)
+      .delete(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${deletableTeamId}`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body.success).toBe(true);
+    expect(deleteResponse.body.data.teamId).toBe(deletableTeamId);
+    expect(deleteResponse.body.data.unassignedPlayerCount).toBe(1);
+
+    const [deletedTeam, affectedPlayer, rosterTeamsResponse, deletedDetailResponse] =
+      await Promise.all([
+        prisma.team.findUnique({
+          where: {
+            id: deletableTeamId,
+          },
+          select: {
+            deletedAt: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: deletablePlayerId,
+          },
+          select: {
+            teamId: true,
+            status: true,
+          },
+        }),
+        request(app)
+          .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/teams`)
+          .set('x-user-id', fixtureIds.adminUserId)
+          .set('x-user-role', 'admin'),
+        request(app)
+          .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/teams/${deletableTeamId}/detail`)
+          .set('x-user-id', fixtureIds.adminUserId)
+          .set('x-user-role', 'admin'),
+      ]);
+
+    expect(deletedTeam?.deletedAt).not.toBeNull();
+    expect(affectedPlayer?.teamId).toBeNull();
+    expect(affectedPlayer?.status).toBe('RACING');
+    expect(rosterTeamsResponse.status).toBe(200);
+    expect(
+      (rosterTeamsResponse.body.data.teams as Array<{ teamId: string }>).some(
+        (team) => team.teamId === deletableTeamId
+      )
+    ).toBe(false);
+    expect(deletedDetailResponse.status).toBe(400);
+    expect(deletedDetailResponse.body.success).toBe(false);
+  });
+
   it('rejects admin routes when authentication context is missing', async () => {
     const response = await request(app).get(`${apiPrefix}/admin/session`);
 
@@ -1185,6 +1691,132 @@ describe('velocity gp backend', () => {
     expect(response.body.data.scope).toBe('admin');
     expect(response.body.data.userId).toBe('admin-1');
     expect(response.body.data.role).toBe('admin');
+  });
+
+  it('keeps non-admin event routes unaffected by admin middleware enforcement', async () => {
+    const unauthenticatedResponse = await request(app).get(`${apiPrefix}/events/current`);
+    const playerHeaderResponse = await request(app)
+      .get(`${apiPrefix}/events/current`)
+      .set('x-user-id', fixtureIds.playerUserId)
+      .set('x-user-role', 'player');
+    const adminHeaderResponse = await request(app)
+      .get(`${apiPrefix}/events/current`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(unauthenticatedResponse.status).toBe(200);
+    expect(playerHeaderResponse.status).toBe(200);
+    expect(adminHeaderResponse.status).toBe(200);
+
+    expect(unauthenticatedResponse.body.success).toBe(true);
+    expect(playerHeaderResponse.body.success).toBe(true);
+    expect(adminHeaderResponse.body.success).toBe(true);
+
+    expect(playerHeaderResponse.body.data.id).toBe(unauthenticatedResponse.body.data.id);
+    expect(adminHeaderResponse.body.data.id).toBe(unauthenticatedResponse.body.data.id);
+  });
+
+  it('updates user capabilities through the unified admin endpoint', async () => {
+    try {
+      const response = await request(app)
+        .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({
+          capabilities: {
+            admin: true,
+            player: true,
+            heliosMember: true,
+          },
+          reason: 'promoted for event operations',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.userId).toBe(fixtureIds.playerUserId);
+      expect(response.body.data.capabilities).toEqual({
+        admin: true,
+        player: true,
+        heliosMember: true,
+      });
+
+      const [user, audit] = await Promise.all([
+        prisma.user.findUnique({
+          where: {
+            id: fixtureIds.playerUserId,
+          },
+          select: {
+            canAdmin: true,
+            canPlayer: true,
+            isHeliosMember: true,
+          },
+        }),
+        prisma.adminActionAudit.findFirst({
+          where: {
+            targetId: fixtureIds.playerUserId,
+            actionType: 'HELIOS_ASSIGNED',
+          },
+        }),
+      ]);
+
+      expect(user).toMatchObject({
+        canAdmin: true,
+        canPlayer: true,
+        isHeliosMember: true,
+      });
+      expect(audit).not.toBeNull();
+    } finally {
+      await prisma.user.update({
+        where: {
+          id: fixtureIds.playerUserId,
+        },
+        data: {
+          role: 'PLAYER',
+          canAdmin: false,
+          canPlayer: true,
+          isHeliosMember: false,
+          isHelios: false,
+        },
+      });
+    }
+  });
+
+  it('rejects capability updates that disable both admin and player access', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        capabilities: {
+          admin: false,
+          player: false,
+          heliosMember: false,
+        },
+        reason: 'attempt invalid disable',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects capability updates when heliosMember is true without player capability', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/users/${fixtureIds.playerUserId}/capabilities`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        capabilities: {
+          admin: true,
+          player: false,
+          heliosMember: true,
+        },
+        reason: 'attempt invalid helios-only membership',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
 
   it('allows legacy admin headers when a stale non-admin session cookie is present', async () => {
@@ -1720,5 +2352,126 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Helios Superpower QR
+  // ---------------------------------------------------------------------------
+
+  it('provisions and returns a Superpower QR for a Helios user on first access', async () => {
+    const upstreamFetch: typeof globalThis.fetch = globalThis.fetch.bind(globalThis);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/webhook/')) {
+        return new Response(
+          JSON.stringify({ qrImageURL: 'https://cdn.velocitygp.app/qr/superpower-test.png' }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return upstreamFetch(input, init);
+    });
+
+    try {
+      const response = await request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.asset.qrImageUrl).toBe(
+        'https://cdn.velocitygp.app/qr/superpower-test.png'
+      );
+      expect(response.body.data.asset.status).toBe('ACTIVE');
+      expect(typeof response.body.data.asset.payload).toBe('string');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('returns the same active Superpower QR on repeat requests', async () => {
+    // No fetch mock needed — asset was provisioned in prior test and should be returned from DB.
+    const [first, second] = await Promise.all([
+      request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios'),
+      request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios'),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.body.data.asset.id).toBe(second.body.data.asset.id);
+  });
+
+  it('regenerates the Superpower QR and revokes the previous one', async () => {
+    const upstreamFetch: typeof globalThis.fetch = globalThis.fetch.bind(globalThis);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/webhook/')) {
+        return new Response(
+          JSON.stringify({ qrImageURL: 'https://cdn.velocitygp.app/qr/superpower-regen.png' }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return upstreamFetch(input, init);
+    });
+
+    try {
+      // Capture the current asset ID before regeneration.
+      const beforeResponse = await request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios');
+      const oldAssetId = beforeResponse.body.data.asset.id as string;
+
+      const regenResponse = await request(app)
+        .post(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr/regenerate`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios');
+
+      expect(regenResponse.status).toBe(200);
+      expect(regenResponse.body.success).toBe(true);
+      expect(regenResponse.body.data.asset.status).toBe('ACTIVE');
+      expect(regenResponse.body.data.asset.id).not.toBe(oldAssetId);
+      expect(regenResponse.body.data.revokedAssetId).toBe(oldAssetId);
+      expect(regenResponse.body.data.asset.qrImageUrl).toBe(
+        'https://cdn.velocitygp.app/qr/superpower-regen.png'
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('rejects a non-Helios player requesting a Superpower QR', async () => {
+    const response = await request(app)
+      .get(`${apiPrefix}/players/${fixtureIds.playerId}/superpower-qr`)
+      .set('x-user-id', fixtureIds.playerUserId)
+      .set('x-user-role', 'player');
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+  });
+
+  it('rejects an unauthenticated request for a Superpower QR', async () => {
+    const response = await request(app).get(
+      `${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+  });
+
+  it('rejects a Helios user from accessing another player Superpower QR', async () => {
+    const response = await request(app)
+      .get(`${apiPrefix}/players/${fixtureIds.playerId}/superpower-qr`)
+      .set('x-user-id', fixtureIds.heliosUserId)
+      .set('x-user-role', 'helios');
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
   });
 });

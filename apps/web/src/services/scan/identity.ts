@@ -51,6 +51,8 @@ export async function resolveScanIdentityForEmail(
       playerId: response.data.playerId,
       teamId: response.data.teamId,
       teamName: response.data.teamName,
+      teamStatus: response.data.teamStatus,
+      pitStopExpiresAt: response.data.pitStopExpiresAt,
       email: response.data.email,
     },
   };

@@ -132,6 +132,7 @@ function normalizeSessionFromResponse(session: SessionResponse['session']): Auth
     teamId: session.teamId,
     teamStatus: session.teamStatus,
     assignmentStatus: session.assignmentStatus,
+    capabilities: session.capabilities,
     role: session.role,
     isAuthenticated: session.isAuthenticated,
     email: session.email,
@@ -160,8 +161,12 @@ function readSessionFromStorage(): AuthSession {
 
     return {
       userId,
-      playerId: typeof parsed.playerId === 'string' ? parsed.playerId : undefined,
-      eventId: typeof parsed.eventId === 'string' ? parsed.eventId : undefined,
+      playerId:
+        parsed.playerId === null || typeof parsed.playerId === 'string'
+          ? parsed.playerId
+          : undefined,
+      eventId:
+        parsed.eventId === null || typeof parsed.eventId === 'string' ? parsed.eventId : undefined,
       teamId:
         parsed.teamId === null || typeof parsed.teamId === 'string' ? parsed.teamId : undefined,
       teamStatus:
@@ -176,6 +181,21 @@ function readSessionFromStorage(): AuthSession {
         parsed.assignmentStatus === 'ASSIGNED_ACTIVE' ||
         parsed.assignmentStatus === 'UNASSIGNED'
           ? parsed.assignmentStatus
+          : undefined,
+      capabilities:
+        parsed.capabilities &&
+        typeof parsed.capabilities === 'object' &&
+        'admin' in parsed.capabilities &&
+        'player' in parsed.capabilities &&
+        'heliosMember' in parsed.capabilities &&
+        typeof parsed.capabilities.admin === 'boolean' &&
+        typeof parsed.capabilities.player === 'boolean' &&
+        typeof parsed.capabilities.heliosMember === 'boolean'
+          ? {
+              admin: parsed.capabilities.admin,
+              player: parsed.capabilities.player,
+              heliosMember: parsed.capabilities.heliosMember,
+            }
           : undefined,
       role: isAuthenticated ? normalizedRole : 'anonymous',
       isAuthenticated,

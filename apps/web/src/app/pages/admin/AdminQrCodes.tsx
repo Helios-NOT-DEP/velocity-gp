@@ -11,7 +11,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import type { QRCodeSummary, QrImportPreviewResponse, QrImportRowInput } from '@/services/api';
+import type { QrImportPreviewResponse, QrImportRowInput } from '@/services/api';
 import {
   applyQrImport,
   createAdminQRCode,
@@ -24,24 +24,8 @@ import {
   updateAdminQrHazardOverrides,
 } from '@/services/admin/qrCodes';
 import { getCurrentEventId } from '@/services/admin/roster';
+import { isAdminQrCodeActiveNow, toAdminQrCode } from '../../admin/adminQrCodeData';
 import { adminDemoQrCodes, type AdminQrCode } from '../../admin/adminViewData';
-
-function toAdminQrCode(qrCode: QRCodeSummary): AdminQrCode {
-  return {
-    id: qrCode.id,
-    name: qrCode.label,
-    points: qrCode.value,
-    zone: qrCode.zone,
-    payload: qrCode.payload,
-    qrImageUrl: qrCode.qrImageUrl,
-    active: qrCode.status === 'ACTIVE',
-    scanCount: qrCode.scanCount,
-    hazardRatioOverride: qrCode.hazardRatioOverride,
-    hazardWeightOverride: qrCode.hazardWeightOverride,
-    activationStartsAt: qrCode.activationStartsAt,
-    activationEndsAt: qrCode.activationEndsAt,
-  };
-}
 
 function toApiIsoDateTime(value: string): string | undefined {
   if (!value) {
@@ -204,7 +188,10 @@ export default function AdminQrCodes() {
   }, []);
 
   const isDemoMode = eventId === null;
-  const activeCount = useMemo(() => qrCodes.filter((code) => code.active).length, [qrCodes]);
+  const activeCount = useMemo(
+    () => qrCodes.filter((code) => isAdminQrCodeActiveNow(code)).length,
+    [qrCodes]
+  );
 
   async function handleCreateQRCode() {
     if (isDemoMode || !eventId || isCreating) {

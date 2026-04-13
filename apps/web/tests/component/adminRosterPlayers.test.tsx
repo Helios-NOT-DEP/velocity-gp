@@ -3,6 +3,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import AdminPlayers from '@/app/pages/admin/AdminPlayers';
 import { AUTH_SESSION_STORAGE_KEY, type AuthSession } from '@/services/auth';
 
@@ -21,6 +22,14 @@ const adminSession: AuthSession = {
   isAuthenticated: true,
   email: 'admin@example.com',
 };
+
+function renderAdminPlayers() {
+  return render(
+    <MemoryRouter>
+      <AdminPlayers />
+    </MemoryRouter>
+  );
+}
 
 describe('AdminPlayers roster workflows', () => {
   beforeEach(() => {
@@ -178,7 +187,7 @@ describe('AdminPlayers roster workflows', () => {
         })
       );
 
-    render(<AdminPlayers />);
+    renderAdminPlayers();
 
     await waitFor(() => {
       expect(screen.getByText('Player One')).toBeTruthy();
@@ -329,7 +338,7 @@ describe('AdminPlayers roster workflows', () => {
         })
       );
 
-    render(<AdminPlayers />);
+    renderAdminPlayers();
 
     await waitFor(() => {
       expect(screen.getByText('Player One')).toBeTruthy();
@@ -435,7 +444,7 @@ describe('AdminPlayers roster workflows', () => {
         })
       );
 
-    render(<AdminPlayers />);
+    renderAdminPlayers();
 
     await waitFor(() => {
       expect(screen.getByText('Roster Import (CSV)')).toBeTruthy();
@@ -473,5 +482,167 @@ describe('AdminPlayers roster workflows', () => {
     });
 
     expect(screen.getByText('Duplicate workEmail in import payload.')).toBeTruthy();
+  });
+
+  it('shows flagged badges and applies flagged-only roster filtering', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    window.fetch = fetchMock as typeof window.fetch;
+
+    fetchMock
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            id: 'event-1',
+            name: 'Velocity GP Finals',
+            startDate: '2026-04-07T10:00:00.000Z',
+            endDate: '2026-04-07T18:00:00.000Z',
+            status: 'ACTIVE',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [
+              {
+                playerId: 'player-flagged',
+                userId: 'user-flagged',
+                eventId: 'event-1',
+                workEmail: 'flagged@velocitygp.dev',
+                displayName: 'Flagged Player',
+                isHelios: false,
+                phoneE164: null,
+                teamId: 'team-1',
+                teamName: 'Apex',
+                teamStatus: 'ACTIVE',
+                assignmentStatus: 'ASSIGNED_ACTIVE',
+                isFlaggedForReview: true,
+                joinedAt: '2026-04-07T10:00:00.000Z',
+                updatedAt: '2026-04-07T10:00:00.000Z',
+              },
+              {
+                playerId: 'player-regular',
+                userId: 'user-regular',
+                eventId: 'event-1',
+                workEmail: 'regular@velocitygp.dev',
+                displayName: 'Regular Player',
+                isHelios: false,
+                phoneE164: null,
+                teamId: 'team-1',
+                teamName: 'Apex',
+                teamStatus: 'ACTIVE',
+                assignmentStatus: 'ASSIGNED_ACTIVE',
+                isFlaggedForReview: false,
+                joinedAt: '2026-04-07T10:00:00.000Z',
+                updatedAt: '2026-04-07T10:00:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            teams: [
+              {
+                teamId: 'team-1',
+                teamName: 'Apex',
+                teamStatus: 'ACTIVE',
+                memberCount: 2,
+              },
+            ],
+            unassignedCount: 0,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [
+              {
+                playerId: 'player-flagged',
+                userId: 'user-flagged',
+                eventId: 'event-1',
+                workEmail: 'flagged@velocitygp.dev',
+                displayName: 'Flagged Player',
+                isHelios: false,
+                phoneE164: null,
+                teamId: 'team-1',
+                teamName: 'Apex',
+                teamStatus: 'ACTIVE',
+                assignmentStatus: 'ASSIGNED_ACTIVE',
+                isFlaggedForReview: true,
+                joinedAt: '2026-04-07T10:00:00.000Z',
+                updatedAt: '2026-04-07T10:00:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            teams: [
+              {
+                teamId: 'team-1',
+                teamName: 'Apex',
+                teamStatus: 'ACTIVE',
+                memberCount: 2,
+              },
+            ],
+            unassignedCount: 0,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      );
+
+    renderAdminPlayers();
+
+    await waitFor(() => {
+      expect(screen.getByText('Flagged Player')).toBeTruthy();
+      expect(screen.getByText('Regular Player')).toBeTruthy();
+      expect(screen.getByText('FLAGGED')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByDisplayValue('All Players'), {
+      target: { value: 'FLAGGED' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Flagged Player')).toBeTruthy();
+      expect(screen.queryByText('Regular Player')).toBeNull();
+    });
+
+    const flaggedFilterCall = fetchMock.mock.calls.find(
+      ([url]) =>
+        String(url).includes('/admin/events/event-1/roster?') &&
+        String(url).includes('isFlaggedForReview=true')
+    );
+    expect(flaggedFilterCall).toBeTruthy();
   });
 });

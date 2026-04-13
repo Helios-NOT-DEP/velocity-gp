@@ -27,3 +27,11 @@ export const updatePlayerSchema = z.object({
   name: z.string().min(2).optional(),
   teamId: z.string().min(1).nullable().optional(),
 });
+
+/**
+ * URL param extractor for Helios Superpower QR endpoints.
+ * Requires the caller to supply a valid player identifier in the route path.
+ */
+export const heliosQrParamsSchema = z.object({
+  playerId: z.string().min(1),
+});

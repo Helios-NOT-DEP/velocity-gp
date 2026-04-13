@@ -35,6 +35,8 @@ describe('scan identity resolver', () => {
         playerId: 'player-lina-active',
         teamId: 'team-apex-comets',
         teamName: 'Apex Comets',
+        teamStatus: 'ACTIVE',
+        pitStopExpiresAt: null,
         email: 'lina@velocitygp.dev',
       },
     });
@@ -51,6 +53,8 @@ describe('scan identity resolver', () => {
       playerId: 'player-lina-active',
       teamId: 'team-apex-comets',
       teamName: 'Apex Comets',
+      teamStatus: 'ACTIVE',
+      pitStopExpiresAt: null,
       email: 'lina@velocitygp.dev',
     });
     expect(getCurrentEventPlayerMock).toHaveBeenCalledTimes(1);
@@ -223,6 +227,7 @@ describe('scan outcome mapper', () => {
       message: 'blocked',
       pointsAwarded: 0,
       errorCode: 'TEAM_IN_PIT',
+      pitStopExpiresAt: new Date(Date.now() + 60_000).toISOString(),
     });
 
     expect(action.feedback.level).toBe('warning');
@@ -247,6 +252,28 @@ describe('scan outcome mapper', () => {
     expect(action.feedback.level).toBe('error');
     expect(action.navigateTo).toBeNull();
     expect(action.shouldResumeScanner).toBe(false);
+  });
+
+  it('maps INVALID outcomes to warning feedback with scanner resume', () => {
+    const action = mapScanResponseToUiAction({
+      outcome: 'INVALID',
+      eventId: 'event-velocity-active',
+      playerId: 'player-lina-active',
+      teamId: 'team-apex-comets',
+      qrCodeId: null,
+      qrPayload: 'VG-UNKNOWN',
+      scannedAt: new Date().toISOString(),
+      message: 'QR payload is not recognized.',
+      pointsAwarded: -1,
+      teamScore: 999,
+      errorCode: 'QR_NOT_FOUND',
+      flaggedForReview: true,
+    });
+
+    expect(action.feedback.level).toBe('warning');
+    expect(action.feedback.message).toContain('Invalid QR code');
+    expect(action.navigateTo).toBeNull();
+    expect(action.shouldResumeScanner).toBe(true);
   });
 });
 

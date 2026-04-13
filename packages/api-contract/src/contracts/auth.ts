@@ -14,6 +14,19 @@ import type { TeamStatus } from './participants.js';
 export type AuthSessionRole = 'admin' | 'helios' | 'player';
 
 /**
+ * Capability flags describing what a signed-in account can do.
+ *
+ * - `admin`: may access organizer/admin controls.
+ * - `player`: may access player gameplay flows.
+ * - `heliosMember`: player subgroup allowed to use Helios rescue/profile features.
+ */
+export interface AuthCapabilities {
+  readonly admin: boolean;
+  readonly player: boolean;
+  readonly heliosMember: boolean;
+}
+
+/**
  * Captures a player's progress through the registration flowchart during an event.
  */
 export type PlayerAssignmentStatus = 'ASSIGNED_PENDING' | 'ASSIGNED_ACTIVE' | 'UNASSIGNED';
@@ -53,12 +66,16 @@ export interface VerifyMagicLinkRequest {
  */
 export interface PlayerAuthSession {
   readonly userId: string;
-  readonly playerId: string;
-  readonly eventId: string;
+  readonly playerId: string | null;
+  readonly eventId: string | null;
   readonly teamId: string | null;
   /** Active PIT or RACE context for the player's team */
   readonly teamStatus: TeamStatus | null;
   readonly assignmentStatus: PlayerAssignmentStatus;
+  readonly capabilities: AuthCapabilities;
+  /**
+   * @deprecated Compatibility role surface. Prefer `capabilities`.
+   */
   readonly role: AuthSessionRole;
   readonly isAuthenticated: true;
   readonly email: string;
@@ -73,7 +90,7 @@ export interface VerifyMagicLinkResponse {
   readonly sessionToken: string;
   readonly session: PlayerAuthSession;
   // Canonical player routes after story #55 route alignment.
-  readonly redirectPath: '/team-setup' | '/race' | '/waiting-assignment';
+  readonly redirectPath: '/team-setup' | '/race' | '/waiting-assignment' | '/admin/game-control';
 }
 
 /**
@@ -90,8 +107,8 @@ export interface SessionResponse {
 export interface RoutingDecisionResponse {
   readonly assignmentStatus: PlayerAssignmentStatus;
   // Canonical player routes after story #55 route alignment.
-  readonly redirectPath: '/team-setup' | '/race' | '/waiting-assignment';
-  readonly eventId: string;
-  readonly playerId: string;
+  readonly redirectPath: '/team-setup' | '/race' | '/waiting-assignment' | '/admin/game-control';
+  readonly eventId: string | null;
+  readonly playerId: string | null;
   readonly teamId: string | null;
 }

@@ -1,7 +1,7 @@
 {
   "name": "@velocity-gp/web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "build": "vite build",
@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "@velocity-gp/api-client": "0.1.0",
+    "@velocity-gp/api-client": "0.2.0",
     "@velocity-gp/api-contract": "0.1.0",
     "@velocity-gp/ui": "0.1.0",
     "@yudiel/react-qr-scanner": "^2.5.1",

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
+import { buildInfo } from '../config/buildInfo.js';
 import { getDatabaseConfig } from '../db/client.js';
 
 export const healthRouter = Router();
@@ -11,6 +12,7 @@ healthRouter.get('/health', (_request, response) => {
     successResponse({
       status: 'ok',
       service: 'velocity-gp-bff',
+      version: buildInfo.version,
       databaseConfigured: getDatabaseConfig().configured,
     })
   );
@@ -21,6 +23,7 @@ healthRouter.get('/ready', (_request, response) => {
   response.json(
     successResponse({
       status: 'ready',
+      version: buildInfo.version,
       checks: {
         api: true,
         databaseConfigured: getDatabaseConfig().configured,

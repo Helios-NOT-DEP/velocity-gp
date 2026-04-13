@@ -7,6 +7,7 @@
 
 import type { RaceControlState } from './raceState.js';
 import type { TeamStatus } from './participants.js';
+import type { AuthCapabilities } from './auth.js';
 
 /**
  * An exhaustive enumeration of system-level actions logged by administrative users.
@@ -22,6 +23,7 @@ export type AdminActionType =
   | 'QR_CREATED'
   | 'QR_STATUS_UPDATED'
   | 'QR_DELETED'
+  | 'SUPERPOWER_QR_REGENERATED'
   | 'QR_HAZARD_RANDOMIZER_UPDATED'
   | 'SCORE_RESET'
   | 'ROSTER_IMPORTED'
@@ -33,7 +35,12 @@ export type AdminActionType =
   | 'QR_IMPORT_APPLIED'
   | 'HAZARD_MULTIPLIER_CREATED'
   | 'HAZARD_MULTIPLIER_UPDATED'
-  | 'HAZARD_MULTIPLIER_DELETED';
+  | 'HAZARD_MULTIPLIER_DELETED'
+  | 'USER_CAPABILITIES_UPDATED'
+  | 'TEAM_SCORE_UPDATED'
+  | 'TEAM_SOFT_DELETED'
+  | 'PLAYER_CONTACT_UPDATED'
+  | 'PLAYER_REVIEW_FLAG_RESOLVED';
 
 /**
  * Request payload for modifying the global status of an event.
@@ -101,6 +108,25 @@ export interface UpdateHeliosRoleRequest {
 export interface UpdateHeliosRoleResponse {
   readonly userId: string;
   readonly isHelios: boolean;
+  readonly capabilities?: AuthCapabilities;
+  readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+/**
+ * Canonical request payload for managing account capabilities.
+ */
+export interface UpdateUserCapabilitiesRequest {
+  readonly capabilities: AuthCapabilities;
+  readonly reason?: string;
+}
+
+/**
+ * Canonical response payload for capability mutations.
+ */
+export interface UpdateUserCapabilitiesResponse {
+  readonly userId: string;
+  readonly capabilities: AuthCapabilities;
   readonly updatedAt: string;
   readonly auditId: string;
 }

@@ -170,6 +170,22 @@ _As an organizer, I need player-level visibility so I can audit participation, c
 - **Then** the console should show a chronological list of the QR codes that player scanned
 - **And** each entry should include the QR name, timestamp, and points awarded.
 
+#### Scenario: Filtering to Players Flagged for Review
+
+- **Given** the Admin is on the "Players" section
+- **When** the Admin applies the "Flagged for Review" filter
+- **Then** the directory should show only players whose review flag is active
+- **And** flagged players should display a visible `FLAGGED` indicator in the roster.
+
+#### Scenario: Resolving a Flagged Player Review Item
+
+- **Given** the Admin is on a flagged player's detail view
+- **When** the Admin selects a review decision and enters a reason
+- **And** submits "Resolve Review Flag"
+- **Then** the player's review flag should be cleared
+- **And** the resolution decision and reason should be recorded for audit visibility
+- **And** the player should no longer appear in flagged-only roster filters.
+
 ### Feature: Statistics and Event Summary
 
 _As an organizer, I want an event summary view that highlights the live competition picture and major operational counts._

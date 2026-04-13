@@ -39,6 +39,44 @@ export interface LeaderboardEntry {
   readonly score: number;
   readonly memberCount: number;
   readonly status: TeamStatus;
+  readonly pitStopExpiresAt?: string | null;
+}
+
+export const displayEventTypes = [
+  'TEAM_ENTERED_PIT',
+  'TEAM_EXITED_PIT',
+  'TEAM_REPAIRS_COMPLETE',
+] as const;
+
+export type DisplayEventType = (typeof displayEventTypes)[number];
+
+export const displayEventReasons = [
+  'HAZARD_TRIGGER',
+  'TIMER_EXPIRED',
+  'ADMIN_MANUAL',
+  'RESCUE_CLEARED',
+] as const;
+
+export type DisplayEventReason = (typeof displayEventReasons)[number];
+
+export interface DisplayEvent {
+  readonly id: string;
+  readonly eventId: string;
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly type: DisplayEventType;
+  readonly reason: DisplayEventReason;
+  readonly occurredAt: string;
+}
+
+export interface ListDisplayEventsQuery {
+  readonly since?: string;
+  readonly limit?: number;
+}
+
+export interface ListDisplayEventsResponse {
+  readonly items: readonly DisplayEvent[];
+  readonly nextCursor: string | null;
 }
 
 /**
@@ -126,7 +164,24 @@ export interface HeliosRescueFlow {
   readonly rescuerUserId: string;
   readonly initiatedAt: string;
   readonly completedAt: string | null;
+  readonly cooldownExpiresAt: string | null;
   readonly status: RescueStatus;
+  readonly reason: string | null;
+}
+
+/**
+ * Query payload for listing rescue history initiated by a specific Helios user.
+ */
+export interface RescueLogQuery {
+  readonly eventId?: string;
+  readonly limit?: number;
+}
+
+/**
+ * Response payload for Helios rescue activity log queries.
+ */
+export interface RescueLogResponse {
+  readonly rescues: readonly HeliosRescueFlow[];
 }
 
 /**
@@ -153,5 +208,41 @@ export interface PlayerActiveIdentity {
   readonly playerId: string;
   readonly teamId: string;
   readonly teamName: string;
+  readonly teamStatus: TeamStatus | null;
+  readonly pitStopExpiresAt: string | null;
   readonly email: string;
+}
+
+/** Lifecycle states for a Helios user's identity-bound Superpower QR asset. */
+export type SuperpowerQRAssetStatus = 'ACTIVE' | 'REVOKED';
+
+/**
+ * A persistent, identity-bound QR asset issued exclusively to Helios users.
+ * Encodes a unique payload that can be scanned to initiate a rescue flow.
+ * Only one ACTIVE asset exists per user at any time.
+ */
+export interface HeliosSuperpowerQRAsset {
+  readonly id: string;
+  readonly userId: string;
+  readonly payload: string;
+  readonly qrImageUrl: string;
+  readonly status: SuperpowerQRAssetStatus;
+  readonly createdAt: string;
+  readonly regeneratedAt: string | null;
+}
+
+/**
+ * Response shape returned when a Helios user fetches their active Superpower QR.
+ */
+export interface GetSuperpowerQRResponse {
+  readonly asset: HeliosSuperpowerQRAsset;
+}
+
+/**
+ * Response shape returned after a successful Superpower QR regeneration.
+ * The previous asset is immediately revoked and replaced.
+ */
+export interface RegenerateSuperpowerQRResponse {
+  readonly asset: HeliosSuperpowerQRAsset;
+  readonly revokedAssetId: string | null;
 }

@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
-import { getSession, isAuthenticatedSession, anonymousSession } from '@/services/auth';
+import {
+  getSession,
+  hasPlayerCapability,
+  isAuthenticatedSession,
+  anonymousSession,
+} from '@/services/auth';
 import type { AuthSession } from '@/services/auth';
 
 interface Props {
@@ -43,6 +48,14 @@ export default function ProtectedRouteGuard({ children }: Props) {
   }
 
   if (!isAuthenticatedSession(session)) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!hasPlayerCapability(session)) {
+    if (session.capabilities?.admin || session.role === 'admin') {
+      return <Navigate to="/admin/game-control" replace />;
+    }
+
     return <Navigate to="/" replace />;
   }
 

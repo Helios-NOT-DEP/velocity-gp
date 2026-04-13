@@ -70,11 +70,19 @@ eventRouter.get(
       throw new AppError(404, 'PLAYER_NOT_ASSIGNED', 'Player is not fully assigned to a team');
     }
 
+    if (!session.eventId || !session.playerId) {
+      throw new AppError(404, 'PLAYER_NOT_ASSIGNED', 'Player context is not available.');
+    }
+
     // Since the auth session token encodes teamId but not teamName,
     // query the database directly to fetch the team name.
     const team = await prisma.team.findUnique({
       where: { id: session.teamId },
-      select: { name: true },
+      select: {
+        name: true,
+        status: true,
+        pitStopExpiresAt: true,
+      },
     });
 
     if (!team) {
@@ -87,6 +95,8 @@ eventRouter.get(
       playerId: session.playerId,
       teamId: session.teamId,
       teamName: team.name,
+      teamStatus: team.status,
+      pitStopExpiresAt: team.pitStopExpiresAt?.toISOString() ?? null,
       email: session.email,
     };
 

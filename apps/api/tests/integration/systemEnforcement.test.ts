@@ -26,6 +26,15 @@ interface ScanFixture {
   readonly userIds: string[];
 }
 
+interface RescueFixture {
+  readonly eventId: string;
+  readonly rescuerUserId: string;
+  readonly rescuerPlayerId: string;
+  readonly requestingPlayerIdA: string;
+  readonly requestingPlayerIdB: string;
+  readonly userIds: string[];
+}
+
 async function cleanupEventData(eventId: string, userIds: string[]): Promise<void> {
   await prisma.adminActionAudit.deleteMany({
     where: {
@@ -215,6 +224,142 @@ async function createScanFixture(options: ScanFixtureOptions = {}): Promise<Scan
   };
 }
 
+async function createRescueFixture(): Promise<RescueFixture> {
+  const token = randomUUID().slice(0, 8);
+  const eventId = `event-rescue-cooldown-${token}`;
+  const rescuerTeamId = `team-rescuer-${token}`;
+  const requestingTeamId = `team-requesting-${token}`;
+
+  const rescuerUserId = `user-rescuer-${token}`;
+  const rescuerPlayerId = `player-rescuer-${token}`;
+  const requestingUserIdA = `user-requesting-a-${token}`;
+  const requestingPlayerIdA = `player-requesting-a-${token}`;
+  const requestingUserIdB = `user-requesting-b-${token}`;
+  const requestingPlayerIdB = `player-requesting-b-${token}`;
+
+  const secondRescuerUserId = `user-rescuer-2-${token}`;
+  const secondRescuerPlayerId = `player-rescuer-2-${token}`;
+  const now = new Date();
+
+  await prisma.user.createMany({
+    data: [
+      {
+        id: rescuerUserId,
+        email: `rescuer-${token}@velocitygp.dev`,
+        displayName: `Rescuer ${token}`,
+        role: 'PLAYER',
+      },
+      {
+        id: secondRescuerUserId,
+        email: `rescuer2-${token}@velocitygp.dev`,
+        displayName: `Rescuer 2 ${token}`,
+        role: 'PLAYER',
+      },
+      {
+        id: requestingUserIdA,
+        email: `requesting-a-${token}@velocitygp.dev`,
+        displayName: `Requesting A ${token}`,
+        role: 'PLAYER',
+      },
+      {
+        id: requestingUserIdB,
+        email: `requesting-b-${token}@velocitygp.dev`,
+        displayName: `Requesting B ${token}`,
+        role: 'PLAYER',
+      },
+    ],
+  });
+
+  await prisma.event.create({
+    data: {
+      id: eventId,
+      name: `Rescue Cooldown Event ${token}`,
+      startDate: new Date(now.getTime() - 60 * 60_000),
+      endDate: new Date(now.getTime() + 60 * 60_000),
+      status: 'ACTIVE',
+      isPublic: false,
+    },
+  });
+
+  await prisma.eventConfig.create({
+    data: {
+      eventId,
+      globalHazardRatio: 15,
+      pitStopDurationSeconds: 900,
+      invalidScanPenalty: 1,
+      raceControlState: 'ACTIVE',
+    },
+  });
+
+  await prisma.team.createMany({
+    data: [
+      {
+        id: rescuerTeamId,
+        eventId,
+        name: `Rescuer Team ${token}`,
+        status: 'ACTIVE',
+      },
+      {
+        id: requestingTeamId,
+        eventId,
+        name: `Requesting Team ${token}`,
+        status: 'IN_PIT',
+        pitStopExpiresAt: new Date(now.getTime() + 15 * 60_000),
+      },
+    ],
+  });
+
+  await prisma.player.createMany({
+    data: [
+      {
+        id: rescuerPlayerId,
+        userId: rescuerUserId,
+        eventId,
+        teamId: rescuerTeamId,
+        status: 'RACING',
+        individualScore: 0,
+        joinedAt: now,
+      },
+      {
+        id: secondRescuerPlayerId,
+        userId: secondRescuerUserId,
+        eventId,
+        teamId: rescuerTeamId,
+        status: 'RACING',
+        individualScore: 0,
+        joinedAt: now,
+      },
+      {
+        id: requestingPlayerIdA,
+        userId: requestingUserIdA,
+        eventId,
+        teamId: requestingTeamId,
+        status: 'IN_PIT',
+        individualScore: 0,
+        joinedAt: now,
+      },
+      {
+        id: requestingPlayerIdB,
+        userId: requestingUserIdB,
+        eventId,
+        teamId: requestingTeamId,
+        status: 'IN_PIT',
+        individualScore: 0,
+        joinedAt: now,
+      },
+    ],
+  });
+
+  return {
+    eventId,
+    rescuerUserId,
+    rescuerPlayerId,
+    requestingPlayerIdA,
+    requestingPlayerIdB,
+    userIds: [rescuerUserId, secondRescuerUserId, requestingUserIdA, requestingUserIdB],
+  };
+}
+
 describe('system backend enforcement', () => {
   it('persists claims and increments score for safe scans', async () => {
     const fixture = await createScanFixture();
@@ -300,6 +445,172 @@ describe('system backend enforcement', () => {
       });
 
       expect(claimCount).toBe(1);
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('blocks scans for teams in active pit lockout and returns authoritative pit expiry', async () => {
+    const fixture = await createScanFixture();
+    const now = new Date();
+    const pitStopExpiresAt = new Date(now.getTime() + 5 * 60_000);
+
+    await prisma.team.update({
+      where: {
+        id: fixture.teamId,
+      },
+      data: {
+        status: 'IN_PIT',
+        pitStopExpiresAt,
+      },
+    });
+
+    try {
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: fixture.qrPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('BLOCKED');
+      if (response.outcome !== 'BLOCKED') {
+        throw new Error(`Expected BLOCKED outcome but received ${response.outcome}.`);
+      }
+      expect(response.errorCode).toBe('TEAM_IN_PIT');
+      if (response.errorCode !== 'TEAM_IN_PIT') {
+        throw new Error(`Expected TEAM_IN_PIT errorCode but received ${response.errorCode}.`);
+      }
+      expect(response.pitStopExpiresAt).toBe(pitStopExpiresAt.toISOString());
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('does not apply invalid scan penalties while a team is in active pit lockout', async () => {
+    const fixture = await createScanFixture();
+    const now = new Date();
+    const pitStopExpiresAt = new Date(now.getTime() + 5 * 60_000);
+    const unknownPayload = `VG-UNKNOWN-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+    await prisma.team.update({
+      where: {
+        id: fixture.teamId,
+      },
+      data: {
+        status: 'IN_PIT',
+        pitStopExpiresAt,
+      },
+    });
+
+    try {
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: unknownPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('BLOCKED');
+      if (response.outcome !== 'BLOCKED') {
+        throw new Error(`Expected BLOCKED outcome but received ${response.outcome}.`);
+      }
+      expect(response.errorCode).toBe('TEAM_IN_PIT');
+      if (response.errorCode !== 'TEAM_IN_PIT') {
+        throw new Error(`Expected TEAM_IN_PIT errorCode but received ${response.errorCode}.`);
+      }
+      expect(response.pitStopExpiresAt).toBe(pitStopExpiresAt.toISOString());
+
+      const [team, player, invalidScanCount] = await Promise.all([
+        prisma.team.findUnique({
+          where: {
+            id: fixture.teamId,
+          },
+          select: {
+            score: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: fixture.playerId,
+          },
+          select: {
+            isFlaggedForReview: true,
+          },
+        }),
+        prisma.scanRecord.count({
+          where: {
+            eventId: fixture.eventId,
+            outcome: 'INVALID',
+          },
+        }),
+      ]);
+
+      expect(team?.score).toBe(0);
+      expect(player?.isFlaggedForReview).toBe(false);
+      expect(invalidScanCount).toBe(0);
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('applies invalid scan penalty and flags player for review during active racing', async () => {
+    const fixture = await createScanFixture();
+    const unknownPayload = `VG-UNKNOWN-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+    try {
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: unknownPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('INVALID');
+      if (response.outcome !== 'INVALID') {
+        throw new Error(`Expected INVALID outcome but received ${response.outcome}.`);
+      }
+      expect(response.errorCode).toBe('QR_NOT_FOUND');
+      expect(response.pointsAwarded).toBe(-1);
+      expect(response.flaggedForReview).toBe(true);
+
+      const [team, player, invalidScan] = await Promise.all([
+        prisma.team.findUnique({
+          where: {
+            id: fixture.teamId,
+          },
+          select: {
+            score: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: fixture.playerId,
+          },
+          select: {
+            isFlaggedForReview: true,
+          },
+        }),
+        prisma.scanRecord.findFirst({
+          where: {
+            eventId: fixture.eventId,
+            playerId: fixture.playerId,
+            outcome: 'INVALID',
+          },
+          select: {
+            pointsAwarded: true,
+            scannedPayload: true,
+          },
+        }),
+      ]);
+
+      expect(team?.score).toBe(-1);
+      expect(player?.isFlaggedForReview).toBe(true);
+      expect(invalidScan?.pointsAwarded).toBe(-1);
+      expect(invalidScan?.scannedPayload).toBe(unknownPayload);
     } finally {
       await cleanupEventData(fixture.eventId, fixture.userIds);
     }
@@ -607,6 +918,101 @@ describe('system backend enforcement', () => {
       expect(rejected?.reason).toBe('SELF_RESCUE_FORBIDDEN');
     } finally {
       await cleanupEventData(eventId, [scannerUserId, scanneeUserId]);
+    }
+  });
+
+  it('enforces rescuer cooldown for three minutes between rescue requests', async () => {
+    const fixture = await createRescueFixture();
+
+    try {
+      const firstRescue = await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdA,
+        scannerUserId: fixture.rescuerUserId,
+      });
+
+      expect(firstRescue.status).toBe('REQUESTED');
+      expect(
+        (firstRescue as { cooldownExpiresAt?: string | null }).cooldownExpiresAt
+      ).not.toBeNull();
+
+      await expect(
+        initiateRescue({
+          eventId: fixture.eventId,
+          playerId: fixture.requestingPlayerIdB,
+          scannerUserId: fixture.rescuerUserId,
+        })
+      ).rejects.toMatchObject({
+        code: 'HELIOS_COOLDOWN_ACTIVE',
+        statusCode: 429,
+      });
+
+      const cooldownRejected = await prisma.rescue.findFirst({
+        where: {
+          eventId: fixture.eventId,
+          requestingPlayerId: fixture.requestingPlayerIdB,
+          status: 'REJECTED',
+          reason: 'HELIOS_COOLDOWN_ACTIVE',
+        },
+      });
+
+      expect(cooldownRejected).not.toBeNull();
+
+      await prisma.rescue.updateMany({
+        where: {
+          eventId: fixture.eventId,
+          rescuerUserId: fixture.rescuerUserId,
+        },
+        data: {
+          cooldownExpiresAt: new Date(Date.now() - 1_000),
+        },
+      });
+
+      const postCooldownRescue = await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdB,
+        scannerUserId: fixture.rescuerUserId,
+      });
+
+      expect(postCooldownRescue.status).toBe('REQUESTED');
+      expect(
+        (postCooldownRescue as { cooldownExpiresAt?: string | null }).cooldownExpiresAt
+      ).not.toBeNull();
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('applies cooldown per rescuer user and not globally', async () => {
+    const fixture = await createRescueFixture();
+    const secondRescuerUserId = fixture.userIds[1];
+
+    try {
+      await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdA,
+        scannerUserId: fixture.rescuerUserId,
+      });
+
+      await expect(
+        initiateRescue({
+          eventId: fixture.eventId,
+          playerId: fixture.requestingPlayerIdB,
+          scannerUserId: fixture.rescuerUserId,
+        })
+      ).rejects.toMatchObject({
+        code: 'HELIOS_COOLDOWN_ACTIVE',
+      });
+
+      const secondRescuerRescue = await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdB,
+        scannerUserId: secondRescuerUserId,
+      });
+
+      expect(secondRescuerRescue.status).toBe('REQUESTED');
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
     }
   });
 

@@ -6,11 +6,13 @@ import RaceHub from './pages/RaceHub';
 import PitStop from './pages/PitStop';
 import HeliosProfile from './pages/HeliosProfile';
 import Leaderboard from './pages/Leaderboard';
+import DisplayBoard from './pages/DisplayBoard';
 import VictoryLane from './pages/VictoryLane';
 import WaitingAssignment from './pages/WaitingAssignment';
 import RootLayout from './layouts/RootLayout';
 import AdminLayout from './layouts/AdminLayout';
 import AdminRouteGuard from './components/auth/AdminRouteGuard';
+import HeliosRouteGuard from './components/auth/HeliosRouteGuard';
 import ProtectedRouteGuard from './components/auth/ProtectedRouteGuard';
 import AdminGameControl from './pages/admin/AdminGameControl';
 import AdminQrCodes from './pages/admin/AdminQrCodes';
@@ -46,6 +48,11 @@ export const appRoutes: RouteObject[] = [
     path: '/waiting-assignment',
     Component: WaitingAssignment,
   },
+  // Venue display board is intentionally public and passive for large-format screens.
+  {
+    path: '/display',
+    Component: DisplayBoard,
+  },
   // Team setup remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
     path: '/team-setup',
@@ -68,7 +75,14 @@ export const appRoutes: RouteObject[] = [
       // In-race player navigation rendered with persistent bottom navigation.
       { path: 'race', Component: RaceHub },
       { path: 'pit-stop', Component: PitStop },
-      { path: 'helios', Component: HeliosProfile },
+      {
+        path: 'helios',
+        element: (
+          <HeliosRouteGuard>
+            <HeliosProfile />
+          </HeliosRouteGuard>
+        ),
+      },
       { path: 'leaderboard', Component: Leaderboard },
       { path: 'victory-lane', Component: VictoryLane },
     ],
@@ -87,7 +101,9 @@ export const appRoutes: RouteObject[] = [
       { path: 'game-control', Component: AdminGameControl },
       { path: 'qr-codes', Component: AdminQrCodes },
       { path: 'teams', Component: AdminTeams },
+      { path: 'teams/:teamId', Component: AdminTeams },
       { path: 'players', Component: AdminPlayers },
+      { path: 'players/:playerId', Component: AdminPlayers },
       { path: 'statistics', Component: AdminStatistics },
     ],
   },

@@ -38,6 +38,10 @@ Every realtime event uses the same envelope:
 - `RESCUE_UPDATED`
   - Trigger source: rescue lifecycle transitions.
   - Minimal payload: rescue identifiers, status, rescuer, timestamps.
+  - Extended payload guidance:
+    - `cooldownExpiresAt`: nullable ISO timestamp when rescuer cooldown ends.
+    - `errorCode`: optional stable error code for rejected transitions (for example `HELIOS_COOLDOWN_ACTIVE`).
+    - `retryAfterSeconds`: optional integer hint for client-side retry UX when cooldown is active.
 - `RACE_CONTROL_UPDATED`
   - Trigger source: admin race pause/resume update.
   - Minimal payload: updated race-control state and audit identifier.
@@ -79,3 +83,9 @@ This channel matrix is encoded in typed contract policy for server-side filterin
 - Persistence/replay backend design.
 
 Those implementation details are intentionally deferred to Issue #49.
+
+## Current Runtime Behavior (Until Issue #49)
+
+- The event contract is the canonical schema, but fanout transport is not yet the primary client sync path.
+- Pit-stop lockout/release UX currently relies on backend-authoritative API state (`teamStatus`, `pitStopExpiresAt`) with periodic client refresh.
+- Any eventual transport implementation must preserve this contract envelope, ordering semantics, and idempotency guarantees.

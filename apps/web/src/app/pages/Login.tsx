@@ -21,24 +21,40 @@ export default function Login() {
         return;
       }
 
-      if (session.role === 'admin') {
+      const capabilities = session.capabilities;
+      const canAdmin = capabilities?.admin === true || session.role === 'admin';
+      const canPlayer =
+        capabilities?.player === true || session.role === 'player' || session.role === 'helios';
+
+      // Player-first routing for dual-capability accounts when player context is available.
+      if (canPlayer) {
+        if (session.assignmentStatus === 'ASSIGNED_PENDING') {
+          navigate('/team-setup', { replace: true });
+          return;
+        }
+
+        if (session.assignmentStatus === 'ASSIGNED_ACTIVE') {
+          navigate('/race', { replace: true });
+          return;
+        }
+
+        // Dual users without assignment fall back to admin. Player-only users wait for assignment.
+        if (session.assignmentStatus === 'UNASSIGNED') {
+          navigate(canAdmin ? '/admin/game-control' : '/waiting-assignment', { replace: true });
+          return;
+        }
+
+        // Legacy/stale local sessions may not include assignmentStatus yet; default to race.
+        navigate('/race', { replace: true });
+        return;
+      }
+
+      if (canAdmin) {
         navigate('/admin/game-control', { replace: true });
         return;
       }
 
-      if (session.assignmentStatus === 'UNASSIGNED') {
-        navigate('/waiting-assignment', { replace: true });
-        return;
-      }
-
-      if (session.assignmentStatus === 'ASSIGNED_PENDING') {
-        // Canonical pending-assignment destination after route alignment.
-        navigate('/team-setup', { replace: true });
-        return;
-      }
-
-      // Canonical active-team destination after route alignment.
-      navigate('/race', { replace: true });
+      navigate('/waiting-assignment', { replace: true });
     }
 
     void redirectIfAuthenticated();

@@ -1,61 +1,107 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { useGame } from '../context/GameContext';
 import { AlertTriangle, Clock, Zap } from 'lucide-react';
+import { resolveScanIdentityForEmail } from '@/services/scan';
+
+const PIT_STATE_POLL_INTERVAL_MS = 5_000;
 
 export default function PitStop() {
-  const { gameState, clearPitStop } = useGame();
+  const { gameState, clearPitStop, hydrateScanIdentity } = useGame();
   const navigate = useNavigate();
-
-  if (!gameState.currentTeam?.inPitStop) {
-    // Pit-stop screen is only valid during lockout; otherwise route back to active scanner flow.
-    navigate('/race');
-    return null;
-  }
-
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const pitSyncInFlightRef = useRef(false);
+  const isInPitStop = Boolean(gameState.currentTeam?.inPitStop);
 
   useEffect(() => {
-    const currentTeam = gameState.currentTeam;
-    const expiresAt = currentTeam?.pitStopExpiresAt;
-    if (!expiresAt) {
-      setTimeLeft(0);
+    if (isInPitStop) {
+      return;
+    }
+
+    // Pit-stop route is only valid during lockout.
+    navigate('/race', { replace: true });
+  }, [isInPitStop, navigate]);
+
+  useEffect(() => {
+    const expiresAt = gameState.currentTeam?.pitStopExpiresAt;
+    if (!expiresAt || !isInPitStop) {
+      setTimeLeft(null);
       return;
     }
 
     const updateTimer = () => {
       const now = Date.now();
       const expiration = new Date(expiresAt).getTime();
+      if (Number.isNaN(expiration)) {
+        setTimeLeft(null);
+        return;
+      }
+
       const remainingSeconds = Math.max(0, Math.floor((expiration - now) / 1000));
       setTimeLeft(remainingSeconds);
-
-      if (remainingSeconds === 0 && currentTeam?.inPitStop) {
-        clearPitStop(currentTeam.id);
-      }
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [
-    clearPitStop,
-    gameState.currentTeam?.id,
-    gameState.currentTeam?.inPitStop,
-    gameState.currentTeam?.pitStopExpiresAt,
-  ]);
+  }, [isInPitStop, gameState.currentTeam?.pitStopExpiresAt]);
 
-  const formatTime = (seconds: number) => {
+  useEffect(() => {
+    if (!isInPitStop) {
+      return;
+    }
+
+    let isMounted = true;
+    let interval: ReturnType<typeof globalThis.setInterval> | null = null;
+
+    const syncPitState = async () => {
+      if (pitSyncInFlightRef.current) {
+        return;
+      }
+
+      pitSyncInFlightRef.current = true;
+      const resolution = await resolveScanIdentityForEmail(gameState.currentUser?.email);
+      try {
+        if (!isMounted || resolution.status !== 'resolved') {
+          return;
+        }
+
+        hydrateScanIdentity(resolution.identity);
+        if (resolution.identity.teamStatus !== 'IN_PIT') {
+          clearPitStop(resolution.identity.teamId);
+          navigate('/race', { replace: true });
+        }
+      } finally {
+        pitSyncInFlightRef.current = false;
+      }
+    };
+
+    void syncPitState();
+    interval = globalThis.setInterval(() => {
+      void syncPitState();
+    }, PIT_STATE_POLL_INTERVAL_MS);
+
+    return () => {
+      isMounted = false;
+      pitSyncInFlightRef.current = false;
+      if (interval) {
+        globalThis.clearInterval(interval);
+      }
+    };
+  }, [clearPitStop, isInPitStop, gameState.currentUser?.email, hydrateScanIdentity, navigate]);
+
+  if (!isInPitStop) {
+    return null;
+  }
+
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) {
+      return '--:--';
+    }
+
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleHeliosRescue = () => {
-    // Demo action mirrors future Helios rescue QR flow by clearing pit status immediately.
-    if (gameState.currentTeam) {
-      clearPitStop(gameState.currentTeam.id);
-      navigate('/race');
-    }
   };
 
   return (
@@ -109,22 +155,11 @@ export default function PitStop() {
             <div>
               <p className="text-white font-semibold mb-1">Need to bypass?</p>
               <p className="text-gray-400 text-sm">
-                Find a Helios player and scan their special QR code to instantly clear this penalty.
+                Find a Helios player and scan their special QR code to request an early pit release.
               </p>
             </div>
           </div>
         </div>
-
-        {/* Demo Button */}
-        <button
-          onClick={handleHeliosRescue}
-          className="w-full py-4 rounded-xl font-semibold text-white transition-all duration-200 hover:opacity-90 mb-4"
-          style={{
-            background: 'linear-gradient(135deg, #3B82F6 0%, #F97316 100%)',
-          }}
-        >
-          Scan Helios QR (Demo)
-        </button>
 
         <button
           onClick={() => navigate('/race')}

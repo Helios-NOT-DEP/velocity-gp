@@ -231,6 +231,26 @@ Mirror that same value into `VITE_FRONTEND_MAGIC_LINK_ORIGIN` so the web app can
    - Screenshots for UI changes
    - Test results (`npm run build` passes)
 
+### Automatic version bump on push
+
+This repo includes a `pre-push` hook that bumps workspace component versions when qualifying code changes are pushed.
+
+- **Bump rule**: commit-driven
+  - `feat:` commits → **minor** bump
+  - all other commit types → **patch** bump
+- **Scope**: only changed workspace components under `apps/*` and `packages/*`
+- **Ignored-only changes** (no bump):
+  - test files/directories (`*.test.*`, `*.spec.*`, `tests/`, `__tests__/`)
+  - documentation (`docs/**`, `*.md`)
+  - CI workflows (`.github/workflows/**`)
+- **Behavior**: the hook writes updated workspace `package.json` versions and auto-commits them before the push continues.
+
+Bypass in emergencies:
+
+```bash
+git push --no-verify
+```
+
 ## Debugging
 
 ### Browser DevTools

@@ -25,6 +25,8 @@ export const raceStateEndpoints = {
     `/events/${eventId}/players/${playerId}/race-state`,
   /** Retrieves the current top team standings and overall leaderboard for an event. */
   getLeaderboard: (eventId: string) => `/events/${eventId}/leaderboard`,
+  /** Retrieves display-focused transition events for venue storytelling states. */
+  getDisplayEvents: (eventId: string) => `/events/${eventId}/display-events`,
 };
 
 /**
@@ -108,6 +110,8 @@ export const qrEndpoints = {
 export const rescueEndpoints = {
   /** Starts a rescue workflow handled by HELIOS staff or authorized players. */
   initiateRescue: '/rescue/initiate',
+  /** Lists recent rescue entries initiated by the authenticated rescuer. */
+  listRescueLog: '/rescue/log',
   /** Polls the status of an active rescue attempt for a player. */
   getRescueStatus: (playerId: string) => `/rescue/${playerId}/status`,
   /** Finalizes a rescue sequence, freeing the trapped player/team. */
@@ -128,6 +132,14 @@ export const adminEndpoints = {
   /** Forcibly places or clears a team from a PIT penalty sequence. */
   manualPitControl: (eventId: string, teamId: string) =>
     `/admin/events/${eventId}/teams/${teamId}/pit-control`,
+  /** Returns team-level detail data for admin drill-down views. */
+  getTeamDetail: (eventId: string, teamId: string) =>
+    `/admin/events/${eventId}/teams/${teamId}/detail`,
+  /** Overrides a team's score directly from the admin detail screen. */
+  updateTeamScore: (eventId: string, teamId: string) =>
+    `/admin/events/${eventId}/teams/${teamId}/score`,
+  /** Soft-deletes a team from active admin operations. */
+  deleteTeam: (eventId: string, teamId: string) => `/admin/events/${eventId}/teams/${teamId}`,
   /** Retrieves the full participant registry for an event. */
   listRoster: (eventId: string) => `/admin/events/${eventId}/roster`,
   /** Retrieves a bulk list of all teams constructed for the roster. */
@@ -135,6 +147,18 @@ export const adminEndpoints = {
   /** Forcibly re-assigns a player to a new team or role. */
   updateRosterAssignment: (eventId: string, playerId: string) =>
     `/admin/events/${eventId}/roster/players/${playerId}/assignment`,
+  /** Returns player-level detail data for admin drill-down views. */
+  getPlayerDetail: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/detail`,
+  /** Updates admin-managed player contact information. */
+  updatePlayerContact: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/contact`,
+  /** Resolves and clears the review flag for a player. */
+  resolvePlayerReviewFlag: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/review-flag`,
+  /** Lists scan history rows for a specific player in an event. */
+  listPlayerScanHistory: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/scan-history`,
   /** Validates a CSV/JSON bulk roster import payload without committing it. */
   previewRosterImport: (eventId: string) => `/admin/events/${eventId}/roster/import/preview`,
   /** Commits a bulk roster import payload to the database. */
@@ -174,6 +198,8 @@ export const adminEndpoints = {
     `/admin/events/${eventId}/qr-codes/${qrCodeId}`,
   /** Toggles HELIOS (staff) privileges for a given user account. */
   updateHeliosRole: (userId: string) => `/admin/users/${userId}/helios-role`,
+  /** Canonical endpoint for updating account capabilities. */
+  updateUserCapabilities: (userId: string) => `/admin/users/${userId}/capabilities`,
   /** Retrieves the centralized log of all administrative actions taken during the event. */
   listAuditEntries: (eventId: string) => `/admin/events/${eventId}/audits`,
 };
@@ -192,6 +218,17 @@ export const authEndpoints = {
   getRoutingDecision: '/auth/routing-decision',
   /** Invalidates the active token and logs the user out. */
   logout: '/auth/logout',
+};
+
+/**
+ * Endpoints for the Helios Superpower QR identity surface.
+ * Restricted to authenticated Helios users only.
+ */
+export const heliosEndpoints = {
+  /** Retrieves the active identity-bound Superpower QR asset for a Helios player. */
+  getSuperpowerQr: (playerId: string) => `/players/${playerId}/superpower-qr`,
+  /** Revokes the current Superpower QR and issues a fresh identity-bound replacement. */
+  regenerateSuperpowerQr: (playerId: string) => `/players/${playerId}/superpower-qr/regenerate`,
 };
 
 // ============================================================================

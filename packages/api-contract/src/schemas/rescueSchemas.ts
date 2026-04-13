@@ -21,3 +21,13 @@ export const initiateRescueSchema = z.object({
   heliosQrId: z.string().min(1).optional(),
   reason: z.string().min(2).optional(),
 });
+
+/**
+ * Query schema for rescue log retrieval.
+ *
+ * Service-layer business validation still governs cooldown and rescue eligibility.
+ */
+export const rescueLogQuerySchema = z.object({
+  eventId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});

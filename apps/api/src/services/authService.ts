@@ -1,4 +1,5 @@
 import type {
+  AuthCapabilities,
   PlayerAuthSession,
   RequestMagicLinkRequest,
   RequestMagicLinkResponse,
@@ -27,7 +28,7 @@ import { normalizeWorkEmail } from '../utils/normalizeEmail.js';
  * Authentication service for magic-link and session flows.
  *
  * This module derives routing decisions from team assignment state and enforces
- * explicit auth eligibility checks during magic-link requests.
+ * capability-aware auth eligibility checks during magic-link requests.
  */
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If your work email is eligible for this event, you will receive a secure sign-in link shortly.';
@@ -35,16 +36,20 @@ const GENERIC_MAGIC_LINK_MESSAGE =
 export const AUTH_SESSION_COOKIE_MAX_AGE_MS = env.AUTH_SESSION_COOKIE_TTL_DAYS * 24 * 60 * 60_000;
 export { AUTH_SESSION_COOKIE_NAME };
 
-interface EligiblePlayer {
-  readonly userId: string;
+interface ActivePlayerContext {
   readonly playerId: string;
   readonly eventId: string;
-  readonly email: string;
-  readonly displayName: string;
-  readonly role: 'ADMIN' | 'HELIOS' | 'PLAYER';
   readonly teamId: string | null;
   readonly teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null;
   readonly eventName: string;
+}
+
+interface AuthCandidate {
+  readonly userId: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly capabilities: AuthCapabilities;
+  readonly activePlayer: ActivePlayerContext | null;
 }
 
 /**
@@ -56,43 +61,69 @@ function resolveFrontendMagicLinkUrl(token: string): string {
   return callbackUrl.toString();
 }
 
-function mapRole(role: EligiblePlayer['role']): PlayerAuthSession['role'] {
-  if (role === 'ADMIN') {
-    return 'admin';
-  }
+function deriveCapabilities(input: {
+  readonly canAdmin: boolean;
+  readonly canPlayer: boolean;
+  readonly isHeliosMember: boolean;
+  readonly legacyRole: 'ADMIN' | 'HELIOS' | 'PLAYER';
+  readonly legacyIsHelios: boolean;
+}): AuthCapabilities {
+  const admin = input.canAdmin || input.legacyRole === 'ADMIN';
+  const player = input.canPlayer || input.legacyRole === 'PLAYER' || input.legacyRole === 'HELIOS';
+  const heliosMember =
+    input.isHeliosMember || input.legacyIsHelios || input.legacyRole === 'HELIOS';
 
-  if (role === 'HELIOS') {
+  return {
+    admin,
+    player,
+    heliosMember,
+  };
+}
+
+function mapCompatibilityRole(capabilities: AuthCapabilities): PlayerAuthSession['role'] {
+  if (capabilities.player && capabilities.heliosMember) {
     return 'helios';
   }
 
-  return 'player';
+  if (capabilities.player) {
+    return 'player';
+  }
+
+  return 'admin';
 }
 
-function resolveAssignmentStatus(teamId: string | null, teamStatus: EligiblePlayer['teamStatus']) {
+function resolveAssignmentStatus(
+  teamId: string | null,
+  teamStatus: ActivePlayerContext['teamStatus']
+): PlayerAuthSession['assignmentStatus'] {
   // Missing team context is treated as unassigned even if a player record exists.
   if (!teamId || !teamStatus) {
-    return 'UNASSIGNED' as const;
+    return 'UNASSIGNED';
   }
 
   if (teamStatus === 'PENDING') {
-    return 'ASSIGNED_PENDING' as const;
+    return 'ASSIGNED_PENDING';
   }
 
-  return 'ASSIGNED_ACTIVE' as const;
+  return 'ASSIGNED_ACTIVE';
 }
 
 /**
  * Maps database enrollment details to the API auth session contract.
  */
-function buildSessionFromEligiblePlayer(input: EligiblePlayer): PlayerAuthSession {
+function buildSessionFromCandidate(input: AuthCandidate): PlayerAuthSession {
   return {
     userId: input.userId,
-    playerId: input.playerId,
-    eventId: input.eventId,
-    teamId: input.teamId,
-    teamStatus: input.teamStatus,
-    assignmentStatus: resolveAssignmentStatus(input.teamId, input.teamStatus),
-    role: mapRole(input.role),
+    playerId: input.activePlayer?.playerId ?? null,
+    eventId: input.activePlayer?.eventId ?? null,
+    teamId: input.activePlayer?.teamId ?? null,
+    teamStatus: input.activePlayer?.teamStatus ?? null,
+    assignmentStatus: resolveAssignmentStatus(
+      input.activePlayer?.teamId ?? null,
+      input.activePlayer?.teamStatus ?? null
+    ),
+    capabilities: input.capabilities,
+    role: mapCompatibilityRole(input.capabilities),
     isAuthenticated: true,
     email: input.email,
     displayName: input.displayName,
@@ -103,17 +134,26 @@ function buildSessionFromEligiblePlayer(input: EligiblePlayer): PlayerAuthSessio
  * Resolves the post-auth navigation destination.
  */
 function resolveRedirectPath(session: PlayerAuthSession): VerifyMagicLinkResponse['redirectPath'] {
-  if (session.assignmentStatus === 'UNASSIGNED') {
-    return '/waiting-assignment';
+  if (session.capabilities.player) {
+    if (session.assignmentStatus === 'UNASSIGNED') {
+      // Dual-capability users fall back to admin when no active player assignment exists.
+      if (session.capabilities.admin) {
+        return '/admin/game-control';
+      }
+
+      return '/waiting-assignment';
+    }
+
+    if (session.assignmentStatus === 'ASSIGNED_PENDING') {
+      // Canonical pending setup path (legacy /garage is now an alias redirect).
+      return '/team-setup';
+    }
+
+    // Canonical active race path (legacy /race-hub is now an alias redirect).
+    return '/race';
   }
 
-  if (session.assignmentStatus === 'ASSIGNED_PENDING') {
-    // Canonical pending setup path (legacy /garage is now an alias redirect).
-    return '/team-setup';
-  }
-
-  // Canonical active race path (legacy /race-hub is now an alias redirect).
-  return '/race';
+  return '/admin/game-control';
 }
 
 function buildRoutingDecision(session: PlayerAuthSession): RoutingDecisionResponse {
@@ -126,12 +166,17 @@ function buildRoutingDecision(session: PlayerAuthSession): RoutingDecisionRespon
   };
 }
 
-async function loadEligiblePlayerByEmail(workEmail: string): Promise<EligiblePlayer | null> {
+async function loadActivePlayerContextByUserId(
+  userId: string,
+  scope?: {
+    readonly playerId: string;
+    readonly eventId: string;
+  }
+): Promise<ActivePlayerContext | null> {
   const player = await prisma.player.findFirst({
     where: {
-      user: {
-        email: workEmail,
-      },
+      userId,
+      ...(scope ? { id: scope.playerId, eventId: scope.eventId } : {}),
       event: {
         status: 'ACTIVE',
       },
@@ -153,14 +198,6 @@ async function loadEligiblePlayerByEmail(workEmail: string): Promise<EligiblePla
           name: true,
         },
       },
-      user: {
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          role: true,
-        },
-      },
     },
   });
 
@@ -169,100 +206,147 @@ async function loadEligiblePlayerByEmail(workEmail: string): Promise<EligiblePla
   }
 
   return {
-    userId: player.user.id,
     playerId: player.id,
     eventId: player.eventId,
-    email: player.user.email,
-    displayName: player.user.displayName,
-    role: player.user.role,
     teamId: player.teamId,
     teamStatus: player.team?.status ?? null,
     eventName: player.event.name,
   };
 }
 
-/**
- * Resolves an eligible player from token claims while enforcing active-event
- * participation.
- */
-async function loadEligiblePlayerByClaims(claims: {
-  readonly userId: string;
-  readonly playerId: string;
-  readonly eventId: string;
-}): Promise<EligiblePlayer | null> {
-  const player = await prisma.player.findFirst({
+async function loadAuthCandidateByEmail(workEmail: string): Promise<AuthCandidate | null> {
+  const user = await prisma.user.findUnique({
     where: {
-      id: claims.playerId,
-      userId: claims.userId,
-      eventId: claims.eventId,
+      email: workEmail,
     },
     select: {
       id: true,
-      eventId: true,
-      teamId: true,
-      team: {
-        select: {
-          status: true,
-        },
-      },
-      event: {
-        select: {
-          name: true,
-          status: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          role: true,
-        },
-      },
+      email: true,
+      displayName: true,
+      role: true,
+      canAdmin: true,
+      canPlayer: true,
+      isHeliosMember: true,
+      isHelios: true,
     },
   });
 
-  if (!player || player.event.status !== 'ACTIVE') {
+  if (!user) {
     return null;
   }
 
   return {
-    userId: player.user.id,
-    playerId: player.id,
-    eventId: player.eventId,
-    teamId: player.teamId,
-    teamStatus: player.team?.status ?? null,
-    email: player.user.email,
-    displayName: player.user.displayName,
-    role: player.user.role,
-    eventName: player.event.name,
+    userId: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    capabilities: deriveCapabilities({
+      canAdmin: user.canAdmin,
+      canPlayer: user.canPlayer,
+      isHeliosMember: user.isHeliosMember,
+      legacyRole: user.role,
+      legacyIsHelios: user.isHelios,
+    }),
+    activePlayer: await loadActivePlayerContextByUserId(user.id),
   };
 }
 
 /**
- * Requests a magic link for an eligible player.
- *
- * Ineligible lookups return AUTH_USER_NOT_FOUND so the login UI can present
- * deterministic feedback to the caller.
+ * Resolves an eligible auth candidate from token claims while enforcing active-event
+ * participation when a player scope is present.
+ */
+async function loadAuthCandidateByClaims(claims: {
+  readonly userId: string;
+  readonly playerId: string | null;
+  readonly eventId: string | null;
+}): Promise<AuthCandidate | null> {
+  const user = await prisma.user.findUnique({
+    where: {
+      id: claims.userId,
+    },
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      role: true,
+      canAdmin: true,
+      canPlayer: true,
+      isHeliosMember: true,
+      isHelios: true,
+    },
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  let activePlayer: ActivePlayerContext | null;
+  if (claims.playerId && claims.eventId) {
+    activePlayer = await loadActivePlayerContextByUserId(user.id, {
+      playerId: claims.playerId,
+      eventId: claims.eventId,
+    });
+
+    if (!activePlayer) {
+      return null;
+    }
+  } else {
+    activePlayer = await loadActivePlayerContextByUserId(user.id);
+  }
+
+  return {
+    userId: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    capabilities: deriveCapabilities({
+      canAdmin: user.canAdmin,
+      canPlayer: user.canPlayer,
+      isHeliosMember: user.isHeliosMember,
+      legacyRole: user.role,
+      legacyIsHelios: user.isHelios,
+    }),
+    activePlayer,
+  };
+}
+
+/**
+ * Requests a magic link for an eligible user.
  */
 export async function requestMagicLink(
   request: RequestMagicLinkRequest
 ): Promise<RequestMagicLinkResponse> {
   return withTraceSpan('auth.magic_link.request', { workEmail: request.workEmail }, async () => {
     const normalizedEmail = normalizeWorkEmail(request.workEmail);
-    const eligiblePlayer = await loadEligiblePlayerByEmail(normalizedEmail);
-    logger.debug('Eligible player loaded', { eligiblePlayer });
-    if (!eligiblePlayer || !eligiblePlayer.teamId || !eligiblePlayer.teamStatus) {
-      // Current product behavior only permits magic-link login for rostered + assigned players.
+    const candidate = await loadAuthCandidateByEmail(normalizedEmail);
+    logger.debug('Auth candidate loaded', { candidate });
+
+    if (!candidate) {
+      incrementCounter('auth.magic_link.request.denied.total');
+      throw new AppError(404, 'AUTH_USER_NOT_FOUND', 'No user found for this work email.');
+    }
+
+    const hasSupportedCapability = candidate.capabilities.admin || candidate.capabilities.player;
+    if (!hasSupportedCapability) {
+      incrementCounter('auth.magic_link.request.denied.total');
+      throw new AppError(404, 'AUTH_USER_NOT_FOUND', 'No user found for this work email.');
+    }
+
+    // Player-only accounts must have an active event player context and assignment.
+    if (
+      candidate.capabilities.player &&
+      !candidate.capabilities.admin &&
+      (!candidate.activePlayer ||
+        !candidate.activePlayer.teamId ||
+        !candidate.activePlayer.teamStatus)
+    ) {
       incrementCounter('auth.magic_link.request.denied.total');
       throw new AppError(404, 'AUTH_USER_NOT_FOUND', 'No user found for this work email.');
     }
 
     const magicLinkToken = createMagicLinkToken({
-      userId: eligiblePlayer.userId,
-      playerId: eligiblePlayer.playerId,
-      eventId: eligiblePlayer.eventId,
-      email: eligiblePlayer.email,
+      userId: candidate.userId,
+      playerId: candidate.activePlayer?.playerId ?? null,
+      eventId: candidate.activePlayer?.eventId ?? null,
+      email: candidate.email,
     });
 
     const magicLinkUrl = resolveFrontendMagicLinkUrl(magicLinkToken);
@@ -270,10 +354,10 @@ export async function requestMagicLink(
     try {
       await getEmailDispatcher().dispatch({
         templateKey: 'magic_link_login',
-        toEmail: eligiblePlayer.email,
+        toEmail: candidate.email,
         variables: {
           magicLinkUrl,
-          eventName: eligiblePlayer.eventName,
+          eventName: candidate.activePlayer?.eventName ?? 'Velocity GP',
           expiresInMinutes: env.MAGIC_LINK_TOKEN_TTL_MINUTES,
         },
       });
@@ -281,16 +365,16 @@ export async function requestMagicLink(
       deliveryStatus = 'dispatch_failed';
       incrementCounter('auth.magic_link.request.dispatch.failure.total');
       logger.error('Magic link dispatch failed', {
-        userId: eligiblePlayer.userId,
-        playerId: eligiblePlayer.playerId,
-        eventId: eligiblePlayer.eventId,
+        userId: candidate.userId,
+        playerId: candidate.activePlayer?.playerId,
+        eventId: candidate.activePlayer?.eventId,
         templateKey: 'magic_link_login',
         errorMessage: error instanceof Error ? error.message : 'unknown error',
       });
     }
 
     incrementCounter('auth.magic_link.request.accepted.total');
-    logger.debug('Magic link request accepted', { eligiblePlayer, deliveryStatus });
+    logger.debug('Magic link request accepted', { candidate, deliveryStatus });
 
     return {
       accepted: true,
@@ -315,21 +399,24 @@ export async function verifyMagicLink(
       throw new AppError(401, 'AUTH_INVALID_LINK', 'Magic link is invalid or expired.');
     }
 
-    const eligiblePlayer = await loadEligiblePlayerByClaims({
+    const candidate = await loadAuthCandidateByClaims({
       userId: claims.userId,
       playerId: claims.playerId,
       eventId: claims.eventId,
     });
 
-    if (!eligiblePlayer) {
+    if (!candidate) {
       incrementCounter('auth.magic_link.verify.invalid.total');
-      logger.debug('Magic link verification failed: eligible player not found', { claims });
+      logger.debug('Magic link verification failed: auth candidate not found', { claims });
       throw new AppError(401, 'AUTH_INVALID_LINK', 'Magic link is invalid or expired.');
     }
 
-    const session = buildSessionFromEligiblePlayer(eligiblePlayer);
-    if (session.assignmentStatus === 'UNASSIGNED') {
-      // Verification succeeds cryptographically, but access is blocked until assignment exists.
+    const session = buildSessionFromCandidate(candidate);
+    if (
+      session.capabilities.player &&
+      !session.capabilities.admin &&
+      session.assignmentStatus === 'UNASSIGNED'
+    ) {
       incrementCounter('auth.magic_link.verify.unassigned.total');
       throw new AppError(
         403,
@@ -338,7 +425,12 @@ export async function verifyMagicLink(
       );
     }
 
-    if (session.assignmentStatus === 'ASSIGNED_ACTIVE' && session.teamId) {
+    if (
+      session.assignmentStatus === 'ASSIGNED_ACTIVE' &&
+      session.teamId &&
+      session.playerId &&
+      session.eventId
+    ) {
       try {
         await recordOnboardingCompletedActivity({
           eventId: session.eventId,
@@ -364,9 +456,10 @@ export async function verifyMagicLink(
       userId: session.userId,
       playerId: session.playerId,
       eventId: session.eventId,
-      teamId: session.teamId ?? '',
-      teamStatus: session.teamStatus ?? 'PENDING',
+      teamId: session.teamId,
+      teamStatus: session.teamStatus,
       role: session.role,
+      capabilities: session.capabilities,
       email: session.email,
       displayName: session.displayName,
     });
@@ -432,18 +525,22 @@ export async function getSessionFromAuthInputs(
       throw new AppError(401, 'AUTH_INVALID_SESSION', 'Session is invalid or expired.');
     }
 
-    const eligiblePlayer = await loadEligiblePlayerByClaims({
+    const candidate = await loadAuthCandidateByClaims({
       userId: claims.userId,
       playerId: claims.playerId,
       eventId: claims.eventId,
     });
 
-    if (!eligiblePlayer) {
+    if (!candidate) {
       throw new AppError(401, 'AUTH_INVALID_SESSION', 'Session is invalid or expired.');
     }
 
-    const session = buildSessionFromEligiblePlayer(eligiblePlayer);
-    if (session.assignmentStatus === 'UNASSIGNED') {
+    const session = buildSessionFromCandidate(candidate);
+    if (
+      session.capabilities.player &&
+      !session.capabilities.admin &&
+      session.assignmentStatus === 'UNASSIGNED'
+    ) {
       throw new AppError(
         403,
         'AUTH_ASSIGNMENT_REQUIRED',

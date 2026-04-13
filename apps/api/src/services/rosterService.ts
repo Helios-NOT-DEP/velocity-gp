@@ -1,5 +1,11 @@
 import type {
+  AdminPlayerScanHistoryItem,
   AdminRosterRow,
+  DeleteAdminTeamResponse,
+  GetAdminPlayerDetailResponse,
+  GetAdminTeamDetailResponse,
+  ListAdminPlayerScanHistoryQuery,
+  ListAdminPlayerScanHistoryResponse,
   ListAdminRosterQuery,
   ListAdminRosterResponse,
   ListAdminRosterTeamsResponse,
@@ -9,6 +15,12 @@ import type {
   RosterImportPreviewRequest,
   RosterImportPreviewResponse,
   RosterImportPreviewRow,
+  ResolveAdminPlayerReviewFlagRequest,
+  ResolveAdminPlayerReviewFlagResponse,
+  UpdateAdminPlayerContactRequest,
+  UpdateAdminPlayerContactResponse,
+  UpdateAdminTeamScoreRequest,
+  UpdateAdminTeamScoreResponse,
   UpdateRosterAssignmentRequest,
   UpdateRosterAssignmentResponse,
 } from '@velocity-gp/api-contract';
@@ -31,6 +43,7 @@ interface RosterPlayerRecord {
   readonly userId: string;
   readonly teamId: string | null;
   readonly status: 'RACING' | 'IN_PIT' | 'FINISHED';
+  readonly isFlaggedForReview: boolean;
   readonly joinedAt: Date;
   readonly updatedAt: Date;
   readonly user: {
@@ -90,6 +103,41 @@ function normalizeTeamKey(teamName: string): string {
   return teamName.trim().toLowerCase();
 }
 
+function findRankById<T extends { id: string }>(rows: readonly T[], id: string): number | null {
+  const index = rows.findIndex((row) => row.id === id);
+  return index >= 0 ? index + 1 : null;
+}
+
+function mapScanHistoryRow(row: {
+  id: string;
+  eventId: string;
+  playerId: string;
+  teamId: string | null;
+  qrCodeId: string | null;
+  scannedPayload: string;
+  outcome: AdminPlayerScanHistoryItem['outcome'];
+  pointsAwarded: number;
+  createdAt: Date;
+  message: string | null;
+  qrCode: {
+    label: string;
+  } | null;
+}): AdminPlayerScanHistoryItem {
+  return {
+    scanId: row.id,
+    eventId: row.eventId,
+    playerId: row.playerId,
+    teamId: row.teamId,
+    qrCodeId: row.qrCodeId,
+    qrCodeLabel: row.qrCode?.label ?? null,
+    qrPayload: row.scannedPayload,
+    outcome: row.outcome,
+    pointsAwarded: row.pointsAwarded,
+    scannedAt: row.createdAt.toISOString(),
+    message: row.message,
+  };
+}
+
 /**
  * Derives assignment status from team relationship and team state.
  */
@@ -116,6 +164,7 @@ function mapRosterRow(player: RosterPlayerRecord): AdminRosterRow {
     workEmail: player.user.email,
     displayName: player.user.displayName,
     isHelios: player.user.isHelios,
+    isFlaggedForReview: player.isFlaggedForReview,
     phoneE164: player.user.phoneE164,
     teamId: player.team?.id ?? null,
     teamName: player.team?.name ?? null,
@@ -143,6 +192,22 @@ function buildRosterWhereClause(
 ): Prisma.PlayerWhereInput {
   const where: Prisma.PlayerWhereInput = {
     eventId,
+    AND: [
+      {
+        OR: [
+          {
+            teamId: null,
+          },
+          {
+            team: {
+              is: {
+                deletedAt: null,
+              },
+            },
+          },
+        ],
+      },
+    ],
   };
 
   if (query.q) {
@@ -167,9 +232,12 @@ function buildRosterWhereClause(
         },
         {
           team: {
-            name: {
-              contains: q,
-              mode: 'insensitive',
+            is: {
+              deletedAt: null,
+              name: {
+                contains: q,
+                mode: 'insensitive',
+              },
             },
           },
         },
@@ -187,16 +255,26 @@ function buildRosterWhereClause(
 
   if (query.assignmentStatus === 'ASSIGNED_PENDING') {
     where.team = {
-      status: 'PENDING',
+      is: {
+        deletedAt: null,
+        status: 'PENDING',
+      },
     };
   }
 
   if (query.assignmentStatus === 'ASSIGNED_ACTIVE') {
     where.team = {
-      status: {
-        in: ['ACTIVE', 'IN_PIT'],
+      is: {
+        deletedAt: null,
+        status: {
+          in: ['ACTIVE', 'IN_PIT'],
+        },
       },
     };
+  }
+
+  if (typeof query.isFlaggedForReview === 'boolean') {
+    where.isFlaggedForReview = query.isFlaggedForReview;
   }
 
   return where;
@@ -236,6 +314,7 @@ export async function listAdminRoster(
         eventId: true,
         teamId: true,
         status: true,
+        isFlaggedForReview: true,
         joinedAt: true,
         updatedAt: true,
         user: {
@@ -276,6 +355,7 @@ export async function listAdminRosterTeams(eventId: string): Promise<ListAdminRo
       prisma.team.findMany({
         where: {
           eventId,
+          deletedAt: null,
         },
         orderBy: {
           name: 'asc',
@@ -362,6 +442,7 @@ export async function updateRosterAssignment(
           where: {
             id: request.teamId,
             eventId,
+            deletedAt: null,
           },
           select: {
             id: true,
@@ -445,6 +526,7 @@ export async function updateRosterAssignment(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -617,6 +699,7 @@ async function resolvePreviewRows(
     prisma.team.findMany({
       where: {
         eventId,
+        deletedAt: null,
         name: {
           in: teamNames,
         },
@@ -719,6 +802,7 @@ export async function applyRosterImport(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -729,6 +813,7 @@ export async function applyRosterImport(
       const existingTeams = await tx.team.findMany({
         where: {
           eventId,
+          deletedAt: null,
         },
         select: {
           id: true,
@@ -939,6 +1024,7 @@ export async function applyRosterImport(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -959,5 +1045,637 @@ export async function applyRosterImport(
         auditId: importAudit.id,
       };
     });
+  });
+}
+
+/**
+ * Returns a full admin team-detail snapshot (rank, score, pit status, and member roster).
+ */
+export async function getAdminTeamDetail(
+  eventId: string,
+  teamId: string
+): Promise<GetAdminTeamDetailResponse> {
+  return withTraceSpan('admin.team.detail.get', { eventId, teamId }, async () => {
+    const [team, rankedTeams] = await Promise.all([
+      prisma.team.findFirst({
+        where: {
+          id: teamId,
+          eventId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          name: true,
+          score: true,
+          status: true,
+          pitStopExpiresAt: true,
+          players: {
+            orderBy: [
+              {
+                individualScore: 'desc',
+              },
+              {
+                user: {
+                  displayName: 'asc',
+                },
+              },
+              {
+                id: 'asc',
+              },
+            ],
+            select: {
+              id: true,
+              userId: true,
+              individualScore: true,
+              joinedAt: true,
+              user: {
+                select: {
+                  displayName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.team.findMany({
+        where: {
+          eventId,
+          deletedAt: null,
+        },
+        orderBy: [
+          {
+            score: 'desc',
+          },
+          {
+            name: 'asc',
+          },
+          {
+            id: 'asc',
+          },
+        ],
+        select: {
+          id: true,
+        },
+      }),
+    ]);
+
+    if (!team) {
+      throw new ValidationError('Team does not exist for this event.', { eventId, teamId });
+    }
+
+    const members = team.players.map((member, index) => ({
+      playerId: member.id,
+      userId: member.userId,
+      displayName: member.user.displayName,
+      workEmail: member.user.email,
+      individualScore: member.individualScore,
+      joinedAt: member.joinedAt.toISOString(),
+      rank: index + 1,
+    }));
+
+    return {
+      eventId: team.eventId,
+      teamId: team.id,
+      teamName: team.name,
+      teamStatus: team.status,
+      score: team.score,
+      rank: findRankById(rankedTeams, team.id) ?? rankedTeams.length + 1,
+      pitStopExpiresAt: team.pitStopExpiresAt?.toISOString() ?? null,
+      keywords: [],
+      memberCount: members.length,
+      members,
+    };
+  });
+}
+
+/**
+ * Updates an admin-managed team score override and writes an audit entry.
+ */
+export async function updateAdminTeamScore(
+  eventId: string,
+  teamId: string,
+  request: UpdateAdminTeamScoreRequest,
+  context: AdminActionContext = {}
+): Promise<UpdateAdminTeamScoreResponse> {
+  return withTraceSpan('admin.team.score.update', { eventId, teamId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorUserId = await resolveActorUserId(tx, context.actorUserId);
+      const existing = await tx.team.findFirst({
+        where: {
+          id: teamId,
+          eventId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          score: true,
+        },
+      });
+
+      if (!existing) {
+        throw new ValidationError('Team does not exist for this event.', { eventId, teamId });
+      }
+
+      const updated = await tx.team.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          score: request.score,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          score: true,
+          updatedAt: true,
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId,
+          actionType: 'TEAM_SCORE_UPDATED',
+          targetType: 'TEAM',
+          targetId: updated.id,
+          details: {
+            previousScore: existing.score,
+            nextScore: updated.score,
+            reason: request.reason,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        eventId: updated.eventId,
+        teamId: updated.id,
+        score: updated.score,
+        updatedAt: updated.updatedAt.toISOString(),
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+/**
+ * Soft-deletes a team, unassigns every member, and records an audit entry.
+ */
+export async function deleteAdminTeam(
+  eventId: string,
+  teamId: string,
+  context: AdminActionContext = {}
+): Promise<DeleteAdminTeamResponse> {
+  return withTraceSpan('admin.team.delete', { eventId, teamId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorUserId = await resolveActorUserId(tx, context.actorUserId);
+      const existing = await tx.team.findFirst({
+        where: {
+          id: teamId,
+          eventId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!existing) {
+        throw new ValidationError('Team does not exist for this event.', { eventId, teamId });
+      }
+
+      const unassignedMembers = await tx.player.updateMany({
+        where: {
+          eventId,
+          teamId: existing.id,
+        },
+        data: {
+          teamId: null,
+          status: 'RACING',
+        },
+      });
+
+      const deletedAt = new Date();
+      await tx.team.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          deletedAt,
+          pitStopExpiresAt: null,
+          status: 'ACTIVE',
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId,
+          actionType: 'TEAM_SOFT_DELETED',
+          targetType: 'TEAM',
+          targetId: existing.id,
+          details: {
+            teamName: existing.name,
+            unassignedPlayerCount: unassignedMembers.count,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        eventId,
+        teamId: existing.id,
+        deletedAt: deletedAt.toISOString(),
+        unassignedPlayerCount: unassignedMembers.count,
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+/**
+ * Returns player-level detail metrics for admin drill-down views.
+ */
+export async function getAdminPlayerDetail(
+  eventId: string,
+  playerId: string
+): Promise<GetAdminPlayerDetailResponse> {
+  return withTraceSpan('admin.player.detail.get', { eventId, playerId }, async () => {
+    const player = await prisma.player.findFirst({
+      where: {
+        id: playerId,
+        eventId,
+      },
+      select: {
+        id: true,
+        eventId: true,
+        userId: true,
+        joinedAt: true,
+        individualScore: true,
+        isFlaggedForReview: true,
+        teamId: true,
+        user: {
+          select: {
+            displayName: true,
+            email: true,
+            phoneE164: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            score: true,
+            deletedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!player) {
+      throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
+    }
+
+    const rankedPlayers = await prisma.player.findMany({
+      where: {
+        eventId,
+      },
+      orderBy: [
+        {
+          individualScore: 'desc',
+        },
+        {
+          user: {
+            displayName: 'asc',
+          },
+        },
+        {
+          id: 'asc',
+        },
+      ],
+      select: {
+        id: true,
+      },
+    });
+
+    let teamId: string | null = null;
+    let teamName: string | null = null;
+    let teamScore: number | null = null;
+    let teamRank: number | null = null;
+
+    if (player.team && player.team.deletedAt === null) {
+      const rankedTeamMembers = await prisma.player.findMany({
+        where: {
+          eventId,
+          teamId: player.team.id,
+        },
+        orderBy: [
+          {
+            individualScore: 'desc',
+          },
+          {
+            user: {
+              displayName: 'asc',
+            },
+          },
+          {
+            id: 'asc',
+          },
+        ],
+        select: {
+          id: true,
+        },
+      });
+
+      teamId = player.team.id;
+      teamName = player.team.name;
+      teamScore = player.team.score;
+      teamRank = findRankById(rankedTeamMembers, player.id);
+    }
+
+    return {
+      eventId: player.eventId,
+      playerId: player.id,
+      userId: player.userId,
+      displayName: player.user.displayName,
+      workEmail: player.user.email,
+      phoneE164: player.user.phoneE164,
+      isFlaggedForReview: player.isFlaggedForReview,
+      joinedAt: player.joinedAt.toISOString(),
+      individualScore: player.individualScore,
+      globalRank: findRankById(rankedPlayers, player.id),
+      teamId,
+      teamName,
+      teamScore,
+      teamRank,
+    };
+  });
+}
+
+/**
+ * Updates player contact details and records a dedicated admin audit event.
+ */
+export async function updateAdminPlayerContact(
+  eventId: string,
+  playerId: string,
+  request: UpdateAdminPlayerContactRequest,
+  context: AdminActionContext = {}
+): Promise<UpdateAdminPlayerContactResponse> {
+  return withTraceSpan('admin.player.contact.update', { eventId, playerId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorUserId = await resolveActorUserId(tx, context.actorUserId);
+      const existing = await tx.player.findFirst({
+        where: {
+          id: playerId,
+          eventId,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          userId: true,
+          user: {
+            select: {
+              email: true,
+              phoneE164: true,
+            },
+          },
+        },
+      });
+
+      if (!existing) {
+        throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
+      }
+
+      const nextEmail = normalizeWorkEmail(request.workEmail);
+      if (!nextEmail) {
+        throw new ValidationError('workEmail must be a valid email address.', {
+          workEmail: request.workEmail,
+        });
+      }
+
+      const conflictingUser = await tx.user.findUnique({
+        where: {
+          email: nextEmail,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (conflictingUser && conflictingUser.id !== existing.userId) {
+        throw new ValidationError('A user with this workEmail already exists.', {
+          workEmail: nextEmail,
+        });
+      }
+
+      const updatedUser = await tx.user.update({
+        where: {
+          id: existing.userId,
+        },
+        data: {
+          email: nextEmail,
+          phoneE164: request.phoneE164,
+        },
+        select: {
+          id: true,
+          email: true,
+          phoneE164: true,
+          updatedAt: true,
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId,
+          actionType: 'PLAYER_CONTACT_UPDATED',
+          targetType: 'PLAYER',
+          targetId: existing.id,
+          details: {
+            previousWorkEmail: existing.user.email,
+            nextWorkEmail: updatedUser.email,
+            previousPhoneE164: existing.user.phoneE164,
+            nextPhoneE164: updatedUser.phoneE164,
+            reason: request.reason,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        eventId: existing.eventId,
+        playerId: existing.id,
+        userId: updatedUser.id,
+        workEmail: updatedUser.email,
+        phoneE164: updatedUser.phoneE164,
+        updatedAt: updatedUser.updatedAt.toISOString(),
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+/**
+ * Resolves a flagged-player review item and clears the review flag.
+ */
+export async function resolveAdminPlayerReviewFlag(
+  eventId: string,
+  playerId: string,
+  request: ResolveAdminPlayerReviewFlagRequest,
+  context: AdminActionContext = {}
+): Promise<ResolveAdminPlayerReviewFlagResponse> {
+  return withTraceSpan('admin.player.review_flag.resolve', { eventId, playerId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorUserId = await resolveActorUserId(tx, context.actorUserId);
+
+      const existing = await tx.player.findFirst({
+        where: {
+          id: playerId,
+          eventId,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          isFlaggedForReview: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!existing) {
+        throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
+      }
+
+      const updatedPlayer = existing.isFlaggedForReview
+        ? await tx.player.update({
+            where: {
+              id: existing.id,
+            },
+            data: {
+              isFlaggedForReview: false,
+            },
+            select: {
+              id: true,
+              eventId: true,
+              isFlaggedForReview: true,
+              updatedAt: true,
+            },
+          })
+        : existing;
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId,
+          actionType: 'PLAYER_REVIEW_FLAG_RESOLVED',
+          targetType: 'PLAYER',
+          targetId: existing.id,
+          details: {
+            reviewResolution: true,
+            wasFlaggedForReview: existing.isFlaggedForReview,
+            isFlaggedForReview: updatedPlayer.isFlaggedForReview,
+            decision: request.decision,
+            reason: request.reason,
+          },
+        },
+        select: {
+          id: true,
+          createdAt: true,
+        },
+      });
+
+      return {
+        eventId: updatedPlayer.eventId,
+        playerId: updatedPlayer.id,
+        isFlaggedForReview: updatedPlayer.isFlaggedForReview,
+        decision: request.decision,
+        reason: request.reason,
+        resolvedAt: audit.createdAt.toISOString(),
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+/**
+ * Returns cursor-paginated scan history for an admin-selected player.
+ */
+export async function listAdminPlayerScanHistory(
+  eventId: string,
+  playerId: string,
+  query: ListAdminPlayerScanHistoryQuery
+): Promise<ListAdminPlayerScanHistoryResponse> {
+  return withTraceSpan('admin.player.scan_history.list', { eventId, playerId }, async () => {
+    const player = await prisma.player.findFirst({
+      where: {
+        id: playerId,
+        eventId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!player) {
+      throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
+    }
+
+    const limit = query.limit ?? 100;
+    const scanRows = await prisma.scanRecord.findMany({
+      where: {
+        eventId,
+        playerId,
+      },
+      orderBy: [
+        {
+          createdAt: 'desc',
+        },
+        {
+          id: 'desc',
+        },
+      ],
+      ...(query.cursor
+        ? {
+            cursor: {
+              id: query.cursor,
+            },
+            skip: 1,
+          }
+        : {}),
+      take: limit + 1,
+      select: {
+        id: true,
+        eventId: true,
+        playerId: true,
+        teamId: true,
+        qrCodeId: true,
+        scannedPayload: true,
+        outcome: true,
+        pointsAwarded: true,
+        createdAt: true,
+        message: true,
+        qrCode: {
+          select: {
+            label: true,
+          },
+        },
+      },
+    });
+
+    const hasMore = scanRows.length > limit;
+    const sliced = hasMore ? scanRows.slice(0, limit) : scanRows;
+
+    return {
+      items: sliced.map((row) => mapScanHistoryRow(row)),
+      nextCursor: hasMore ? (sliced[sliced.length - 1]?.id ?? null) : null,
+    };
   });
 }

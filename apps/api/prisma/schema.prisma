@@ -91,8 +91,18 @@ enum AdminActionType {
     HAZARD_MULTIPLIER_CREATED
     HAZARD_MULTIPLIER_UPDATED
     HAZARD_MULTIPLIER_DELETED
+    USER_CAPABILITIES_UPDATED
+    TEAM_SCORE_UPDATED
+    TEAM_SOFT_DELETED
+    PLAYER_CONTACT_UPDATED
+    PLAYER_REVIEW_FLAG_RESOLVED
+    SUPERPOWER_QR_REGENERATED
 }
 
+enum SuperpowerQRAssetStatus {
+    ACTIVE
+    REVOKED
+}
 // ── Garage workflow enums ────────────────────────────────────────────────────
 
 // Tracks each player's self-description through the moderation pipeline.
@@ -122,16 +132,20 @@ model User {
     displayName         String
     phoneE164           String?
     role                UserRole @default(PLAYER)
+    canAdmin            Boolean  @default(false)
+    canPlayer           Boolean  @default(true)
+    isHeliosMember      Boolean  @default(false)
     isHelios            Boolean  @default(false)
     hasReturnEmailIssue Boolean  @default(false)
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
-    players           Player[]
-    adminActionAudits AdminActionAudit[]    @relation("AdminActionActor")
-    rescuesGiven      Rescue[]              @relation("RescueScannedBy")
-    teamTransitions   TeamStateTransition[] @relation("TeamTransitionTriggeredByUser")
-    emailEvents       EmailEvent[]
+    players            Player[]
+    adminActionAudits  AdminActionAudit[]    @relation("AdminActionActor")
+    rescuesGiven       Rescue[]              @relation("RescueScannedBy")
+    teamTransitions    TeamStateTransition[] @relation("TeamTransitionTriggeredByUser")
+    emailEvents        EmailEvent[]
+    superpowerQrAssets SuperpowerQRAsset[]
 }
 
 model Event {
@@ -177,14 +191,14 @@ model EventConfig {
 }
 
 model HazardMultiplierRule {
-    id              String   @id @default(cuid())
+    id              String    @id @default(cuid())
     eventId         String
     name            String
     startsAt        DateTime
     endsAt          DateTime
     ratioMultiplier Float
-    createdAt       DateTime @default(now())
-    updatedAt       DateTime @updatedAt
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
     deletedAt       DateTime?
 
     event Event @relation(fields: [eventId], references: [id])
@@ -201,6 +215,7 @@ model Team {
     score            Int            @default(0)
     status           TeamStatus     @default(PENDING)
     pitStopExpiresAt DateTime?
+    deletedAt        DateTime?
 
     // ── Garage fields ──────────────────────────────────────────────────────────
     // How many players must submit approved descriptions before logo generation
@@ -230,6 +245,7 @@ model Team {
     @@unique([eventId, name])
     @@index([eventId])
     @@index([eventId, status])
+    @@index([eventId, deletedAt])
 }
 
 model Player {
@@ -280,9 +296,9 @@ model QRCode {
     updatedAt            DateTime     @updatedAt
     deletedAt            DateTime?
 
-    event       Event         @relation(fields: [eventId], references: [id])
-    claims      QRCodeClaim[]
-    scanRecords ScanRecord[]
+    event              Event               @relation(fields: [eventId], references: [id])
+    claims             QRCodeClaim[]
+    scanRecords        ScanRecord[]
     teamActivityEvents TeamActivityEvent[]
 
     @@unique([eventId, label])
@@ -426,21 +442,21 @@ model Rescue {
 }
 
 model TeamActivityEvent {
-    id           String           @id @default(cuid())
-    eventId      String
-    teamId       String
-    playerId     String
-    qrCodeId     String?
-    type         TeamActivityType
-    sourceKey    String
-    scanOutcome  ScanOutcome?
+    id            String           @id @default(cuid())
+    eventId       String
+    teamId        String
+    playerId      String
+    qrCodeId      String?
+    type          TeamActivityType
+    sourceKey     String
+    scanOutcome   ScanOutcome?
     pointsAwarded Int?
-    errorCode    String?
-    qrCodeLabel  String?
-    qrPayload    String?
-    summary      String
-    occurredAt   DateTime
-    createdAt    DateTime         @default(now())
+    errorCode     String?
+    qrCodeLabel   String?
+    qrPayload     String?
+    summary       String
+    occurredAt    DateTime
+    createdAt     DateTime         @default(now())
 
     event  Event   @relation(fields: [eventId], references: [id])
     team   Team    @relation(fields: [teamId], references: [id])

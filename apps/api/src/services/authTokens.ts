@@ -1,7 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 
-import type { AuthSessionRole, TeamStatus } from '@velocity-gp/api-contract';
+import type { AuthCapabilities, AuthSessionRole, TeamStatus } from '@velocity-gp/api-contract';
 
 import { env } from '../config/env.js';
 
@@ -15,8 +15,8 @@ export interface MagicLinkTokenClaims {
   readonly kind: 'magic_link';
   readonly tokenId: string;
   readonly userId: string;
-  readonly playerId: string;
-  readonly eventId: string;
+  readonly playerId: string | null;
+  readonly eventId: string | null;
   readonly email: string;
   readonly issuedAt: number;
   readonly expiresAt: number;
@@ -26,11 +26,12 @@ export interface SessionTokenClaims {
   readonly kind: 'session';
   readonly tokenId: string;
   readonly userId: string;
-  readonly playerId: string;
-  readonly eventId: string;
-  readonly teamId: string;
-  readonly teamStatus: TeamStatus;
+  readonly playerId: string | null;
+  readonly eventId: string | null;
+  readonly teamId: string | null;
+  readonly teamStatus: TeamStatus | null;
   readonly role: AuthSessionRole;
+  readonly capabilities: AuthCapabilities;
   readonly email: string;
   readonly displayName: string;
   readonly issuedAt: number;
@@ -38,6 +39,14 @@ export interface SessionTokenClaims {
 }
 
 type AuthTokenClaims = MagicLinkTokenClaims | SessionTokenClaims;
+
+function deriveCapabilitiesFromRole(role: AuthSessionRole): AuthCapabilities {
+  return {
+    admin: role === 'admin',
+    player: role === 'player' || role === 'helios',
+    heliosMember: role === 'helios',
+  };
+}
 
 /**
  * Resolves signing secret. Throws in production if not configured.
@@ -123,8 +132,8 @@ function parseToken(token: string): AuthTokenClaims {
  */
 export function createMagicLinkToken(input: {
   readonly userId: string;
-  readonly playerId: string;
-  readonly eventId: string;
+  readonly playerId: string | null;
+  readonly eventId: string | null;
   readonly email: string;
   readonly now?: Date;
 }): string {
@@ -154,11 +163,12 @@ export function createMagicLinkToken(input: {
  */
 export function createSessionToken(input: {
   readonly userId: string;
-  readonly playerId: string;
-  readonly eventId: string;
-  readonly teamId: string;
-  readonly teamStatus: TeamStatus;
+  readonly playerId: string | null;
+  readonly eventId: string | null;
+  readonly teamId: string | null;
+  readonly teamStatus: TeamStatus | null;
   readonly role: AuthSessionRole;
+  readonly capabilities?: AuthCapabilities;
   readonly email: string;
   readonly displayName: string;
   readonly now?: Date;
@@ -176,6 +186,7 @@ export function createSessionToken(input: {
     teamId: input.teamId,
     teamStatus: input.teamStatus,
     role: input.role,
+    capabilities: input.capabilities ?? deriveCapabilitiesFromRole(input.role),
     email: input.email,
     displayName: input.displayName,
     issuedAt,

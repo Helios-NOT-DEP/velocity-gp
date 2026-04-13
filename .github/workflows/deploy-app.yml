@@ -8,6 +8,11 @@ on:
         description: "Environment to run against"
         type: environment
         required: true
+      reseed_data:
+        description: "Reseed the database data"
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: read
   id-token: write
@@ -61,6 +66,25 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
+        
+      - name: Get Action IP
+        if: ${{ inputs.environment == 'prod' }}
+        id: ip
+        run: |
+          IPV4=$(curl -s https://api.ipify.org)
+          echo "ipv4=$IPV4" >> $GITHUB_OUTPUT
+
+      - name: Whitelist Runner IP
+        if: ${{ inputs.environment == 'prod' }}
+        id: whitelist
+        run: |
+          IP_ADDR="${{ steps.ip.outputs.ipv4 }}/32"
+          # Run the command and capture output
+          OUTPUT=$(doctl databases firewalls append ${{ vars.DB_CLUSTER_ID }} --rule "ip_addr:$IP_ADDR")
+          echo "$OUTPUT"
+          # Extract UUID for the specific IP
+          UUID=$(echo "$OUTPUT" | grep "$IP_ADDR" | awk '{print $1}')
+          echo "uuid=$UUID" >> $GITHUB_OUTPUT
 
       - name: Run Database Migrations
         env:
@@ -72,18 +96,28 @@ jobs:
           SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
         run: |
-          if [ "${{ inputs.environment }}" = "dev" ]; then
             npm run db:deploy
-            echo "Running seed script for dev environment"
+
+
+      - name: Run Database Seed for dev
+        if: ${{ inputs.environment == 'dev' && inputs.reseed_data == 'true' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SEED_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
+          DIRECT_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
+          SPACE_ACCESS_KEY_ID: ${{ vars.SPACE_ACCESS_KEY_ID }}
+          SPACE_SECRET_ACCESS_KEY: ${{ secrets.SPACE_SECRET_ACCESS_KEY }}
+          SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
+          SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
+        run: |
             npm run db:generate
             npm run db:seed
-          else
-            npm run db:deploy
-          fi
-
       # - if: vars.DO_APP_ID == ' '
       #   name: Deploy App
       #   run: doctl apps create-deployment ${{ vars.DO_APP_ID }} --verbose --wait
+      - name: Remove IP from Whitelist
+        if: inputs.environment == 'prod' && always() && steps.whitelist.outputs.uuid != ''
+        run: doctl databases firewalls remove ${{ vars.DB_CLUSTER_ID }} --uuid ${{ steps.whitelist.outputs.uuid }}
 
       - name: Trigger DigitalOcean App Platform deployment
         run: |

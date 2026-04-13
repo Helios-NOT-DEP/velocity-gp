@@ -66,3 +66,15 @@ The admin Game Control screen renders recent entries (actor, action, target, tim
 
 - Reset-all-scores workflow remains tracked separately from #26.
 - This artifact does not define transport/push mechanics; it covers API + admin UI contract behavior only.
+
+## Player Review Flag Resolution Flow
+
+Issue #20 extends admin operations with an explicit review lifecycle for invalid scans:
+
+1. Invalid QR scan is processed by scan ingestion and marks `Player.isFlaggedForReview=true`.
+2. Admin Players list can filter by `isFlaggedForReview=true`.
+3. Admin opens a flagged player's detail and submits a review decision + reason.
+4. Backend clears `isFlaggedForReview` and writes an admin audit row with decision metadata.
+5. Player no longer appears in flagged-only filters after refresh.
+
+This keeps anti-cheat enforcement and operator resolution in one auditable path while preserving backend-authoritative score/scan integrity.

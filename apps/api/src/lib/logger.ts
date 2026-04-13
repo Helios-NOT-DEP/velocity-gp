@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 
+import { buildInfo } from '../config/buildInfo.js';
 import { env } from '../config/env.js';
 
 // export const logger = pino({
@@ -23,8 +24,6 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic
 import { OpenTelemetryTransportV3 } from '@opentelemetry/winston-transport';
 import * as winston from 'winston';
 
-const packageJson = { version: '1.0.0' }; // require(env.packageJson.apiPath);
-
 // Initialize configuration
 const posthogKey = env.VITE_PUBLIC_POSTHOG_KEY;
 const posthogHost = env.VITE_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
@@ -41,7 +40,7 @@ if (posthogKey) {
   // Create a Resource that identifies this service
   const resource = resourceFromAttributes({
     [ATTR_SERVICE_NAME]: serviceName,
-    [ATTR_SERVICE_VERSION]: packageJson.version,
+    [ATTR_SERVICE_VERSION]: buildInfo.version,
     deploymentEnvironment: nodeEnv,
   });
 
