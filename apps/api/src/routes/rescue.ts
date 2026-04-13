@@ -2,12 +2,22 @@ import { Router } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
+import {
+  initiateRescueSchema,
+  rescueLogQuerySchema,
+  rescuePlayerParamsSchema,
+} from '@velocity-gp/api-contract/schemas';
 import { resolveRequestAuthContext } from '../lib/requestAuth.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import { requirePlayer } from '../middleware/requirePlayer.js';
-import { initiateRescueSchema, rescuePlayerParamsSchema } from '@velocity-gp/api-contract/schemas';
-import { completeRescue, getRescueStatus, initiateRescue } from '../services/rescueService.js';
+import {
+  completeRescue,
+  getRescueStatus,
+  initiateRescue,
+  listRescueLogByRescuer,
+} from '../services/rescueService.js';
+import { UnauthorizedError } from '../utils/appError.js';
 
 export const rescueRouter = Router();
 
@@ -46,6 +56,31 @@ rescueRouter.post(
         { requestId: response.locals.requestId }
       )
     );
+  })
+);
+
+rescueRouter.get(
+  '/rescue/log',
+  rescueRateLimiter,
+  requirePlayer,
+  validate(rescueLogQuerySchema, 'query'),
+  asyncHandler(async (request, response) => {
+    const authContext = resolveRequestAuthContext(request);
+    if (!authContext?.userId) {
+      throw new UnauthorizedError('Authentication is required.');
+    }
+
+    const { eventId, limit } = request.query as {
+      eventId?: string;
+      limit?: number;
+    };
+
+    const rescues = await listRescueLogByRescuer(authContext.userId, {
+      eventId,
+      limit,
+    });
+
+    response.json(successResponse({ rescues }, { requestId: response.locals.requestId }));
   })
 );
 

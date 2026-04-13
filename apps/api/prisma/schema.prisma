@@ -96,6 +96,12 @@ enum AdminActionType {
     TEAM_SOFT_DELETED
     PLAYER_CONTACT_UPDATED
     PLAYER_REVIEW_FLAG_RESOLVED
+    SUPERPOWER_QR_REGENERATED
+}
+
+enum SuperpowerQRAssetStatus {
+    ACTIVE
+    REVOKED
 }
 
 enum EmailProvider {
@@ -116,11 +122,12 @@ model User {
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
-    players           Player[]
-    adminActionAudits AdminActionAudit[]    @relation("AdminActionActor")
-    rescuesGiven      Rescue[]              @relation("RescueScannedBy")
-    teamTransitions   TeamStateTransition[] @relation("TeamTransitionTriggeredByUser")
-    emailEvents       EmailEvent[]
+    players            Player[]
+    adminActionAudits  AdminActionAudit[]    @relation("AdminActionActor")
+    rescuesGiven       Rescue[]              @relation("RescueScannedBy")
+    teamTransitions    TeamStateTransition[] @relation("TeamTransitionTriggeredByUser")
+    emailEvents        EmailEvent[]
+    superpowerQrAssets SuperpowerQRAsset[]
 }
 
 model Event {
@@ -137,17 +144,17 @@ model Event {
     createdAt          DateTime    @default(now())
     updatedAt          DateTime    @updatedAt
 
-    config            EventConfig?
-    teams             Team[]
-    players           Player[]
-    qrCodes           QRCode[]
-    qrCodeClaims      QRCodeClaim[]
-    scanRecords       ScanRecord[]
-    teamActivityEvents TeamActivityEvent[]
-    rescues           Rescue[]
-    teamTransitions   TeamStateTransition[]
-    adminActionAudits AdminActionAudit[]
-    emailEvents       EmailEvent[]
+    config                EventConfig?
+    teams                 Team[]
+    players               Player[]
+    qrCodes               QRCode[]
+    qrCodeClaims          QRCodeClaim[]
+    scanRecords           ScanRecord[]
+    teamActivityEvents    TeamActivityEvent[]
+    rescues               Rescue[]
+    teamTransitions       TeamStateTransition[]
+    adminActionAudits     AdminActionAudit[]
+    emailEvents           EmailEvent[]
     hazardMultiplierRules HazardMultiplierRule[]
 }
 
@@ -165,14 +172,14 @@ model EventConfig {
 }
 
 model HazardMultiplierRule {
-    id              String   @id @default(cuid())
+    id              String    @id @default(cuid())
     eventId         String
     name            String
     startsAt        DateTime
     endsAt          DateTime
     ratioMultiplier Float
-    createdAt       DateTime @default(now())
-    updatedAt       DateTime @updatedAt
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
     deletedAt       DateTime?
 
     event Event @relation(fields: [eventId], references: [id])
@@ -193,12 +200,12 @@ model Team {
     createdAt        DateTime   @default(now())
     updatedAt        DateTime   @updatedAt
 
-    event            Event                 @relation(fields: [eventId], references: [id])
-    players          Player[]
-    scanRecords      ScanRecord[]
+    event              Event                 @relation(fields: [eventId], references: [id])
+    players            Player[]
+    scanRecords        ScanRecord[]
     teamActivityEvents TeamActivityEvent[]
-    rescuesRequested Rescue[]              @relation("RescueRequestingTeam")
-    teamTransitions  TeamStateTransition[]
+    rescuesRequested   Rescue[]              @relation("RescueRequestingTeam")
+    teamTransitions    TeamStateTransition[]
 
     @@unique([eventId, name])
     @@index([eventId])
@@ -219,15 +226,15 @@ model Player {
     createdAt           DateTime     @default(now())
     updatedAt           DateTime     @updatedAt
 
-    user             User                  @relation(fields: [userId], references: [id])
-    event            Event                 @relation(fields: [eventId], references: [id])
-    team             Team?                 @relation(fields: [teamId], references: [id])
-    qrClaims         QRCodeClaim[]
-    scanRecords      ScanRecord[]
+    user               User                  @relation(fields: [userId], references: [id])
+    event              Event                 @relation(fields: [eventId], references: [id])
+    team               Team?                 @relation(fields: [teamId], references: [id])
+    qrClaims           QRCodeClaim[]
+    scanRecords        ScanRecord[]
     teamActivityEvents TeamActivityEvent[]
-    rescuesRequested Rescue[]              @relation("RescueRequestingPlayer")
-    teamTransitions  TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
-    emailEvents      EmailEvent[]
+    rescuesRequested   Rescue[]              @relation("RescueRequestingPlayer")
+    teamTransitions    TeamStateTransition[] @relation("TeamTransitionTriggeredByPlayer")
+    emailEvents        EmailEvent[]
 
     @@unique([eventId, userId])
     @@index([eventId])
@@ -252,9 +259,9 @@ model QRCode {
     updatedAt            DateTime     @updatedAt
     deletedAt            DateTime?
 
-    event       Event         @relation(fields: [eventId], references: [id])
-    claims      QRCodeClaim[]
-    scanRecords ScanRecord[]
+    event              Event               @relation(fields: [eventId], references: [id])
+    claims             QRCodeClaim[]
+    scanRecords        ScanRecord[]
     teamActivityEvents TeamActivityEvent[]
 
     @@unique([eventId, label])
@@ -398,21 +405,21 @@ model Rescue {
 }
 
 model TeamActivityEvent {
-    id           String           @id @default(cuid())
-    eventId      String
-    teamId       String
-    playerId     String
-    qrCodeId     String?
-    type         TeamActivityType
-    sourceKey    String
-    scanOutcome  ScanOutcome?
+    id            String           @id @default(cuid())
+    eventId       String
+    teamId        String
+    playerId      String
+    qrCodeId      String?
+    type          TeamActivityType
+    sourceKey     String
+    scanOutcome   ScanOutcome?
     pointsAwarded Int?
-    errorCode    String?
-    qrCodeLabel  String?
-    qrPayload    String?
-    summary      String
-    occurredAt   DateTime
-    createdAt    DateTime         @default(now())
+    errorCode     String?
+    qrCodeLabel   String?
+    qrPayload     String?
+    summary       String
+    occurredAt    DateTime
+    createdAt     DateTime         @default(now())
 
     event  Event   @relation(fields: [eventId], references: [id])
     team   Team    @relation(fields: [teamId], references: [id])
@@ -423,4 +430,20 @@ model TeamActivityEvent {
     @@index([eventId, teamId, occurredAt])
     @@index([teamId, occurredAt])
     @@index([playerId, occurredAt])
+}
+
+model SuperpowerQRAsset {
+    id            String                  @id @default(cuid())
+    userId        String
+    payload       String                  @unique
+    qrImageUrl    String
+    status        SuperpowerQRAssetStatus @default(ACTIVE)
+    createdAt     DateTime                @default(now())
+    revokedAt     DateTime?
+    regeneratedAt DateTime?
+
+    user User @relation(fields: [userId], references: [id])
+
+    @@index([userId, status])
+    @@index([userId, createdAt])
 }

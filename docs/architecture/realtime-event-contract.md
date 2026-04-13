@@ -38,6 +38,10 @@ Every realtime event uses the same envelope:
 - `RESCUE_UPDATED`
   - Trigger source: rescue lifecycle transitions.
   - Minimal payload: rescue identifiers, status, rescuer, timestamps.
+  - Extended payload guidance:
+    - `cooldownExpiresAt`: nullable ISO timestamp when rescuer cooldown ends.
+    - `errorCode`: optional stable error code for rejected transitions (for example `HELIOS_COOLDOWN_ACTIVE`).
+    - `retryAfterSeconds`: optional integer hint for client-side retry UX when cooldown is active.
 - `RACE_CONTROL_UPDATED`
   - Trigger source: admin race pause/resume update.
   - Minimal payload: updated race-control state and audit identifier.

@@ -123,7 +123,9 @@ export const placeholderRescue: HeliosRescueFlow = {
   rescuerUserId: 'user-helios-hugo',
   initiatedAt: createIsoDate(-7),
   completedAt: createIsoDate(-6),
+  cooldownExpiresAt: createIsoDate(-4),
   status: 'COMPLETED',
+  reason: null,
 };
 
 /**

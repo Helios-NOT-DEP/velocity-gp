@@ -110,6 +110,8 @@ export const qrEndpoints = {
 export const rescueEndpoints = {
   /** Starts a rescue workflow handled by HELIOS staff or authorized players. */
   initiateRescue: '/rescue/initiate',
+  /** Lists recent rescue entries initiated by the authenticated rescuer. */
+  listRescueLog: '/rescue/log',
   /** Polls the status of an active rescue attempt for a player. */
   getRescueStatus: (playerId: string) => `/rescue/${playerId}/status`,
   /** Finalizes a rescue sequence, freeing the trapped player/team. */
@@ -216,6 +218,17 @@ export const authEndpoints = {
   getRoutingDecision: '/auth/routing-decision',
   /** Invalidates the active token and logs the user out. */
   logout: '/auth/logout',
+};
+
+/**
+ * Endpoints for the Helios Superpower QR identity surface.
+ * Restricted to authenticated Helios users only.
+ */
+export const heliosEndpoints = {
+  /** Retrieves the active identity-bound Superpower QR asset for a Helios player. */
+  getSuperpowerQr: (playerId: string) => `/players/${playerId}/superpower-qr`,
+  /** Revokes the current Superpower QR and issues a fresh identity-bound replacement. */
+  regenerateSuperpowerQr: (playerId: string) => `/players/${playerId}/superpower-qr/regenerate`,
 };
 
 // ============================================================================

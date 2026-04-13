@@ -1,14 +1,113 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
+import { Loader2, RefreshCw, Zap, Shield, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useGame } from '../context/GameContext';
-import { Zap, Shield, ArrowLeft } from 'lucide-react';
+import { getSuperpowerQr, regenerateSuperpowerQr } from '@/services/helios';
+import { getRescueLog } from '@/services/rescue';
+import type { HeliosRescueFlow } from '@velocity-gp/api-contract';
+
+function formatRescueTimestamp(isoTimestamp: string): string {
+  const parsed = new Date(isoTimestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'Unknown time';
+  }
+
+  return parsed.toLocaleString();
+}
 
 export default function HeliosProfile() {
   const { gameState } = useGame();
   const navigate = useNavigate();
 
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [isLoadingQr, setIsLoadingQr] = useState(true);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [rescueLog, setRescueLog] = useState<HeliosRescueFlow[]>([]);
+  const [isRescueLogLoading, setIsRescueLogLoading] = useState(true);
+  const [rescueLogError, setRescueLogError] = useState<string | null>(null);
+
+  const playerId = gameState.currentUser?.playerId ?? null;
+  const eventId = gameState.currentUser?.eventId ?? undefined;
+
+  useEffect(() => {
+    if (!playerId) return;
+    let isMounted = true;
+
+    setIsLoadingQr(true);
+    setQrError(null);
+
+    getSuperpowerQr(playerId)
+      .then((data) => {
+        if (isMounted) {
+          setQrImageUrl(data.asset.qrImageUrl);
+          setIsLoadingQr(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setQrError('Could not load your Superpower QR. Please try again.');
+          setIsLoadingQr(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [playerId]);
+
+  useEffect(() => {
+    if (!playerId) return;
+
+    let isMounted = true;
+    setIsRescueLogLoading(true);
+    setRescueLogError(null);
+
+    getRescueLog({ eventId, limit: 10 })
+      .then((rescues) => {
+        if (!isMounted) return;
+        setRescueLog(rescues);
+        setIsRescueLogLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setRescueLogError('Could not load rescue activity. Please try again.');
+        setIsRescueLogLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [eventId, playerId]);
+
+  const handleRegenerate = useCallback(async () => {
+    if (!playerId || isRegenerating) return;
+
+    setIsRegenerating(true);
+    setQrError(null);
+
+    try {
+      const data = await regenerateSuperpowerQr(playerId);
+      setQrImageUrl(data.asset.qrImageUrl);
+    } catch {
+      setQrError('Could not regenerate your Superpower QR. Please try again.');
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [playerId, isRegenerating]);
+
   if (!gameState.currentUser) {
-    return <Navigate to="/" replace />;
+    return (
+      <main
+        className="min-h-screen bg-black p-6 flex items-center justify-center"
+        style={{ fontFamily: 'var(--font-body)' }}
+      >
+        <div className="flex items-center gap-2 text-gray-400 text-sm" role="status">
+          <Loader2 className="w-4 h-4 animate-spin" aria-label="Loading Helios profile" />
+          Loading Helios profile...
+        </div>
+      </main>
+    );
   }
 
   if (!gameState.currentUser.isHelios) {
@@ -57,28 +156,38 @@ export default function HeliosProfile() {
 
           <div className="bg-white rounded-2xl p-6 mb-6">
             {/* QR Code */}
-            <div className="aspect-square bg-black rounded-xl flex items-center justify-center relative overflow-hidden">
-              {/* Simplified QR pattern */}
-              <div className="grid grid-cols-8 grid-rows-8 gap-1 w-full h-full p-6">
-                {Array.from({ length: 64 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-sm"
-                    style={{
-                      background: Math.random() > 0.5 ? '#000' : '#fff',
-                    }}
-                  />
-                ))}
-              </div>
-
-              {/* Center logo */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-orange-500 rounded-xl flex items-center justify-center">
-                  <Zap className="w-8 h-8 text-white" fill="white" />
+            <div className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center relative overflow-hidden">
+              {isLoadingQr && (
+                <Loader2
+                  className="w-12 h-12 text-gray-400 animate-spin"
+                  aria-label="Loading QR code"
+                />
+              )}
+              {!isLoadingQr && qrImageUrl && (
+                <img
+                  src={qrImageUrl}
+                  alt="Your Superpower QR code — scan to rescue a penalised team"
+                  className="w-full h-full object-contain rounded-xl"
+                />
+              )}
+              {!isLoadingQr && !qrImageUrl && !qrError && (
+                <div className="flex flex-col items-center gap-2 text-gray-400 text-sm text-center p-4">
+                  <AlertCircle className="w-8 h-8" />
+                  <span>QR not available</span>
                 </div>
-              </div>
+              )}
             </div>
           </div>
+
+          {qrError && (
+            <div
+              className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4"
+              role="alert"
+            >
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+              <p className="text-red-400 text-sm">{qrError}</p>
+            </div>
+          )}
 
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
             <p className="text-blue-400 text-sm">
@@ -86,6 +195,16 @@ export default function HeliosProfile() {
               their Pit Stop timer and get them back in the race.
             </p>
           </div>
+
+          <button
+            onClick={handleRegenerate}
+            disabled={isRegenerating || isLoadingQr}
+            className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label="Regenerate Superpower QR code"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+            {isRegenerating ? 'Regenerating…' : 'Regenerate QR'}
+          </button>
         </div>
 
         {/* Stats */}
@@ -109,6 +228,58 @@ export default function HeliosProfile() {
               {gameState.teams.length}
             </p>
           </div>
+        </div>
+
+        {/* Rescue Log */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
+          <h2
+            className="text-xl font-bold text-white mb-4"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            Rescue Activity Log
+          </h2>
+
+          {isRescueLogLoading && (
+            <div className="flex items-center gap-2 text-gray-400 text-sm" role="status">
+              <Loader2 className="w-4 h-4 animate-spin" aria-label="Loading rescue activity" />
+              Loading rescue activity...
+            </div>
+          )}
+
+          {!isRescueLogLoading && rescueLogError && (
+            <div
+              className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4"
+              role="alert"
+            >
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+              <p className="text-red-400 text-sm">{rescueLogError}</p>
+            </div>
+          )}
+
+          {!isRescueLogLoading && !rescueLogError && rescueLog.length === 0 && (
+            <p className="text-gray-400 text-sm">No rescues logged yet.</p>
+          )}
+
+          {!isRescueLogLoading && !rescueLogError && rescueLog.length > 0 && (
+            <ul className="space-y-3" role="log" aria-label="Recent rescue activity">
+              {rescueLog.map((rescue) => (
+                <li
+                  key={rescue.id}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm text-white font-medium">Player {rescue.playerId}</p>
+                    <p className="text-xs text-gray-400">
+                      {formatRescueTimestamp(rescue.initiatedAt)}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                    {rescue.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Actions */}
