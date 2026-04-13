@@ -283,4 +283,117 @@ test.describe('Velocity GP web flows', () => {
     expect(cameraRequestCount).toBeGreaterThan(0);
     expect(scannedPayload).toBe('VG-001');
   });
+
+  test('Helios user sees their Superpower QR on the profile page', async ({ page }) => {
+    await seedAuthSession(page, {
+      userId: 'helios-e2e-user-1',
+      role: 'helios',
+      isAuthenticated: true,
+      email: 'helios-e2e@velocitygp.app',
+    });
+
+    await page.route('**/api/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            session: {
+              userId: 'helios-e2e-user-1',
+              playerId: 'player-helios-e2e-1',
+              role: 'helios',
+              isAuthenticated: true,
+              email: 'helios-e2e@velocitygp.app',
+              displayName: 'Helios Creator',
+              capabilities: { heliosMember: true, player: true, admin: false },
+            },
+          },
+        }),
+      });
+    });
+
+    await page.route('**/api/rescue/log**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { rescues: [] },
+        }),
+      });
+    });
+
+    await page.route('**/api/players/player-helios-e2e-1/superpower-qr', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            asset: {
+              id: 'qr-e2e-1',
+              userId: 'helios-e2e-user-1',
+              payload: 'VG-SP-E2E001',
+              qrImageUrl: 'https://cdn.velocitygp.app/qr/e2e-superpower.png',
+              status: 'ACTIVE',
+              createdAt: '2026-04-12T00:00:00.000Z',
+              regeneratedAt: null,
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/helios');
+
+    // Profile heading and Superpower QR section should be visible.
+    await expect(page.getByText('Rescue QR Code')).toBeVisible();
+
+    // The QR image should be rendered with the mocked URL.
+    const qrImage = page.getByRole('img', { name: /Superpower QR/i });
+    await expect(qrImage).toBeVisible();
+    await expect(qrImage).toHaveAttribute(
+      'src',
+      'https://cdn.velocitygp.app/qr/e2e-superpower.png'
+    );
+
+    // Regenerate button should be present and enabled.
+    await expect(page.getByRole('button', { name: /Regenerate Superpower QR/i })).toBeEnabled();
+  });
+
+  test('non-Helios player is redirected away from the Helios profile', async ({ page }) => {
+    await seedAuthSession(page, {
+      userId: 'player-e2e-regular-1',
+      role: 'player',
+      isAuthenticated: true,
+      email: 'player-e2e@velocitygp.app',
+    });
+
+    await page.route('**/api/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            session: {
+              userId: 'player-e2e-regular-1',
+              playerId: 'player-e2e-regular-1',
+              role: 'player',
+              isAuthenticated: true,
+              email: 'player-e2e@velocitygp.app',
+              displayName: 'Regular Player',
+              capabilities: { heliosMember: false, player: true, admin: false },
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/helios');
+
+    // Should not see the profile QR section — redirect occurs.
+    await expect(page.getByText('Rescue QR Code')).not.toBeVisible({ timeout: 3000 });
+  });
 });

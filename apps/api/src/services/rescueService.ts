@@ -26,6 +26,34 @@ interface RescuerResolution {
   readonly scannerTeamId: string | null;
 }
 
+const RESCUE_COOLDOWN_WINDOW_MS = 3 * 60 * 1000;
+
+interface RescueFlowRecord {
+  readonly id: string;
+  readonly requestingPlayerId: string;
+  readonly eventId: string;
+  readonly rescuerUserId: string;
+  readonly initiatedAt: Date;
+  readonly completedAt: Date | null;
+  readonly cooldownExpiresAt: Date | null;
+  readonly status: HeliosRescueFlow['status'];
+  readonly reason: string | null;
+}
+
+function toHeliosRescueFlow(record: RescueFlowRecord): HeliosRescueFlow {
+  return {
+    id: record.id,
+    playerId: record.requestingPlayerId,
+    eventId: record.eventId,
+    rescuerUserId: record.rescuerUserId,
+    initiatedAt: record.initiatedAt.toISOString(),
+    completedAt: record.completedAt?.toISOString() ?? null,
+    cooldownExpiresAt: record.cooldownExpiresAt?.toISOString() ?? null,
+    status: record.status,
+    reason: record.reason,
+  } as HeliosRescueFlow;
+}
+
 /**
  * Resolves rescuer identity from scanner context, QR context, explicit IDs, or
  * Helios fallback user.
@@ -203,6 +231,50 @@ export async function initiateRescue(request: InitiateRescueInput): Promise<Heli
           };
         }
 
+        const cooldownRescue = await tx.rescue.findFirst({
+          where: {
+            eventId: request.eventId,
+            rescuerUserId: rescuer.rescuerUserId,
+            cooldownExpiresAt: {
+              gt: now,
+            },
+          },
+          orderBy: {
+            cooldownExpiresAt: 'desc',
+          },
+          select: {
+            id: true,
+            cooldownExpiresAt: true,
+          },
+        });
+
+        if (cooldownRescue?.cooldownExpiresAt) {
+          const rejectedRescue = await tx.rescue.create({
+            data: {
+              eventId: request.eventId,
+              requestingPlayerId: requestingPlayer.id,
+              requestingTeamId: requestingPlayer.teamId,
+              rescuerUserId: rescuer.rescuerUserId,
+              status: 'REJECTED',
+              reason: 'HELIOS_COOLDOWN_ACTIVE',
+              initiatedAt: now,
+              completedAt: null,
+              cooldownExpiresAt: cooldownRescue.cooldownExpiresAt,
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          return {
+            outcome: 'COOLDOWN_REJECTED' as const,
+            rescueId: rejectedRescue.id,
+            cooldownExpiresAt: cooldownRescue.cooldownExpiresAt,
+          };
+        }
+
+        const cooldownExpiresAt = new Date(now.getTime() + RESCUE_COOLDOWN_WINDOW_MS);
+
         const createdRescue = await tx.rescue.create({
           data: {
             eventId: request.eventId,
@@ -213,7 +285,7 @@ export async function initiateRescue(request: InitiateRescueInput): Promise<Heli
             reason: request.reason,
             initiatedAt: now,
             completedAt: null,
-            cooldownExpiresAt: null,
+            cooldownExpiresAt,
           },
           select: {
             id: true,
@@ -222,7 +294,9 @@ export async function initiateRescue(request: InitiateRescueInput): Promise<Heli
             rescuerUserId: true,
             initiatedAt: true,
             completedAt: true,
+            cooldownExpiresAt: true,
             status: true,
+            reason: true,
           },
         });
 
@@ -246,16 +320,29 @@ export async function initiateRescue(request: InitiateRescueInput): Promise<Heli
         );
       }
 
+      if (result.outcome === 'COOLDOWN_REJECTED') {
+        incrementCounter('rescue.reject.total', { reason: 'HELIOS_COOLDOWN_ACTIVE' });
+        const retryAfterSeconds = Math.max(
+          0,
+          Math.ceil((result.cooldownExpiresAt.getTime() - now.getTime()) / 1000)
+        );
+
+        throw new AppError(
+          429,
+          'HELIOS_COOLDOWN_ACTIVE',
+          'Helios rescue is cooling down. Please wait before rescuing again.',
+          {
+            eventId: request.eventId,
+            playerId: request.playerId,
+            rescueId: result.rescueId,
+            cooldownExpiresAt: result.cooldownExpiresAt.toISOString(),
+            retryAfterSeconds,
+          }
+        );
+      }
+
       incrementCounter('rescue.request.total', { status: result.rescue.status });
-      return {
-        id: result.rescue.id,
-        playerId: result.rescue.requestingPlayerId,
-        eventId: result.rescue.eventId,
-        rescuerUserId: result.rescue.rescuerUserId,
-        initiatedAt: result.rescue.initiatedAt.toISOString(),
-        completedAt: result.rescue.completedAt?.toISOString() ?? null,
-        status: result.rescue.status,
-      };
+      return toHeliosRescueFlow(result.rescue);
     }
   );
 }
@@ -280,23 +367,54 @@ export async function getRescueStatus(playerId: string): Promise<HeliosRescueFlo
       rescuerUserId: true,
       initiatedAt: true,
       completedAt: true,
+      cooldownExpiresAt: true,
       status: true,
+      reason: true,
     },
   });
 
   if (latestRescue) {
-    return {
-      id: latestRescue.id,
-      playerId: latestRescue.requestingPlayerId,
-      eventId: latestRescue.eventId,
-      rescuerUserId: latestRescue.rescuerUserId,
-      initiatedAt: latestRescue.initiatedAt.toISOString(),
-      completedAt: latestRescue.completedAt?.toISOString() ?? null,
-      status: latestRescue.status,
-    };
+    return toHeliosRescueFlow(latestRescue);
   }
 
   throw new NotFoundError('No rescue record found for this player.', { playerId });
+}
+
+/**
+ * Lists most recent rescue entries initiated by a rescuer.
+ */
+export async function listRescueLogByRescuer(
+  rescuerUserId: string,
+  options?: {
+    readonly eventId?: string;
+    readonly limit?: number;
+  }
+): Promise<HeliosRescueFlow[]> {
+  const limit = options?.limit ?? 20;
+
+  const rescues = await prisma.rescue.findMany({
+    where: {
+      rescuerUserId,
+      eventId: options?.eventId,
+    },
+    orderBy: {
+      initiatedAt: 'desc',
+    },
+    take: limit,
+    select: {
+      id: true,
+      requestingPlayerId: true,
+      eventId: true,
+      rescuerUserId: true,
+      initiatedAt: true,
+      completedAt: true,
+      cooldownExpiresAt: true,
+      status: true,
+      reason: true,
+    },
+  });
+
+  return rescues.map((rescue) => toHeliosRescueFlow(rescue));
 }
 
 /**

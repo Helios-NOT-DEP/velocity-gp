@@ -26,6 +26,15 @@ interface ScanFixture {
   readonly userIds: string[];
 }
 
+interface RescueFixture {
+  readonly eventId: string;
+  readonly rescuerUserId: string;
+  readonly rescuerPlayerId: string;
+  readonly requestingPlayerIdA: string;
+  readonly requestingPlayerIdB: string;
+  readonly userIds: string[];
+}
+
 async function cleanupEventData(eventId: string, userIds: string[]): Promise<void> {
   await prisma.adminActionAudit.deleteMany({
     where: {
@@ -212,6 +221,142 @@ async function createScanFixture(options: ScanFixtureOptions = {}): Promise<Scan
     qrCodeId,
     qrPayload,
     userIds: [userId],
+  };
+}
+
+async function createRescueFixture(): Promise<RescueFixture> {
+  const token = randomUUID().slice(0, 8);
+  const eventId = `event-rescue-cooldown-${token}`;
+  const rescuerTeamId = `team-rescuer-${token}`;
+  const requestingTeamId = `team-requesting-${token}`;
+
+  const rescuerUserId = `user-rescuer-${token}`;
+  const rescuerPlayerId = `player-rescuer-${token}`;
+  const requestingUserIdA = `user-requesting-a-${token}`;
+  const requestingPlayerIdA = `player-requesting-a-${token}`;
+  const requestingUserIdB = `user-requesting-b-${token}`;
+  const requestingPlayerIdB = `player-requesting-b-${token}`;
+
+  const secondRescuerUserId = `user-rescuer-2-${token}`;
+  const secondRescuerPlayerId = `player-rescuer-2-${token}`;
+  const now = new Date();
+
+  await prisma.user.createMany({
+    data: [
+      {
+        id: rescuerUserId,
+        email: `rescuer-${token}@velocitygp.dev`,
+        displayName: `Rescuer ${token}`,
+        role: 'PLAYER',
+      },
+      {
+        id: secondRescuerUserId,
+        email: `rescuer2-${token}@velocitygp.dev`,
+        displayName: `Rescuer 2 ${token}`,
+        role: 'PLAYER',
+      },
+      {
+        id: requestingUserIdA,
+        email: `requesting-a-${token}@velocitygp.dev`,
+        displayName: `Requesting A ${token}`,
+        role: 'PLAYER',
+      },
+      {
+        id: requestingUserIdB,
+        email: `requesting-b-${token}@velocitygp.dev`,
+        displayName: `Requesting B ${token}`,
+        role: 'PLAYER',
+      },
+    ],
+  });
+
+  await prisma.event.create({
+    data: {
+      id: eventId,
+      name: `Rescue Cooldown Event ${token}`,
+      startDate: new Date(now.getTime() - 60 * 60_000),
+      endDate: new Date(now.getTime() + 60 * 60_000),
+      status: 'ACTIVE',
+      isPublic: false,
+    },
+  });
+
+  await prisma.eventConfig.create({
+    data: {
+      eventId,
+      globalHazardRatio: 15,
+      pitStopDurationSeconds: 900,
+      invalidScanPenalty: 1,
+      raceControlState: 'ACTIVE',
+    },
+  });
+
+  await prisma.team.createMany({
+    data: [
+      {
+        id: rescuerTeamId,
+        eventId,
+        name: `Rescuer Team ${token}`,
+        status: 'ACTIVE',
+      },
+      {
+        id: requestingTeamId,
+        eventId,
+        name: `Requesting Team ${token}`,
+        status: 'IN_PIT',
+        pitStopExpiresAt: new Date(now.getTime() + 15 * 60_000),
+      },
+    ],
+  });
+
+  await prisma.player.createMany({
+    data: [
+      {
+        id: rescuerPlayerId,
+        userId: rescuerUserId,
+        eventId,
+        teamId: rescuerTeamId,
+        status: 'RACING',
+        individualScore: 0,
+        joinedAt: now,
+      },
+      {
+        id: secondRescuerPlayerId,
+        userId: secondRescuerUserId,
+        eventId,
+        teamId: rescuerTeamId,
+        status: 'RACING',
+        individualScore: 0,
+        joinedAt: now,
+      },
+      {
+        id: requestingPlayerIdA,
+        userId: requestingUserIdA,
+        eventId,
+        teamId: requestingTeamId,
+        status: 'IN_PIT',
+        individualScore: 0,
+        joinedAt: now,
+      },
+      {
+        id: requestingPlayerIdB,
+        userId: requestingUserIdB,
+        eventId,
+        teamId: requestingTeamId,
+        status: 'IN_PIT',
+        individualScore: 0,
+        joinedAt: now,
+      },
+    ],
+  });
+
+  return {
+    eventId,
+    rescuerUserId,
+    rescuerPlayerId,
+    requestingPlayerIdA,
+    requestingPlayerIdB,
+    userIds: [rescuerUserId, secondRescuerUserId, requestingUserIdA, requestingUserIdB],
   };
 }
 
@@ -773,6 +918,101 @@ describe('system backend enforcement', () => {
       expect(rejected?.reason).toBe('SELF_RESCUE_FORBIDDEN');
     } finally {
       await cleanupEventData(eventId, [scannerUserId, scanneeUserId]);
+    }
+  });
+
+  it('enforces rescuer cooldown for three minutes between rescue requests', async () => {
+    const fixture = await createRescueFixture();
+
+    try {
+      const firstRescue = await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdA,
+        scannerUserId: fixture.rescuerUserId,
+      });
+
+      expect(firstRescue.status).toBe('REQUESTED');
+      expect(
+        (firstRescue as { cooldownExpiresAt?: string | null }).cooldownExpiresAt
+      ).not.toBeNull();
+
+      await expect(
+        initiateRescue({
+          eventId: fixture.eventId,
+          playerId: fixture.requestingPlayerIdB,
+          scannerUserId: fixture.rescuerUserId,
+        })
+      ).rejects.toMatchObject({
+        code: 'HELIOS_COOLDOWN_ACTIVE',
+        statusCode: 429,
+      });
+
+      const cooldownRejected = await prisma.rescue.findFirst({
+        where: {
+          eventId: fixture.eventId,
+          requestingPlayerId: fixture.requestingPlayerIdB,
+          status: 'REJECTED',
+          reason: 'HELIOS_COOLDOWN_ACTIVE',
+        },
+      });
+
+      expect(cooldownRejected).not.toBeNull();
+
+      await prisma.rescue.updateMany({
+        where: {
+          eventId: fixture.eventId,
+          rescuerUserId: fixture.rescuerUserId,
+        },
+        data: {
+          cooldownExpiresAt: new Date(Date.now() - 1_000),
+        },
+      });
+
+      const postCooldownRescue = await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdB,
+        scannerUserId: fixture.rescuerUserId,
+      });
+
+      expect(postCooldownRescue.status).toBe('REQUESTED');
+      expect(
+        (postCooldownRescue as { cooldownExpiresAt?: string | null }).cooldownExpiresAt
+      ).not.toBeNull();
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('applies cooldown per rescuer user and not globally', async () => {
+    const fixture = await createRescueFixture();
+    const secondRescuerUserId = fixture.userIds[1];
+
+    try {
+      await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdA,
+        scannerUserId: fixture.rescuerUserId,
+      });
+
+      await expect(
+        initiateRescue({
+          eventId: fixture.eventId,
+          playerId: fixture.requestingPlayerIdB,
+          scannerUserId: fixture.rescuerUserId,
+        })
+      ).rejects.toMatchObject({
+        code: 'HELIOS_COOLDOWN_ACTIVE',
+      });
+
+      const secondRescuerRescue = await initiateRescue({
+        eventId: fixture.eventId,
+        playerId: fixture.requestingPlayerIdB,
+        scannerUserId: secondRescuerUserId,
+      });
+
+      expect(secondRescuerRescue.status).toBe('REQUESTED');
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
     }
   });
 
