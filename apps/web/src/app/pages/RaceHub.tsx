@@ -281,25 +281,36 @@ export default function RaceHub() {
 
   useEffect(() => {
     let isMounted = true;
-    let interval: ReturnType<typeof globalThis.setInterval> | null = null;
+    let pollTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+    let requestSeq = 0;
 
     const pollIdentity = async () => {
-      const resolution = await resolveScanIdentityForEmail(gameState.currentUser?.email);
-      if (!isMounted || resolution.status !== 'resolved') {
-        return;
-      }
+      const currentRequestSeq = ++requestSeq;
+      try {
+        const resolution = await resolveScanIdentityForEmail(gameState.currentUser?.email);
+        if (!isMounted || currentRequestSeq !== requestSeq || resolution.status !== 'resolved') {
+          return;
+        }
 
-      applyIdentityResolution(resolution);
+        applyIdentityResolution(resolution);
+      } finally {
+        if (isMounted && currentRequestSeq === requestSeq) {
+          pollTimeout = globalThis.setTimeout(() => {
+            void pollIdentity();
+          }, IDENTITY_POLL_INTERVAL_MS);
+        }
+      }
     };
 
-    interval = globalThis.setInterval(() => {
+    pollTimeout = globalThis.setTimeout(() => {
       void pollIdentity();
     }, IDENTITY_POLL_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      if (interval) {
-        globalThis.clearInterval(interval);
+      requestSeq += 1;
+      if (pollTimeout) {
+        globalThis.clearTimeout(pollTimeout);
       }
     };
   }, [applyIdentityResolution, gameState.currentUser?.email]);

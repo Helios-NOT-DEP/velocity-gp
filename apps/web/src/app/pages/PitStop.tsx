@@ -11,19 +11,20 @@ export default function PitStop() {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const pitSyncInFlightRef = useRef(false);
+  const isInPitStop = Boolean(gameState.currentTeam?.inPitStop);
 
   useEffect(() => {
-    if (gameState.currentTeam?.inPitStop) {
+    if (isInPitStop) {
       return;
     }
 
     // Pit-stop route is only valid during lockout.
     navigate('/race', { replace: true });
-  }, [gameState.currentTeam?.inPitStop, navigate]);
+  }, [isInPitStop, navigate]);
 
   useEffect(() => {
     const expiresAt = gameState.currentTeam?.pitStopExpiresAt;
-    if (!expiresAt || !gameState.currentTeam?.inPitStop) {
+    if (!expiresAt || !isInPitStop) {
       setTimeLeft(null);
       return;
     }
@@ -43,10 +44,10 @@ export default function PitStop() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [gameState.currentTeam?.inPitStop, gameState.currentTeam?.pitStopExpiresAt]);
+  }, [isInPitStop, gameState.currentTeam?.pitStopExpiresAt]);
 
   useEffect(() => {
-    if (!gameState.currentTeam?.inPitStop) {
+    if (!isInPitStop) {
       return;
     }
 
@@ -87,13 +88,11 @@ export default function PitStop() {
         globalThis.clearInterval(interval);
       }
     };
-  }, [
-    clearPitStop,
-    gameState.currentTeam?.inPitStop,
-    gameState.currentUser?.email,
-    hydrateScanIdentity,
-    navigate,
-  ]);
+  }, [clearPitStop, isInPitStop, gameState.currentUser?.email, hydrateScanIdentity, navigate]);
+
+  if (!isInPitStop) {
+    return null;
+  }
 
   const formatTime = (seconds: number | null) => {
     if (seconds === null) {

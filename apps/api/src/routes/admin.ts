@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import type { ListAdminRosterQuery } from '@velocity-gp/api-contract';
 import { successResponse } from '@velocity-gp/api-contract/http';
-import { z } from 'zod';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { getRequestAuthContext } from '../lib/requestAuth.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
@@ -21,6 +20,7 @@ import {
   manualPitControlSchema,
   qrImportApplySchema,
   qrImportPreviewSchema,
+  resolveAdminPlayerReviewFlagSchema,
   rosterImportApplySchema,
   rosterImportPreviewSchema,
   adminPlayerScanHistoryQuerySchema,
@@ -73,11 +73,6 @@ import {
   updateAdminTeamScore,
   updateRosterAssignment,
 } from '../services/rosterService.js';
-
-const resolveAdminPlayerReviewFlagSchema = z.object({
-  decision: z.enum(['APPROVED', 'WARNED', 'DISQUALIFIED']),
-  reason: z.string().min(2).max(500),
-});
 
 export const adminRouter = Router();
 

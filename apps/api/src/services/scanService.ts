@@ -218,6 +218,23 @@ async function processScanInTransaction(
 
   const team = playerWithTeam.team;
   const globalScanCountAfter = globalScanCountBefore + 1;
+
+  if (eventConfig.raceControlState === 'PAUSED') {
+    // Race-control pause short-circuits all scans but still records blocked attempts.
+    return createBlockedScanResponse(tx, {
+      eventId: input.eventId,
+      playerId: playerWithTeam.id,
+      teamId: team.id,
+      qrCodeId: null,
+      qrCodeLabel: null,
+      qrPayload,
+      message: 'Race control is paused.',
+      errorCode: 'RACE_PAUSED',
+      globalScanCountBefore,
+      globalScanCountAfter,
+    });
+  }
+
   const blockedTeamInPit =
     team.status === 'IN_PIT' &&
     (!team.pitStopExpiresAt || team.pitStopExpiresAt.getTime() > now.getTime());
@@ -336,22 +353,6 @@ async function processScanInTransaction(
       errorCode: 'QR_NOT_FOUND',
       flaggedForReview: true,
     };
-  }
-
-  if (eventConfig.raceControlState === 'PAUSED') {
-    // Race-control pause short-circuits all scans but still records blocked attempts.
-    return createBlockedScanResponse(tx, {
-      eventId: input.eventId,
-      playerId: playerWithTeam.id,
-      teamId: team.id,
-      qrCodeId: qrCode.id,
-      qrCodeLabel: qrCode.label,
-      qrPayload,
-      message: 'Race control is paused.',
-      errorCode: 'RACE_PAUSED',
-      globalScanCountBefore,
-      globalScanCountAfter,
-    });
   }
 
   if (qrCode.status === 'DISABLED') {

@@ -1572,7 +1572,7 @@ export async function resolveAdminPlayerReviewFlag(
         data: {
           eventId,
           actorUserId,
-          actionType: 'ROSTER_REASSIGNED',
+          actionType: 'PLAYER_REVIEW_FLAG_RESOLVED',
           targetType: 'PLAYER',
           targetId: existing.id,
           details: {

@@ -1106,7 +1106,7 @@ describe('velocity gp backend', () => {
       prisma.adminActionAudit.findFirst({
         where: {
           eventId: fixtureIds.eventId,
-          actionType: 'ROSTER_REASSIGNED',
+          actionType: 'PLAYER_REVIEW_FLAG_RESOLVED',
           targetId: fixtureIds.playerId,
         },
         orderBy: {
