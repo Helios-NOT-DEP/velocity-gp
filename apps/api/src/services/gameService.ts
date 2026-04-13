@@ -185,27 +185,30 @@ export async function getDisplayEvents(
 ): Promise<ListDisplayEventsResponse> {
   const take = clampDisplayEventsLimit(query.limit);
   const cursor = parseDisplayEventsCursor(query.since);
-  const cursorWhereClause = cursor
-    ? {
-        OR: [
-          {
+  const cursorWhereClause =
+    cursor === null
+      ? {}
+      : cursor.transitionId === null
+        ? {
             createdAt: {
               gt: cursor.occurredAt,
             },
-          },
-          {
-            createdAt: cursor.occurredAt,
-            ...(cursor.transitionId
-              ? {
-                  id: {
-                    gt: cursor.transitionId,
-                  },
-                }
-              : {}),
-          },
-        ],
-      }
-    : {};
+          }
+        : {
+            OR: [
+              {
+                createdAt: {
+                  gt: cursor.occurredAt,
+                },
+              },
+              {
+                createdAt: cursor.occurredAt,
+                id: {
+                  gt: cursor.transitionId,
+                },
+              },
+            ],
+          };
 
   const rows = await prisma.teamStateTransition.findMany({
     where: {
