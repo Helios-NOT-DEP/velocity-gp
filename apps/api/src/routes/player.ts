@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -12,10 +13,44 @@ import {
 import { createPlayer, getPlayerProfile, updatePlayerProfile } from '../services/playerService.js';
 import { getActiveSuperpowerQR, regenerateSuperpowerQR } from '../services/superpowerQrService.js';
 import { requireHelios } from '../middleware/requireHelios.js';
-import { getRequestAuthContext } from '../lib/requestAuth.js';
+import { getRequestAuthContext, resolveRequestAuthContext } from '../lib/requestAuth.js';
 import { ForbiddenError } from '../utils/appError.js';
 
 export const playerRouter = Router();
+
+const superpowerQrReadRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  keyGenerator: (request, _response) => {
+    const authContext = resolveRequestAuthContext(request);
+    if (!authContext) {
+      return ipKeyGenerator(request.ip || 'unknown');
+    }
+
+    if (authContext.capabilities.player && !authContext.capabilities.admin) {
+      return `player:${authContext.playerId ?? authContext.userId}`;
+    }
+
+    return `${authContext.role ?? 'capability'}:${authContext.userId}`;
+  },
+});
+
+const superpowerQrRegenerateRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (request, _response) => {
+    const authContext = resolveRequestAuthContext(request);
+    if (!authContext) {
+      return ipKeyGenerator(request.ip || 'unknown');
+    }
+
+    if (authContext.capabilities.player && !authContext.capabilities.admin) {
+      return `player:${authContext.playerId ?? authContext.userId}`;
+    }
+
+    return `${authContext.role ?? 'capability'}:${authContext.userId}`;
+  },
+});
 
 // Player CRUD/profile endpoints used by onboarding and profile screens.
 playerRouter.post(
@@ -66,6 +101,7 @@ playerRouter.put(
  */
 playerRouter.get(
   '/players/:playerId/superpower-qr',
+  superpowerQrReadRateLimiter,
   requireHelios,
   validate(heliosQrParamsSchema, 'params'),
   asyncHandler(async (request, response) => {
@@ -97,6 +133,7 @@ playerRouter.get(
  */
 playerRouter.post(
   '/players/:playerId/superpower-qr/regenerate',
+  superpowerQrRegenerateRateLimiter,
   requireHelios,
   validate(heliosQrParamsSchema, 'params'),
   asyncHandler(async (request, response) => {
