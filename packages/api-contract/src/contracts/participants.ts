@@ -39,6 +39,44 @@ export interface LeaderboardEntry {
   readonly score: number;
   readonly memberCount: number;
   readonly status: TeamStatus;
+  readonly pitStopExpiresAt?: string | null;
+}
+
+export const displayEventTypes = [
+  'TEAM_ENTERED_PIT',
+  'TEAM_EXITED_PIT',
+  'TEAM_REPAIRS_COMPLETE',
+] as const;
+
+export type DisplayEventType = (typeof displayEventTypes)[number];
+
+export const displayEventReasons = [
+  'HAZARD_TRIGGER',
+  'TIMER_EXPIRED',
+  'ADMIN_MANUAL',
+  'RESCUE_CLEARED',
+] as const;
+
+export type DisplayEventReason = (typeof displayEventReasons)[number];
+
+export interface DisplayEvent {
+  readonly id: string;
+  readonly eventId: string;
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly type: DisplayEventType;
+  readonly reason: DisplayEventReason;
+  readonly occurredAt: string;
+}
+
+export interface ListDisplayEventsQuery {
+  readonly since?: string;
+  readonly limit?: number;
+}
+
+export interface ListDisplayEventsResponse {
+  readonly items: readonly DisplayEvent[];
+  readonly nextCursor: string | null;
 }
 
 /**

@@ -21,4 +21,17 @@ describe('route access configuration', () => {
     expect(waitingRoute?.Component).toBe(WaitingAssignment);
     expect(waitingRoute?.element).toBeUndefined();
   });
+
+  it('keeps /display publicly reachable for venue boards', async () => {
+    const [{ appRoutes }, { default: DisplayBoard }] = await Promise.all([
+      import('@/app/routes'),
+      import('@/app/pages/DisplayBoard'),
+    ]);
+
+    const displayRoute = appRoutes.find((route) => route.path === '/display');
+
+    expect(displayRoute).toBeDefined();
+    expect(displayRoute?.Component).toBe(DisplayBoard);
+    expect(displayRoute?.element).toBeUndefined();
+  });
 });

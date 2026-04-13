@@ -1,14 +1,22 @@
 import { Router } from 'express';
 
+import type { ListDisplayEventsQuery } from '@velocity-gp/api-contract';
 import { successResponse } from '@velocity-gp/api-contract/http';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import {
+  displayEventsParamsSchema,
+  displayEventsQuerySchema,
   hazardStatusSchema,
   leaderboardParamsSchema,
   raceStateParamsSchema,
 } from '@velocity-gp/api-contract/schemas';
-import { getLeaderboard, getRaceState, updateHazardStatus } from '../services/gameService.js';
+import {
+  getDisplayEvents,
+  getLeaderboard,
+  getRaceState,
+  updateHazardStatus,
+} from '../services/gameService.js';
 
 export const gameRouter = Router();
 
@@ -49,7 +57,23 @@ gameRouter.get(
     const eventId = String(request.params.eventId);
 
     response.json(
-      successResponse(getLeaderboard(eventId), { requestId: response.locals.requestId })
+      successResponse(await getLeaderboard(eventId), { requestId: response.locals.requestId })
+    );
+  })
+);
+
+gameRouter.get(
+  '/events/:eventId/display-events',
+  validate(displayEventsParamsSchema, 'params'),
+  validate(displayEventsQuerySchema, 'query'),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const query = request.query as ListDisplayEventsQuery;
+
+    response.json(
+      successResponse(await getDisplayEvents(eventId, query), {
+        requestId: response.locals.requestId,
+      })
     );
   })
 );

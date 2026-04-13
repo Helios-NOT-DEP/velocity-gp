@@ -1,9 +1,13 @@
 import type {
+  DisplayEvent,
   GetRaceStateResponse,
   HazardStatusUpdateRequest,
   HazardStatusUpdateResponse,
   LeaderboardEntry,
+  ListDisplayEventsQuery,
+  ListDisplayEventsResponse,
 } from '@velocity-gp/api-contract';
+import { prisma } from '../db/client.js';
 
 import { createIsoDate, placeholderPlayer, placeholderTeam } from './placeholderData.js';
 
@@ -34,6 +38,30 @@ export function getRaceState(eventId: string, playerId: string): GetRaceStateRes
   };
 }
 
+const DISPLAY_EVENT_REASON_TO_TYPE: Record<
+  'HAZARD_TRIGGER' | 'TIMER_EXPIRED' | 'ADMIN_MANUAL' | 'RESCUE_CLEARED',
+  DisplayEvent['type']
+> = {
+  HAZARD_TRIGGER: 'TEAM_ENTERED_PIT',
+  TIMER_EXPIRED: 'TEAM_EXITED_PIT',
+  ADMIN_MANUAL: 'TEAM_EXITED_PIT',
+  RESCUE_CLEARED: 'TEAM_REPAIRS_COMPLETE',
+};
+
+const DISPLAY_EVENT_REASONS = Object.keys(DISPLAY_EVENT_REASON_TO_TYPE) as Array<
+  keyof typeof DISPLAY_EVENT_REASON_TO_TYPE
+>;
+const DEFAULT_DISPLAY_EVENTS_LIMIT = 25;
+const MAX_DISPLAY_EVENTS_LIMIT = 100;
+
+function clampDisplayEventsLimit(limit: number | undefined): number {
+  if (!limit || Number.isNaN(limit)) {
+    return DEFAULT_DISPLAY_EVENTS_LIMIT;
+  }
+
+  return Math.max(1, Math.min(MAX_DISPLAY_EVENTS_LIMIT, Math.floor(limit)));
+}
+
 /**
  * Persists and returns a player's hazard status update.
  *
@@ -58,31 +86,115 @@ export function updateHazardStatus(
  *
  * Placeholder standings include one dynamic team name based on the provided event ID.
  */
-export function getLeaderboard(eventId: string): LeaderboardEntry[] {
-  return [
-    {
-      rank: 1,
-      teamId: placeholderTeam.id,
-      teamName: placeholderTeam.name,
-      score: placeholderTeam.score,
-      memberCount: placeholderTeam.members.length,
-      status: placeholderTeam.status,
+export async function getLeaderboard(eventId: string): Promise<LeaderboardEntry[]> {
+  const teams = await prisma.team.findMany({
+    where: {
+      eventId,
+      deletedAt: null,
     },
-    {
-      rank: 2,
-      teamId: 'team-drift-runners',
-      teamName: `${eventId}-Drift-Runners`,
-      score: 1110,
-      memberCount: 3,
-      status: 'ACTIVE',
+    orderBy: [{ score: 'desc' }, { updatedAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      score: true,
+      status: true,
+      pitStopExpiresAt: true,
+      _count: {
+        select: {
+          players: true,
+        },
+      },
     },
-    {
-      rank: 3,
-      teamId: 'team-nova-thunder',
-      teamName: `${eventId}-Nova-Thunder`,
-      score: 920,
-      memberCount: 2,
-      status: 'IN_PIT',
+  });
+
+  if (teams.length === 0) {
+    // Preserve placeholder behavior in empty/dev states while migration to persistent data continues.
+    return [
+      {
+        rank: 1,
+        teamId: placeholderTeam.id,
+        teamName: placeholderTeam.name,
+        score: placeholderTeam.score,
+        memberCount: placeholderTeam.members.length,
+        status: placeholderTeam.status,
+        pitStopExpiresAt: placeholderTeam.pitStopExpiresAt,
+      },
+      {
+        rank: 2,
+        teamId: 'team-drift-runners',
+        teamName: `${eventId}-Drift-Runners`,
+        score: 1110,
+        memberCount: 3,
+        status: 'ACTIVE',
+        pitStopExpiresAt: null,
+      },
+      {
+        rank: 3,
+        teamId: 'team-nova-thunder',
+        teamName: `${eventId}-Nova-Thunder`,
+        score: 920,
+        memberCount: 2,
+        status: 'IN_PIT',
+        pitStopExpiresAt: createIsoDate(15),
+      },
+    ];
+  }
+
+  return teams.map((team, index) => ({
+    rank: index + 1,
+    teamId: team.id,
+    teamName: team.name,
+    score: team.score,
+    memberCount: team._count.players,
+    status: team.status,
+    pitStopExpiresAt:
+      team.status === 'IN_PIT' ? (team.pitStopExpiresAt?.toISOString() ?? null) : null,
+  }));
+}
+
+export async function getDisplayEvents(
+  eventId: string,
+  query: ListDisplayEventsQuery
+): Promise<ListDisplayEventsResponse> {
+  const take = clampDisplayEventsLimit(query.limit);
+  const since = query.since ? new Date(query.since) : null;
+
+  const rows = await prisma.teamStateTransition.findMany({
+    where: {
+      eventId,
+      reason: {
+        in: DISPLAY_EVENT_REASONS,
+      },
+      ...(since ? { createdAt: { gt: since } } : {}),
     },
-  ];
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    take,
+    select: {
+      id: true,
+      eventId: true,
+      teamId: true,
+      reason: true,
+      createdAt: true,
+      team: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  const items: DisplayEvent[] = rows.map((row) => ({
+    id: row.id,
+    eventId: row.eventId,
+    teamId: row.teamId,
+    teamName: row.team.name,
+    type: DISPLAY_EVENT_REASON_TO_TYPE[row.reason as keyof typeof DISPLAY_EVENT_REASON_TO_TYPE],
+    reason: row.reason as DisplayEvent['reason'],
+    occurredAt: row.createdAt.toISOString(),
+  }));
+
+  return {
+    items,
+    nextCursor: items.length > 0 ? items[items.length - 1].occurredAt : (query.since ?? null),
+  };
 }
