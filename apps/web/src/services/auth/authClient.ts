@@ -273,12 +273,9 @@ export async function getSession(): Promise<AuthSession> {
   const storedToken = readAuthTokenFromStorage();
   const storedSession = readSessionFromStorage();
 
-  // In local dev, skip the API call when there's a manually-injected localStorage session.
-  // This lets developers bypass the magic-link flow by setting localStorage directly.
-  // The check is stripped out in production builds by Vite's dead-code elimination.
-  if (import.meta.env.DEV && storedSession.isAuthenticated && storedSession.playerId) {
-    return storedSession;
-  }
+  // Always validate session with the backend; do not short-circuit auth checks.
+  // (Removed the previous DEV-only localStorage bypass to ensure consistent
+  // behavior across environments.)
 
   let response: Awaited<ReturnType<typeof apiClient.get<SessionResponse>>>;
   try {
