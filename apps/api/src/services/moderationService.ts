@@ -62,6 +62,16 @@ interface OpenAIModerationResponse {
  * a 5xx rather than silently approving unmoderated content.
  */
 export async function moderateText(text: string): Promise<ModerationResult> {
+  // Allow disabling the external OpenAI call via config for short-term
+  // operational reasons. When disabled we fall back to the local keyword
+  // blocklist so developers/operators can still exercise the flow.
+  if (env.SKIP_OPENAI_MODERATION) {
+    logger.warn(
+      '[moderationService] OpenAI moderation disabled via config — using keyword fallback'
+    );
+    return keywordFallback(text);
+  }
+
   // ── Path 1: OpenAI Moderations API ────────────────────────────────────────
   if (env.OPENAI_API_KEY) {
     return callOpenAIModeration(text);

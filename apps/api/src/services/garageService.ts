@@ -245,9 +245,9 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
   //   • The submit response always returns fast (no n8n latency exposed to user)
   //   • The UI polls /status every ~4s and sees GENERATING → READY when done
   //   • If n8n fails, the status is set to FAILED and the next submission retries
-  setImmediate(() => {
+  setTimeout(() => {
     void triggerLogoGeneration(teamId, team.name);
-  });
+  }, 0);
 }
 
 // ── Internal: n8n logo generation ────────────────────────────────────────────

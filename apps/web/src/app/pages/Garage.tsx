@@ -36,14 +36,14 @@ import { usePlayerSession } from '@/hooks';
  * relevant data (no "which fields might be undefined?" guesswork).
  */
 type GarageUIState =
-  | { screen: 'LOADING' }                                  // initial status fetch
-  | { screen: 'INPUT' }                                    // player composing description
-  | { screen: 'SUBMITTING' }                               // POST in-flight
-  | { screen: 'REJECTED'; policyMessage: string }          // moderation blocked
-  | { screen: 'WAITING'; teamStatus: TeamGarageStatus }    // submitted; others pending
+  | { screen: 'LOADING' } // initial status fetch
+  | { screen: 'INPUT' } // player composing description
+  | { screen: 'SUBMITTING' } // POST in-flight
+  | { screen: 'REJECTED'; policyMessage: string } // moderation blocked
+  | { screen: 'WAITING'; teamStatus: TeamGarageStatus } // submitted; others pending
   | { screen: 'GENERATING'; teamStatus: TeamGarageStatus } // quota met; n8n in-flight
-  | { screen: 'LOGO_REVEAL'; teamStatus: TeamGarageStatus }// logo ready
-  | { screen: 'ERROR'; message: string };                  // network / 5xx failure
+  | { screen: 'LOGO_REVEAL'; teamStatus: TeamGarageStatus } // logo ready
+  | { screen: 'ERROR'; message: string }; // network / 5xx failure
 
 // How often to poll the status endpoint while waiting or generating (ms)
 const POLL_INTERVAL_MS = 4_000;
@@ -90,7 +90,9 @@ export default function Garage() {
     }
 
     void loadInitialStatus();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [teamId, playerId, isReady]);
 
   // ── Polling: WAITING, GENERATING, and LOGO_REVEAL screens ──────────────────────
@@ -212,13 +214,14 @@ export default function Garage() {
 
             {/* Main card */}
             <div className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-2xl p-8 md:p-12 shadow-2xl">
-
               {/* Policy rejection banner */}
               {uiState.screen === 'REJECTED' && (
                 <div className="bg-red-900/20 border border-red-500/40 rounded-xl p-4 mb-6 flex items-start gap-3">
                   <ShieldAlert className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-red-300 font-semibold mb-1">Description not accepted</p>
+                    <p className="text-sm text-red-300 font-semibold mb-1">
+                      Description not accepted
+                    </p>
                     <p className="text-sm text-red-400">{uiState.policyMessage}</p>
                   </div>
                 </div>
@@ -235,8 +238,8 @@ export default function Garage() {
               <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-xl p-4 mb-8 flex items-start gap-3">
                 <Info className="w-5 h-5 text-[#00D4FF] flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-[#00D4FF] font-['DM_Sans']">
-                  Your description will be combined with your teammates' to generate
-                  a unique team logo using AI.
+                  Your description will be combined with your teammates' to generate a unique team
+                  logo using AI.
                 </p>
               </div>
 
@@ -257,20 +260,14 @@ export default function Garage() {
                   className="w-full px-5 py-4 bg-black border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-[#00D4FF] focus:ring-2 focus:ring-[#00D4FF]/20 transition-all resize-none font-['DM_Sans']"
                 />
                 <div className="flex justify-between items-center mt-2">
-                  <p className="text-xs text-gray-500 font-['DM_Sans']">
-                    3–200 characters
-                  </p>
-                  <span className="text-xs text-gray-500 font-mono">
-                    {description.length}/200
-                  </span>
+                  <p className="text-xs text-gray-500 font-['DM_Sans']">3–200 characters</p>
+                  <span className="text-xs text-gray-500 font-mono">{description.length}/200</span>
                 </div>
               </div>
 
               {/* Quick-pick chips */}
               <div className="mb-8">
-                <p className="text-sm text-gray-400 mb-3 font-['DM_Sans']">
-                  Popular choices:
-                </p>
+                <p className="text-sm text-gray-400 mb-3 font-['DM_Sans']">Popular choices:</p>
                 <div className="flex flex-wrap gap-2">
                   {SUGGESTION_CHIPS.map((word) => (
                     <button
@@ -338,7 +335,8 @@ export default function Garage() {
                 Waiting for teammates
               </h2>
               <p className="text-gray-400 font-['DM_Sans'] mb-8">
-                {uiState.teamStatus.approvedCount} of {uiState.teamStatus.requiredCount} descriptions submitted
+                {uiState.teamStatus.approvedCount} of {uiState.teamStatus.requiredCount}{' '}
+                descriptions submitted
               </p>
 
               {/* Progress bar */}
@@ -373,9 +371,7 @@ export default function Garage() {
               </h2>
               <p className="text-gray-400 font-['DM_Sans'] mb-2">
                 AI is crafting a unique logo for{' '}
-                <span className="text-[#F97316] font-semibold">
-                  {uiState.teamStatus.teamName}
-                </span>
+                <span className="text-[#F97316] font-semibold">{uiState.teamStatus.teamName}</span>
               </p>
               <p className="text-gray-500 text-sm font-['DM_Sans']">
                 This usually takes 10–20 seconds…
@@ -429,9 +425,7 @@ export default function Garage() {
                 </div>
               )}
 
-              <p className="text-gray-400 font-['DM_Sans'] mb-8">
-                Your team's identity is ready.
-              </p>
+              <p className="text-gray-400 font-['DM_Sans'] mb-8">Your team's identity is ready.</p>
 
               {/* Enter Race Hub CTA */}
               <button
@@ -536,8 +530,12 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SUGGESTION_CHIPS = [
-  'Fast', 'Bold', 'Innovative', 'Dynamic',
-  'Fierce', 'Unstoppable', 'Creative', 'Strategic',
+  'Fast',
+  'Bold',
+  'Innovative',
+  'Dynamic',
+  'Fierce',
+  'Unstoppable',
+  'Creative',
+  'Strategic',
 ];
-
-

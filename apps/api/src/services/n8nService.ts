@@ -24,11 +24,7 @@ function buildImageFileName(teamName: string): string {
 }
 
 function signN8nJwt(secret: string): string {
-  return jwt.sign(
-    { iss: 'velocity-gp-api' },
-    secret,
-    { expiresIn: '5m', algorithm: 'HS512' }
-  );
+  return jwt.sign({ iss: 'velocity-gp-api' }, secret, { expiresIn: '5m', algorithm: 'HS512' });
 }
 
 /**
@@ -40,13 +36,18 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
   // Dev fallback: if no n8n URL is configured, return a placeholder so the full
   // garage flow (submit → GENERATING → READY → logo reveal) can be tested locally.
   if (!env.N8N_IMAGE_API_URL) {
-    logger.warn('[n8nService] N8N_IMAGE_API_URL not set — returning placeholder logo URL (dev mode)', { teamName });
+    logger.warn(
+      '[n8nService] N8N_IMAGE_API_URL not set — returning placeholder logo URL (dev mode)',
+      { teamName }
+    );
     const encoded = encodeURIComponent(teamName);
     return `https://placehold.co/512x512/0B1E3B/00D4FF?text=${encoded}`;
   }
 
   logger.info('[n8nService] POST to n8n webhook', {
-    url: env.N8N_IMAGE_API_URL, teamName, promptLength: prompt.length,
+    url: env.N8N_IMAGE_API_URL,
+    teamName,
+    promptLength: prompt.length,
   });
 
   const response = await fetch(env.N8N_IMAGE_API_URL, {
@@ -70,7 +71,9 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
 
   if (!responseText || responseText.trim() === '') {
     logger.error('[n8nService] n8n returned empty response body', { status: response.status });
-    throw new Error('n8n workflow returned an empty response — check the Respond to Webhook node is configured');
+    throw new Error(
+      'n8n workflow returned an empty response — check the Respond to Webhook node is configured'
+    );
   }
 
   let data: { imageUrl?: string; imageFileName?: string };
@@ -90,7 +93,9 @@ export async function generateTeamLogo({ prompt, teamName }: { prompt: string; t
   if (data.imageFileName) {
     const base = (env.STORAGE_BASE_URL ?? 'https://cdn.velocitygp.app').replace(/\/$/, '');
     const imageUrl = `${base}/${data.imageFileName}`;
-    logger.info('[n8nService] Constructed imageUrl from STORAGE_BASE_URL + imageFileName', { imageUrl });
+    logger.info('[n8nService] Constructed imageUrl from STORAGE_BASE_URL + imageFileName', {
+      imageUrl,
+    });
     return imageUrl;
   }
 

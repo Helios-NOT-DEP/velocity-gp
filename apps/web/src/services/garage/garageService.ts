@@ -38,10 +38,7 @@ export const garageService = {
    *   if (result.status === 'rejected') showPolicyMessage(result.policyMessage);
    */
   async submit(req: GarageSubmitRequest): Promise<GarageSubmitResponse> {
-    const response = await apiClient.post<GarageSubmitResponse>(
-      '/garage/submit',
-      req
-    );
+    const response = await apiClient.post<GarageSubmitResponse>('/garage/submit', req);
 
     if (!response.ok) {
       // 4xx/5xx that slipped through — surface a typed error
@@ -72,10 +69,7 @@ export const garageService = {
     );
 
     if (!response.ok) {
-      throw new GarageServiceError(
-        'Failed to load team status. Please refresh.',
-        response.status
-      );
+      throw new GarageServiceError('Failed to load team status. Please refresh.', response.status);
     }
 
     // apiClient already unwraps the { success, data } envelope in parseResponseBody

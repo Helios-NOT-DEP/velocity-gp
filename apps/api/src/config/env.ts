@@ -52,6 +52,15 @@ const booleanFromEnv = z.preprocess(
     .transform((value) => value !== 'false')
 );
 
+// Boolean env helper that defaults to false unless explicitly set to 'true'.
+const booleanTrueOnlyIfExplicit = z.preprocess(
+  (value) => (typeof value === 'string' ? value.toLowerCase() : value),
+  z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true')
+);
+
 const optionalUrl = z.preprocess(
   (v) => (v === '' ? undefined : v),
   z.string().url().optional().nullable()
@@ -158,6 +167,9 @@ const envSchema = z.object({
   // Used by moderationService to call the OpenAI Moderations endpoint.
   // Optional — when absent the service falls back to a keyword blocklist (dev only).
   OPENAI_API_KEY: z.string().optional(),
+  // When `true`, skip calling the OpenAI Moderations API and fall back to
+  // the local keyword blocklist. Defaults to `false`.
+  SKIP_OPENAI_MODERATION: booleanTrueOnlyIfExplicit.default(false),
 });
 
 export const packageJson = z
