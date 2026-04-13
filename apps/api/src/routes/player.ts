@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { type Request, Router } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
@@ -18,38 +18,29 @@ import { ForbiddenError } from '../utils/appError.js';
 
 export const playerRouter = Router();
 
+function buildRateLimitKey(request: Request): string {
+  const authContext = resolveRequestAuthContext(request);
+  if (!authContext) {
+    return ipKeyGenerator(request.ip || 'unknown');
+  }
+
+  if (authContext.capabilities.player && !authContext.capabilities.admin) {
+    return `player:${authContext.playerId ?? authContext.userId}`;
+  }
+
+  return `${authContext.role ?? 'capability'}:${authContext.userId}`;
+}
+
 const superpowerQrReadRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 60,
-  keyGenerator: (request, _response) => {
-    const authContext = resolveRequestAuthContext(request);
-    if (!authContext) {
-      return ipKeyGenerator(request.ip || 'unknown');
-    }
-
-    if (authContext.capabilities.player && !authContext.capabilities.admin) {
-      return `player:${authContext.playerId ?? authContext.userId}`;
-    }
-
-    return `${authContext.role ?? 'capability'}:${authContext.userId}`;
-  },
+  keyGenerator: (request, _response) => buildRateLimitKey(request),
 });
 
 const superpowerQrRegenerateRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyGenerator: (request, _response) => {
-    const authContext = resolveRequestAuthContext(request);
-    if (!authContext) {
-      return ipKeyGenerator(request.ip || 'unknown');
-    }
-
-    if (authContext.capabilities.player && !authContext.capabilities.admin) {
-      return `player:${authContext.playerId ?? authContext.userId}`;
-    }
-
-    return `${authContext.role ?? 'capability'}:${authContext.userId}`;
-  },
+  keyGenerator: (request, _response) => buildRateLimitKey(request),
 });
 
 // Player CRUD/profile endpoints used by onboarding and profile screens.
