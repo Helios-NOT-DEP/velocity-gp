@@ -88,7 +88,10 @@ function resolvePitStopSeconds(pitStopExpiresAt: string): number {
   return Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
 }
 
-function resolveTeamPitState(teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null, pitStopExpiresAt: string | null) {
+function resolveTeamPitState(
+  teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null,
+  pitStopExpiresAt: string | null
+) {
   if (teamStatus !== 'IN_PIT') {
     return {
       inPitStop: false,
@@ -400,7 +403,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             nextTeam.inPitStop = true;
             nextTeam.pitStopExpiresAt = response.pitStopExpiresAt ?? undefined;
 
-            if (response.pitStopExpiresAt && resolvePitStopSeconds(response.pitStopExpiresAt) <= 0) {
+            if (
+              response.pitStopExpiresAt &&
+              resolvePitStopSeconds(response.pitStopExpiresAt) <= 0
+            ) {
               nextTeam.inPitStop = false;
               nextTeam.pitStopExpiresAt = undefined;
             }

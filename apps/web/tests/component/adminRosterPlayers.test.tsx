@@ -638,9 +638,10 @@ describe('AdminPlayers roster workflows', () => {
       expect(screen.queryByText('Regular Player')).toBeNull();
     });
 
-    const flaggedFilterCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes('/admin/events/event-1/roster?') &&
-      String(url).includes('isFlaggedForReview=true')
+    const flaggedFilterCall = fetchMock.mock.calls.find(
+      ([url]) =>
+        String(url).includes('/admin/events/event-1/roster?') &&
+        String(url).includes('isFlaggedForReview=true')
     );
     expect(flaggedFilterCall).toBeTruthy();
   });
