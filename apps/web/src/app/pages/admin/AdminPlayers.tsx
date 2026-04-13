@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
+  AdminPlayerReviewDecision,
   AdminPlayerScanHistoryItem,
   ListAdminRosterQuery,
   ListAdminRosterResponse,
@@ -20,6 +21,7 @@ import {
   listAdminRosterTeams,
   parseRosterCsvFile,
   previewAdminRosterImport,
+  resolveAdminPlayerReviewFlag,
   updateAdminPlayerContact,
   updateAdminRosterAssignment,
 } from '@/services/admin/roster';
@@ -27,6 +29,7 @@ import {
 const UNASSIGNED_OPTION = '__UNASSIGNED__';
 
 type AssignmentFilter = 'ALL' | 'ASSIGNED_PENDING' | 'ASSIGNED_ACTIVE' | 'UNASSIGNED';
+type ReviewFilter = 'ALL' | 'FLAGGED';
 
 function summarizeImportResult(result: RosterImportApplyResponse): string {
   return [
@@ -54,6 +57,14 @@ function assignmentLabel(value: AssignmentFilter): string {
   }
 
   return 'Unassigned';
+}
+
+function reviewLabel(value: ReviewFilter): string {
+  if (value === 'FLAGGED') {
+    return 'Flagged for Review';
+  }
+
+  return 'All Players';
 }
 
 function formatScanOutcome(outcome: AdminPlayerScanHistoryItem['outcome']): string {
@@ -111,6 +122,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('ALL');
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
   const [teamFilter, setTeamFilter] = useState<string>('ALL');
 
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({});
@@ -156,6 +168,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
         limit: 100,
         ...(trimmedSearch.length > 0 ? { q: trimmedSearch } : {}),
         ...(assignmentFilter !== 'ALL' ? { assignmentStatus: assignmentFilter } : {}),
+        ...(reviewFilter === 'FLAGGED' ? { isFlaggedForReview: true } : {}),
         ...(teamFilter !== 'ALL' ? { teamId: teamFilter } : {}),
       };
 
@@ -178,7 +191,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
 
   useEffect(() => {
     void loadRoster();
-  }, [appliedSearch, assignmentFilter, teamFilter]);
+  }, [appliedSearch, assignmentFilter, reviewFilter, teamFilter]);
 
   const rosterRows = roster?.items ?? [];
   const teamSelectOptions = useMemo(() => teamOptions?.teams ?? [], [teamOptions]);
@@ -323,7 +336,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
 
       <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6 space-y-4">
         <h3 className="font-['Space_Grotesk'] text-lg md:text-xl">Roster Filters</h3>
-        <form className="grid grid-cols-1 md:grid-cols-4 gap-3" onSubmit={handleSubmitSearch}>
+        <form className="grid grid-cols-1 md:grid-cols-5 gap-3" onSubmit={handleSubmitSearch}>
           <input
             type="text"
             value={searchInput}
@@ -343,6 +356,17 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                 </option>
               )
             )}
+          </select>
+          <select
+            value={reviewFilter}
+            onChange={(event) => setReviewFilter(event.target.value as ReviewFilter)}
+            className="px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+          >
+            {(['ALL', 'FLAGGED'] as const).map((value) => (
+              <option key={value} value={value}>
+                {reviewLabel(value)}
+              </option>
+            ))}
           </select>
           <select
             value={teamFilter}
@@ -498,6 +522,11 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                       >
                         {row.assignmentStatus}
                       </span>
+                      {row.isFlaggedForReview ? (
+                        <span className="rounded px-2 py-1 text-xs font-semibold border border-[#FF3939]/50 bg-[#FF3939]/20 text-[#FF9B9B]">
+                          FLAGGED
+                        </span>
+                      ) : null}
                       <button
                         type="button"
                         disabled={savingHeliosUserId === row.userId}
@@ -569,12 +598,15 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSavingContact, setIsSavingContact] = useState(false);
+  const [isResolvingReview, setIsResolvingReview] = useState(false);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getAdminPlayerDetail>> | null>(
     null
   );
   const [scanHistory, setScanHistory] = useState<readonly AdminPlayerScanHistoryItem[]>([]);
   const [workEmailDraft, setWorkEmailDraft] = useState('');
   const [phoneDraft, setPhoneDraft] = useState('');
+  const [reviewDecision, setReviewDecision] = useState<AdminPlayerReviewDecision>('APPROVED');
+  const [reviewReasonDraft, setReviewReasonDraft] = useState('');
 
   const loadDetail = async (overrideEventId?: string) => {
     setIsLoading(true);
@@ -594,6 +626,8 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
       setScanHistory(nextScanHistory.items);
       setWorkEmailDraft(nextDetail.workEmail);
       setPhoneDraft(nextDetail.phoneE164 ?? '');
+      setReviewDecision('APPROVED');
+      setReviewReasonDraft('');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load player detail.');
       setDetail(null);
@@ -624,6 +658,36 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save contact details.');
     } finally {
       setIsSavingContact(false);
+    }
+  }
+
+  async function handleResolveReviewFlag() {
+    if (!eventId || !detail || !detail.isFlaggedForReview) {
+      return;
+    }
+
+    const normalizedReason = reviewReasonDraft.trim();
+    if (normalizedReason.length < 2) {
+      setError('Provide a short reason (at least 2 characters) before resolving the review flag.');
+      return;
+    }
+
+    setIsResolvingReview(true);
+    setError(null);
+    try {
+      await resolveAdminPlayerReviewFlag(eventId, playerId, {
+        decision: reviewDecision,
+        reason: normalizedReason,
+      });
+      await loadDetail(eventId);
+    } catch (resolveError) {
+      setError(
+        resolveError instanceof Error
+          ? resolveError.message
+          : 'Unable to resolve player review flag.'
+      );
+    } finally {
+      setIsResolvingReview(false);
     }
   }
 
@@ -659,7 +723,7 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
               <p className="text-xs text-gray-400 font-mono">{detail.playerId}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
               <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Individual Score</p>
                 <p className="text-xl font-semibold text-[#39FF14] sm:text-2xl">
@@ -686,6 +750,16 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
                 <p className="text-xs uppercase tracking-wide text-gray-400">Joined</p>
                 <p className="text-base font-semibold sm:text-lg">
                   {formatJoinedDate(detail.joinedAt)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Review Flag</p>
+                <p
+                  className={`text-sm font-semibold sm:text-base ${
+                    detail.isFlaggedForReview ? 'text-[#FF9B9B]' : 'text-gray-300'
+                  }`}
+                >
+                  {detail.isFlaggedForReview ? 'Flagged for Review' : 'Clear'}
                 </p>
               </div>
             </div>
@@ -728,6 +802,49 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
               {isSavingContact ? 'Saving…' : 'Save Contact'}
             </button>
           </article>
+
+          {detail.isFlaggedForReview ? (
+            <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-[#FF3939]/30 rounded-xl p-4 md:p-6 space-y-4">
+              <h3 className="font-['Space_Grotesk'] text-lg md:text-xl">Review Resolution</h3>
+              <p className="text-sm text-gray-300">
+                This player is currently flagged for review due to invalid scan activity.
+              </p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-xs text-gray-400">Decision</span>
+                  <select
+                    value={reviewDecision}
+                    onChange={(event) =>
+                      setReviewDecision(event.target.value as AdminPlayerReviewDecision)
+                    }
+                    className="w-full rounded bg-black/40 border border-gray-700 px-3 py-2 text-sm focus:outline-none focus:border-[#00D4FF]"
+                  >
+                    <option value="APPROVED">Approved</option>
+                    <option value="WARNED">Warned</option>
+                    <option value="DISQUALIFIED">Disqualified</option>
+                  </select>
+                </label>
+                <label className="space-y-1 md:col-span-2">
+                  <span className="text-xs text-gray-400">Reason</span>
+                  <textarea
+                    value={reviewReasonDraft}
+                    onChange={(event) => setReviewReasonDraft(event.target.value)}
+                    placeholder="Document why this flag is being resolved."
+                    rows={3}
+                    className="w-full rounded bg-black/40 border border-gray-700 px-3 py-2 text-sm focus:outline-none focus:border-[#00D4FF]"
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                disabled={isResolvingReview}
+                onClick={() => void handleResolveReviewFlag()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded bg-[#FF3939] px-3 py-2 font-semibold text-white disabled:opacity-50 sm:w-auto"
+              >
+                {isResolvingReview ? 'Resolving…' : 'Resolve Review Flag'}
+              </button>
+            </article>
+          ) : null}
 
           <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6">
             <h3 className="font-['Space_Grotesk'] text-lg md:text-xl mb-3">Scan History</h3>

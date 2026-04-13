@@ -20,6 +20,7 @@ import {
   manualPitControlSchema,
   qrImportApplySchema,
   qrImportPreviewSchema,
+  resolveAdminPlayerReviewFlagSchema,
   rosterImportApplySchema,
   rosterImportPreviewSchema,
   adminPlayerScanHistoryQuerySchema,
@@ -67,6 +68,7 @@ import {
   listAdminRoster,
   listAdminRosterTeams,
   previewRosterImport,
+  resolveAdminPlayerReviewFlag,
   updateAdminPlayerContact,
   updateAdminTeamScore,
   updateRosterAssignment,
@@ -225,6 +227,26 @@ adminRouter.patch(
     response.json(
       successResponse(
         await updateAdminPlayerContact(eventId, playerId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/players/:playerId/review-flag',
+  validate(adminEventRosterPlayerParamsSchema, 'params'),
+  validate(resolveAdminPlayerReviewFlagSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const playerId = String(request.params.playerId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await resolveAdminPlayerReviewFlag(eventId, playerId, request.body, {
           actorUserId: authContext?.userId,
         }),
         { requestId: response.locals.requestId }

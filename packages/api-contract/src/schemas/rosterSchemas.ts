@@ -33,6 +33,28 @@ export const adminEventRosterPlayerParamsSchema = z.object({
   playerId: z.string().min(1),
 });
 
+const optionalBooleanQuerySchema = z.preprocess((value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') {
+      return true;
+    }
+    if (normalized === 'false') {
+      return false;
+    }
+  }
+
+  return value;
+}, z.boolean().optional());
+
 /**
  * Paginates DataGrid arrays querying an Admin's Roster screen natively via strict string
  * and boolean boundaries against the backend.
@@ -40,6 +62,7 @@ export const adminEventRosterPlayerParamsSchema = z.object({
 export const adminRosterListQuerySchema = z.object({
   q: z.string().min(1).max(120).optional(),
   assignmentStatus: rosterAssignmentStatusSchema.optional(),
+  isFlaggedForReview: optionalBooleanQuerySchema,
   teamId: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().min(1).optional(),
@@ -76,6 +99,12 @@ export const updateAdminPlayerContactSchema = z.object({
   workEmail: z.string().email(),
   phoneE164: phoneE164StrictSchema.nullable(),
   reason: z.string().min(2).max(500).optional(),
+});
+
+/** Validates admin review resolution payloads for flagged players. */
+export const resolveAdminPlayerReviewFlagSchema = z.object({
+  decision: z.enum(['APPROVED', 'WARNED', 'DISQUALIFIED']),
+  reason: z.string().min(2).max(500),
 });
 
 /** Validates query options for player scan-history pagination. */

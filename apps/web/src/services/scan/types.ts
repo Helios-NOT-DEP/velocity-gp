@@ -1,4 +1,4 @@
-import type { SubmitScanResponse } from '@velocity-gp/api-contract';
+import type { SubmitScanResponse, TeamStatus } from '@velocity-gp/api-contract';
 
 export type ScannerState =
   | 'idle'
@@ -32,6 +32,8 @@ export interface ScanIdentity {
   readonly playerId: string;
   readonly teamId: string;
   readonly teamName: string;
+  readonly teamStatus: TeamStatus | null;
+  readonly pitStopExpiresAt: string | null;
   readonly email: string;
 }
 

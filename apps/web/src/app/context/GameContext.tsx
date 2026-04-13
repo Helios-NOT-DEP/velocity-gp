@@ -88,6 +88,37 @@ function resolvePitStopSeconds(pitStopExpiresAt: string): number {
   return Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
 }
 
+function resolveTeamPitState(
+  teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null,
+  pitStopExpiresAt: string | null
+) {
+  if (teamStatus !== 'IN_PIT') {
+    return {
+      inPitStop: false,
+      pitStopExpiresAt: undefined,
+    };
+  }
+
+  if (!pitStopExpiresAt) {
+    return {
+      inPitStop: true,
+      pitStopExpiresAt: undefined,
+    };
+  }
+
+  if (resolvePitStopSeconds(pitStopExpiresAt) <= 0) {
+    return {
+      inPitStop: false,
+      pitStopExpiresAt: undefined,
+    };
+  }
+
+  return {
+    inPitStop: true,
+    pitStopExpiresAt,
+  };
+}
+
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [gameState, setGameState] = useState<GameState>({
     currentUser: null,
@@ -272,19 +303,28 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameState((prev) => {
       // Seed team/current user context from scanner identity so downstream scan calls can
       // execute even before full roster hydration is available.
+      const resolvedPitState = resolveTeamPitState(identity.teamStatus, identity.pitStopExpiresAt);
       const existingTeam = prev.teams.find((team) => team.id === identity.teamId);
       const seedTeam: Team = existingTeam ?? {
         id: identity.teamId,
         name: identity.teamName,
         score: 0,
         rank: prev.teams.length + 1,
-        inPitStop: false,
+        inPitStop: resolvedPitState.inPitStop,
+        pitStopExpiresAt: resolvedPitState.pitStopExpiresAt,
       };
 
       const teams = withUpdatedRanks(
         existingTeam
           ? prev.teams.map((team) =>
-              team.id === seedTeam.id ? { ...team, name: identity.teamName } : team
+              team.id === seedTeam.id
+                ? {
+                    ...team,
+                    name: identity.teamName,
+                    inPitStop: resolvedPitState.inPitStop,
+                    pitStopExpiresAt: resolvedPitState.pitStopExpiresAt,
+                  }
+                : team
             )
           : [...prev.teams, seedTeam]
       );
@@ -361,8 +401,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (response.outcome === 'BLOCKED' && response.errorCode === 'TEAM_IN_PIT') {
             // Preserve pit-stop lock in UI when server rejects scans during lockout.
             nextTeam.inPitStop = true;
-            if (!nextTeam.pitStopExpiresAt) {
-              nextTeam.pitStopExpiresAt = new Date(Date.now() + 60 * 1000).toISOString();
+            nextTeam.pitStopExpiresAt = response.pitStopExpiresAt ?? undefined;
+
+            if (
+              response.pitStopExpiresAt &&
+              resolvePitStopSeconds(response.pitStopExpiresAt) <= 0
+            ) {
+              nextTeam.inPitStop = false;
+              nextTeam.pitStopExpiresAt = undefined;
             }
           }
 

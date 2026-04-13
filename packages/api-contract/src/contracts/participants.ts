@@ -148,5 +148,7 @@ export interface PlayerActiveIdentity {
   readonly playerId: string;
   readonly teamId: string;
   readonly teamName: string;
+  readonly teamStatus: TeamStatus | null;
+  readonly pitStopExpiresAt: string | null;
   readonly email: string;
 }

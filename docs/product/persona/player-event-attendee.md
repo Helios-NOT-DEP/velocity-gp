@@ -81,6 +81,12 @@ _The core game loop involving point collection, global QR code hazard ratios, an
 - **And** the team status should change to "IN_PIT" for all members
 - **And** a global lockout timer (e.g., 15 minutes) should begin for the entire team, disabling their scanners.
 
+Implementation note (current):
+
+- Pit-stop countdown is derived from backend `pitStopExpiresAt` and periodically refreshed from session-backed player identity.
+- Team scanner lockout is enforced server-side; teammate clients reflect lockout state from backend identity sync.
+- Full push-based realtime fanout is planned separately; current behavior is backend-authoritative sync with periodic refresh.
+
 #### Scenario: Seeking Rescue from a Helios Member
 
 - **Given** my team is "IN_PIT"
@@ -103,4 +109,6 @@ _The core game loop involving point collection, global QR code hazard ratios, an
 - **Given** a Player attempts to scan a QR code
 - **When** the scanned code is not recognized by the Velocity GP system
 - **Then** the team's Fuel Level should decrease by 1 point
-- **And** the user record should be marked with a "Flagged for Review" status in the Admin Dashboard.
+- **And** the user record should be marked with a "Flagged for Review" status in the Admin Dashboard
+- **And** the Player should see clear warning feedback that the scan was rejected as invalid
+- **And** the scanner should remain available so the Player can continue scanning official markers.

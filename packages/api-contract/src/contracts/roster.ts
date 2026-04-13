@@ -32,6 +32,7 @@ export interface AdminRosterRow {
   readonly workEmail: string;
   readonly displayName: string;
   readonly isHelios: boolean;
+  readonly isFlaggedForReview: boolean;
   readonly phoneE164: string | null;
   readonly teamId: string | null;
   readonly teamName: string | null;
@@ -187,6 +188,7 @@ export interface RosterImportApplyResponse {
 export interface ListAdminRosterQuery {
   readonly q?: string;
   readonly assignmentStatus?: PlayerAssignmentStatus;
+  readonly isFlaggedForReview?: boolean;
   readonly teamId?: string;
   readonly limit?: number;
   readonly cursor?: string;
@@ -261,6 +263,7 @@ export interface GetAdminPlayerDetailResponse {
   readonly displayName: string;
   readonly workEmail: string;
   readonly phoneE164: string | null;
+  readonly isFlaggedForReview: boolean;
   readonly joinedAt: string;
   readonly individualScore: number;
   readonly globalRank: number | null;
@@ -289,6 +292,32 @@ export interface UpdateAdminPlayerContactResponse {
   readonly workEmail: string;
   readonly phoneE164: string | null;
   readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+/**
+ * Supported admin review outcomes when resolving a flagged player.
+ */
+export type AdminPlayerReviewDecision = 'APPROVED' | 'WARNED' | 'DISQUALIFIED';
+
+/**
+ * Admin payload for resolving a flagged-player review item.
+ */
+export interface ResolveAdminPlayerReviewFlagRequest {
+  readonly decision: AdminPlayerReviewDecision;
+  readonly reason: string;
+}
+
+/**
+ * Response payload after resolving (clearing) a player review flag.
+ */
+export interface ResolveAdminPlayerReviewFlagResponse {
+  readonly eventId: string;
+  readonly playerId: string;
+  readonly isFlaggedForReview: boolean;
+  readonly decision: AdminPlayerReviewDecision;
+  readonly reason: string;
+  readonly resolvedAt: string;
   readonly auditId: string;
 }
 

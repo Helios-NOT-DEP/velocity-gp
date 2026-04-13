@@ -155,6 +155,8 @@ const resolvedIdentity = {
     playerId: 'player-lina-active',
     teamId: 'team-apex-comets',
     teamName: 'Apex Comets',
+    teamStatus: 'ACTIVE',
+    pitStopExpiresAt: null,
     email: 'lina@velocitygp.dev',
   },
 };

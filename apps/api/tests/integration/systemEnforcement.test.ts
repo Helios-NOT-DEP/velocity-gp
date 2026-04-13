@@ -305,6 +305,172 @@ describe('system backend enforcement', () => {
     }
   });
 
+  it('blocks scans for teams in active pit lockout and returns authoritative pit expiry', async () => {
+    const fixture = await createScanFixture();
+    const now = new Date();
+    const pitStopExpiresAt = new Date(now.getTime() + 5 * 60_000);
+
+    await prisma.team.update({
+      where: {
+        id: fixture.teamId,
+      },
+      data: {
+        status: 'IN_PIT',
+        pitStopExpiresAt,
+      },
+    });
+
+    try {
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: fixture.qrPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('BLOCKED');
+      if (response.outcome !== 'BLOCKED') {
+        throw new Error(`Expected BLOCKED outcome but received ${response.outcome}.`);
+      }
+      expect(response.errorCode).toBe('TEAM_IN_PIT');
+      if (response.errorCode !== 'TEAM_IN_PIT') {
+        throw new Error(`Expected TEAM_IN_PIT errorCode but received ${response.errorCode}.`);
+      }
+      expect(response.pitStopExpiresAt).toBe(pitStopExpiresAt.toISOString());
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('does not apply invalid scan penalties while a team is in active pit lockout', async () => {
+    const fixture = await createScanFixture();
+    const now = new Date();
+    const pitStopExpiresAt = new Date(now.getTime() + 5 * 60_000);
+    const unknownPayload = `VG-UNKNOWN-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+    await prisma.team.update({
+      where: {
+        id: fixture.teamId,
+      },
+      data: {
+        status: 'IN_PIT',
+        pitStopExpiresAt,
+      },
+    });
+
+    try {
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: unknownPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('BLOCKED');
+      if (response.outcome !== 'BLOCKED') {
+        throw new Error(`Expected BLOCKED outcome but received ${response.outcome}.`);
+      }
+      expect(response.errorCode).toBe('TEAM_IN_PIT');
+      if (response.errorCode !== 'TEAM_IN_PIT') {
+        throw new Error(`Expected TEAM_IN_PIT errorCode but received ${response.errorCode}.`);
+      }
+      expect(response.pitStopExpiresAt).toBe(pitStopExpiresAt.toISOString());
+
+      const [team, player, invalidScanCount] = await Promise.all([
+        prisma.team.findUnique({
+          where: {
+            id: fixture.teamId,
+          },
+          select: {
+            score: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: fixture.playerId,
+          },
+          select: {
+            isFlaggedForReview: true,
+          },
+        }),
+        prisma.scanRecord.count({
+          where: {
+            eventId: fixture.eventId,
+            outcome: 'INVALID',
+          },
+        }),
+      ]);
+
+      expect(team?.score).toBe(0);
+      expect(player?.isFlaggedForReview).toBe(false);
+      expect(invalidScanCount).toBe(0);
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
+  it('applies invalid scan penalty and flags player for review during active racing', async () => {
+    const fixture = await createScanFixture();
+    const unknownPayload = `VG-UNKNOWN-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+    try {
+      const response = await submitScan({
+        eventId: fixture.eventId,
+        request: {
+          playerId: fixture.playerId,
+          qrPayload: unknownPayload,
+        },
+      });
+
+      expect(response.outcome).toBe('INVALID');
+      if (response.outcome !== 'INVALID') {
+        throw new Error(`Expected INVALID outcome but received ${response.outcome}.`);
+      }
+      expect(response.errorCode).toBe('QR_NOT_FOUND');
+      expect(response.pointsAwarded).toBe(-1);
+      expect(response.flaggedForReview).toBe(true);
+
+      const [team, player, invalidScan] = await Promise.all([
+        prisma.team.findUnique({
+          where: {
+            id: fixture.teamId,
+          },
+          select: {
+            score: true,
+          },
+        }),
+        prisma.player.findUnique({
+          where: {
+            id: fixture.playerId,
+          },
+          select: {
+            isFlaggedForReview: true,
+          },
+        }),
+        prisma.scanRecord.findFirst({
+          where: {
+            eventId: fixture.eventId,
+            playerId: fixture.playerId,
+            outcome: 'INVALID',
+          },
+          select: {
+            pointsAwarded: true,
+            scannedPayload: true,
+          },
+        }),
+      ]);
+
+      expect(team?.score).toBe(-1);
+      expect(player?.isFlaggedForReview).toBe(true);
+      expect(invalidScan?.pointsAwarded).toBe(-1);
+      expect(invalidScan?.scannedPayload).toBe(unknownPayload);
+    } finally {
+      await cleanupEventData(fixture.eventId, fixture.userIds);
+    }
+  });
+
   it('uses per-QR hazard override precedence and triggers pit transition on modulo', async () => {
     const fixture = await createScanFixture({
       globalHazardRatio: 50,
