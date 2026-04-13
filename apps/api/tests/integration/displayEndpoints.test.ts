@@ -326,7 +326,9 @@ describe('display endpoints', () => {
           occurredAt: fixture.transitionTimes.rescueCleared,
         },
       ]);
-      expect(allResponse.body.data.nextCursor).toBe(fixture.transitionTimes.rescueCleared);
+      expect(allResponse.body.data.nextCursor).toBe(
+        `${fixture.transitionTimes.rescueCleared}|${allResponse.body.data.items[3].id}`
+      );
 
       const filteredResponse = await request(app)
         .get(`${apiPrefix}/events/${fixture.eventId}/display-events`)
@@ -347,7 +349,62 @@ describe('display endpoints', () => {
         },
       ]);
       expect(filteredResponse.body.data.items).toHaveLength(2);
-      expect(filteredResponse.body.data.nextCursor).toBe(fixture.transitionTimes.rescueCleared);
+      expect(filteredResponse.body.data.nextCursor).toBe(
+        `${fixture.transitionTimes.rescueCleared}|${filteredResponse.body.data.items[1].id}`
+      );
+    } finally {
+      await cleanupDisplayFixture(fixture);
+    }
+  });
+
+  it('supports cursor pagination when multiple transitions share the same timestamp', async () => {
+    const fixture = await createDisplayFixture();
+    const sharedTimestamp = new Date(Date.UTC(2030, 3, 13, 2, 0, 6));
+
+    await prisma.teamStateTransition.createMany({
+      data: [
+        {
+          id: `transition-shared-a-${fixture.eventId}`,
+          eventId: fixture.eventId,
+          teamId: fixture.teamIds.alpha,
+          fromStatus: 'ACTIVE',
+          toStatus: 'IN_PIT',
+          reason: 'HAZARD_TRIGGER',
+          createdAt: sharedTimestamp,
+        },
+        {
+          id: `transition-shared-b-${fixture.eventId}`,
+          eventId: fixture.eventId,
+          teamId: fixture.teamIds.bravo,
+          fromStatus: 'IN_PIT',
+          toStatus: 'ACTIVE',
+          reason: 'TIMER_EXPIRED',
+          createdAt: sharedTimestamp,
+        },
+      ],
+    });
+
+    try {
+      const pageOne = await request(app)
+        .get(`${apiPrefix}/events/${fixture.eventId}/display-events`)
+        .query({ since: fixture.transitionTimes.rescueCleared, limit: 1 });
+
+      expect(pageOne.status).toBe(200);
+      expect(pageOne.body.success).toBe(true);
+      expect(pageOne.body.data.items).toHaveLength(1);
+      expect(pageOne.body.data.nextCursor).toBe(
+        `${pageOne.body.data.items[0].occurredAt}|${pageOne.body.data.items[0].id}`
+      );
+
+      const pageTwo = await request(app)
+        .get(`${apiPrefix}/events/${fixture.eventId}/display-events`)
+        .query({ since: pageOne.body.data.nextCursor, limit: 10 });
+
+      expect(pageTwo.status).toBe(200);
+      expect(pageTwo.body.success).toBe(true);
+      expect(pageTwo.body.data.items).toHaveLength(1);
+      expect(pageTwo.body.data.items[0].occurredAt).toBe(sharedTimestamp.toISOString());
+      expect(pageTwo.body.data.items[0].id).not.toBe(pageOne.body.data.items[0].id);
     } finally {
       await cleanupDisplayFixture(fixture);
     }

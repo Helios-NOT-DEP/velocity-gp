@@ -53,6 +53,12 @@ const DISPLAY_EVENT_REASONS = Object.keys(DISPLAY_EVENT_REASON_TO_TYPE) as Array
 >;
 const DEFAULT_DISPLAY_EVENTS_LIMIT = 25;
 const MAX_DISPLAY_EVENTS_LIMIT = 100;
+const DISPLAY_EVENTS_CURSOR_SEPARATOR = '|';
+
+interface DisplayEventsCursor {
+  readonly occurredAt: Date;
+  readonly transitionId: string | null;
+}
 
 function clampDisplayEventsLimit(limit: number | undefined): number {
   if (!limit || Number.isNaN(limit)) {
@@ -60,6 +66,27 @@ function clampDisplayEventsLimit(limit: number | undefined): number {
   }
 
   return Math.max(1, Math.min(MAX_DISPLAY_EVENTS_LIMIT, Math.floor(limit)));
+}
+
+function parseDisplayEventsCursor(cursor: string | undefined): DisplayEventsCursor | null {
+  if (!cursor) {
+    return null;
+  }
+
+  const [occurredAtToken, ...transitionIdTokens] = cursor.split(DISPLAY_EVENTS_CURSOR_SEPARATOR);
+  const occurredAt = new Date(occurredAtToken);
+
+  if (Number.isNaN(occurredAt.getTime())) {
+    return null;
+  }
+
+  const transitionId =
+    transitionIdTokens.length > 0 ? transitionIdTokens.join(DISPLAY_EVENTS_CURSOR_SEPARATOR) : null;
+
+  return {
+    occurredAt,
+    transitionId: transitionId && transitionId.length > 0 ? transitionId : null,
+  };
 }
 
 /**
@@ -157,7 +184,28 @@ export async function getDisplayEvents(
   query: ListDisplayEventsQuery
 ): Promise<ListDisplayEventsResponse> {
   const take = clampDisplayEventsLimit(query.limit);
-  const since = query.since ? new Date(query.since) : null;
+  const cursor = parseDisplayEventsCursor(query.since);
+  const cursorWhereClause = cursor
+    ? {
+        OR: [
+          {
+            createdAt: {
+              gt: cursor.occurredAt,
+            },
+          },
+          {
+            createdAt: cursor.occurredAt,
+            ...(cursor.transitionId
+              ? {
+                  id: {
+                    gt: cursor.transitionId,
+                  },
+                }
+              : {}),
+          },
+        ],
+      }
+    : {};
 
   const rows = await prisma.teamStateTransition.findMany({
     where: {
@@ -165,7 +213,7 @@ export async function getDisplayEvents(
       reason: {
         in: DISPLAY_EVENT_REASONS,
       },
-      ...(since ? { createdAt: { gt: since } } : {}),
+      ...cursorWhereClause,
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     take,
@@ -195,6 +243,9 @@ export async function getDisplayEvents(
 
   return {
     items,
-    nextCursor: items.length > 0 ? items[items.length - 1].occurredAt : (query.since ?? null),
+    nextCursor:
+      items.length > 0
+        ? `${items[items.length - 1].occurredAt}${DISPLAY_EVENTS_CURSOR_SEPARATOR}${items[items.length - 1].id}`
+        : (query.since ?? null),
   };
 }

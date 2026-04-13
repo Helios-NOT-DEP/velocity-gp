@@ -458,7 +458,7 @@ test.describe('Velocity GP web flows', () => {
                 occurredAt: '2030-04-13T02:00:02.000Z',
               },
             ],
-            nextCursor: '2030-04-13T02:00:02.000Z',
+            nextCursor: '2030-04-13T02:00:02.000Z|transition-2',
           },
         }),
       });
@@ -479,7 +479,7 @@ test.describe('Velocity GP web flows', () => {
     await expect(page.locator('[aria-label="Pit entry alert"]')).toBeVisible({ timeout: 14_000 });
     const repairsBanner = page.getByRole('status').filter({ hasText: 'REPAIRS COMPLETE' });
     await expect(repairsBanner).toBeVisible({ timeout: 18_000 });
-    await expect(repairsBanner).toContainText('Team Team Delta is back on track.');
+    await expect(repairsBanner).toContainText('Team Delta is back on track.');
   });
 
   test('requests camera access and scans a QR code in Race Hub', async ({ page, context }) => {

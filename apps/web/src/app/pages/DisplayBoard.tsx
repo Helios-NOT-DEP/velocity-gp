@@ -124,7 +124,7 @@ function buildTickerMessage(
       return `AI COMMENTARY: ${activeStoryEvent.teamName} exits the pit and rejoins the race.`;
     }
 
-    return `AI COMMENTARY: REPAIRS COMPLETE. Team ${activeStoryEvent.teamName} is back on track.`;
+    return `AI COMMENTARY: REPAIRS COMPLETE. ${activeStoryEvent.teamName} is back on track.`;
   }
 
   if (teams.length === 0) {
@@ -378,8 +378,23 @@ export default function DisplayBoard() {
       const nextSnapshot = await resolveDisplayBoardSnapshot(fallbackTeamsRef.current);
       setSnapshot(nextSnapshot);
 
+      const previousSnapshot = previousSnapshotRef.current;
+      const eventChanged =
+        previousSnapshot?.source === 'api'
+          ? previousSnapshot.eventId !== nextSnapshot.eventId
+          : nextSnapshot.source === 'api' && Boolean(nextSnapshot.eventId);
       const nowMs = Date.now();
-      const overtakeEvents = detectOvertakeStoryEvents(previousSnapshotRef.current, nextSnapshot);
+      const overtakeEvents = detectOvertakeStoryEvents(previousSnapshot, nextSnapshot);
+
+      if (eventChanged) {
+        displayEventsCursorRef.current = null;
+        setStoryQueue([]);
+        setActiveStoryEvent(null);
+        setHighlightedTeam(null);
+        setPitEdgeFlashUntilMs(0);
+        setRepairsBanner(null);
+      }
+
       previousSnapshotRef.current = nextSnapshot;
 
       let storyEventsFetchFailed = false;
@@ -399,6 +414,8 @@ export default function DisplayBoard() {
           storyEventsFetchFailed = true;
           setStoryFeedDegraded(true);
         }
+      } else {
+        setStoryFeedDegraded(false);
       }
 
       const incomingStoryEvents = [...overtakeEvents, ...displayEventsStory];
@@ -502,7 +519,7 @@ export default function DisplayBoard() {
         >
           <p className="text-xs tracking-[0.2em] text-emerald-200">REPAIRS COMPLETE</p>
           <p className="text-lg text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-            Team {repairsBanner.teamName} is back on track.
+            {repairsBanner.teamName} is back on track.
           </p>
         </motion.div>
       )}

@@ -24,7 +24,13 @@ export const displayEventsParamsSchema = z.object({
 
 /** Query guard for incremental display-event polling with cursor and page size. */
 export const displayEventsQuerySchema = z.object({
-  since: z.string().datetime().optional(),
+  since: z
+    .string()
+    .min(1)
+    .refine((cursor) => !Number.isNaN(new Date(cursor.split('|')[0]).getTime()), {
+      message: 'Display-events cursor must start with an ISO timestamp.',
+    })
+    .optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 

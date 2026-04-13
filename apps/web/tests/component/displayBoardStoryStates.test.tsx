@@ -23,7 +23,6 @@ function renderWithRoute(pathname: string) {
 describe('display board storytelling states', () => {
   beforeEach(() => {
     let leaderboardCallCount = 0;
-    let displayEventsCallCount = 0;
 
     const fetchMock = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const requestUrl =
@@ -192,26 +191,6 @@ describe('display board storytelling states', () => {
       }
 
       if (requestUrl.includes('/display-events')) {
-        displayEventsCallCount += 1;
-
-        if (displayEventsCallCount === 1) {
-          return new Response(
-            JSON.stringify({
-              success: true,
-              data: {
-                items: [],
-                nextCursor: null,
-              },
-            }),
-            {
-              status: 200,
-              headers: {
-                'content-type': 'application/json',
-              },
-            }
-          );
-        }
-
         return new Response(
           JSON.stringify({
             success: true,
@@ -236,7 +215,7 @@ describe('display board storytelling states', () => {
                   occurredAt: '2030-04-13T02:00:02.000Z',
                 },
               ],
-              nextCursor: '2030-04-13T02:00:02.000Z',
+              nextCursor: '2030-04-13T02:00:02.000Z|transition-2',
             },
           }),
           {
@@ -290,7 +269,7 @@ describe('display board storytelling states', () => {
     await waitFor(
       () => {
         expect(screen.getByText('REPAIRS COMPLETE')).toBeTruthy();
-        expect(screen.getByText('Team Team Delta is back on track.')).toBeTruthy();
+        expect(screen.getByText('Team Delta is back on track.')).toBeTruthy();
       },
       { timeout: 14_000 }
     );
