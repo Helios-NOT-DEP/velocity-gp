@@ -35,6 +35,8 @@ describe('scan identity resolver', () => {
         playerId: 'player-lina-active',
         teamId: 'team-apex-comets',
         teamName: 'Apex Comets',
+        teamStatus: 'ACTIVE',
+        pitStopExpiresAt: null,
         email: 'lina@velocitygp.dev',
       },
     });
@@ -51,6 +53,8 @@ describe('scan identity resolver', () => {
       playerId: 'player-lina-active',
       teamId: 'team-apex-comets',
       teamName: 'Apex Comets',
+      teamStatus: 'ACTIVE',
+      pitStopExpiresAt: null,
       email: 'lina@velocitygp.dev',
     });
     expect(getCurrentEventPlayerMock).toHaveBeenCalledTimes(1);
@@ -223,6 +227,7 @@ describe('scan outcome mapper', () => {
       message: 'blocked',
       pointsAwarded: 0,
       errorCode: 'TEAM_IN_PIT',
+      pitStopExpiresAt: new Date(Date.now() + 60_000).toISOString(),
     });
 
     expect(action.feedback.level).toBe('warning');

@@ -93,6 +93,7 @@ describe('Admin team/player detail routes', () => {
                 teamName: 'Apex Team',
                 teamStatus: 'ACTIVE',
                 assignmentStatus: 'ASSIGNED_ACTIVE',
+                isFlaggedForReview: true,
                 joinedAt: '2026-04-07T10:00:00.000Z',
                 updatedAt: '2026-04-07T10:00:00.000Z',
               },
@@ -427,6 +428,7 @@ describe('Admin team/player detail routes', () => {
             teamName: 'Apex Team',
             teamScore: 1180,
             teamRank: 1,
+            isFlaggedForReview: true,
           },
         })
       )
@@ -484,6 +486,7 @@ describe('Admin team/player detail routes', () => {
             teamName: 'Apex Team',
             teamScore: 1180,
             teamRank: 1,
+            isFlaggedForReview: true,
           },
         })
       )
@@ -529,6 +532,7 @@ describe('Admin team/player detail routes', () => {
       expect(router.state.location.pathname).toBe('/admin/players/player-1');
       expect(screen.getByRole('button', { name: 'Back to Players' })).toBeTruthy();
       expect(screen.getByText('HAZARD')).toBeTruthy();
+      expect(screen.getByText('Flagged for Review')).toBeTruthy();
     });
 
     fireEvent.change(screen.getByLabelText('Work Email'), {

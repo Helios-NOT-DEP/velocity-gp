@@ -873,10 +873,13 @@ describe('velocity gp backend', () => {
     expect(cookieSessionResponse.status).toBe(200);
     expect(cookieSessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
 
-    const [sessionResponse, routingResponse] = await Promise.all([
+    const [sessionResponse, routingResponse, identityResponse] = await Promise.all([
       request(app).get(`${apiPrefix}/auth/session`).set('authorization', `Bearer ${sessionToken}`),
       request(app)
         .get(`${apiPrefix}/auth/routing-decision`)
+        .set('authorization', `Bearer ${sessionToken}`),
+      request(app)
+        .get(`${apiPrefix}/events/current/players/me`)
         .set('authorization', `Bearer ${sessionToken}`),
     ]);
 
@@ -884,6 +887,10 @@ describe('velocity gp backend', () => {
     expect(sessionResponse.body.data.session.playerId).toBe(fixtureIds.playerId);
     expect(routingResponse.status).toBe(200);
     expect(routingResponse.body.data.redirectPath).toBe('/race');
+    expect(identityResponse.status).toBe(200);
+    expect(identityResponse.body.data.playerId).toBe(fixtureIds.playerId);
+    expect(identityResponse.body.data.teamStatus).toBe('ACTIVE');
+    expect(identityResponse.body.data.pitStopExpiresAt).toBeNull();
   });
 
   it('falls back to cookie auth when a stale bearer token is also present', async () => {
@@ -1004,6 +1011,15 @@ describe('velocity gp backend', () => {
   });
 
   it('lists admin roster and supports assignment-status filtering', async () => {
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.unassignedPlayerId,
+      },
+      data: {
+        isFlaggedForReview: true,
+      },
+    });
+
     const allRosterResponse = await request(app)
       .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
       .set('x-user-id', fixtureIds.adminUserId)
@@ -1012,6 +1028,7 @@ describe('velocity gp backend', () => {
     expect(allRosterResponse.status).toBe(200);
     expect(allRosterResponse.body.success).toBe(true);
     expect(allRosterResponse.body.data.items.length).toBeGreaterThanOrEqual(2);
+    expect(allRosterResponse.body.data.items[0]).toHaveProperty('isFlaggedForReview');
 
     const unassignedResponse = await request(app)
       .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
@@ -1024,6 +1041,26 @@ describe('velocity gp backend', () => {
     expect(unassignedResponse.body.data.items).toHaveLength(1);
     expect(unassignedResponse.body.data.items[0].playerId).toBe(fixtureIds.unassignedPlayerId);
     expect(unassignedResponse.body.data.items[0].assignmentStatus).toBe('UNASSIGNED');
+
+    const flaggedResponse = await request(app)
+      .get(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster`)
+      .query({ isFlaggedForReview: 'true' })
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin');
+
+    expect(flaggedResponse.status).toBe(200);
+    expect(flaggedResponse.body.success).toBe(true);
+    expect(flaggedResponse.body.data.items.length).toBeGreaterThanOrEqual(1);
+    expect(
+      flaggedResponse.body.data.items.every(
+        (item: { isFlaggedForReview: boolean }) => item.isFlaggedForReview
+      )
+    ).toBe(true);
+    expect(
+      flaggedResponse.body.data.items.some(
+        (item: { playerId: string }) => item.playerId === fixtureIds.unassignedPlayerId
+      )
+    ).toBe(true);
   });
 
   it('updates roster assignments and writes roster audit rows', async () => {
@@ -1317,6 +1354,7 @@ describe('velocity gp backend', () => {
       data: {
         teamId: fixtureIds.teamId,
         individualScore: 500,
+        isFlaggedForReview: true,
       },
     });
 
@@ -1408,6 +1446,7 @@ describe('velocity gp backend', () => {
     expect(detailResponse.body.data.globalRank).toBe(1);
     expect(detailResponse.body.data.teamRank).toBe(1);
     expect(detailResponse.body.data.teamId).toBe(fixtureIds.teamId);
+    expect(detailResponse.body.data.isFlaggedForReview).toBe(true);
 
     const contactResponse = await request(app)
       .patch(

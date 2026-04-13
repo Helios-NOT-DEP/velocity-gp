@@ -218,6 +218,25 @@ async function processScanInTransaction(
 
   const team = playerWithTeam.team;
   const globalScanCountAfter = globalScanCountBefore + 1;
+  const blockedTeamInPit =
+    team.status === 'IN_PIT' &&
+    (!team.pitStopExpiresAt || team.pitStopExpiresAt.getTime() > now.getTime());
+
+  if (blockedTeamInPit) {
+    return createBlockedScanResponse(tx, {
+      eventId: input.eventId,
+      playerId: playerWithTeam.id,
+      teamId: team.id,
+      qrCodeId: null,
+      qrCodeLabel: null,
+      qrPayload,
+      message: 'Team is currently in pit stop lockout.',
+      errorCode: 'TEAM_IN_PIT',
+      pitStopExpiresAt: team.pitStopExpiresAt?.toISOString() ?? null,
+      globalScanCountBefore,
+      globalScanCountAfter,
+    });
+  }
 
   const qrCode = await tx.qRCode.findFirst({
     where: {
@@ -319,10 +338,6 @@ async function processScanInTransaction(
     };
   }
 
-  const blockedTeamInPit =
-    team.status === 'IN_PIT' &&
-    (!team.pitStopExpiresAt || team.pitStopExpiresAt.getTime() > now.getTime());
-
   if (eventConfig.raceControlState === 'PAUSED') {
     // Race-control pause short-circuits all scans but still records blocked attempts.
     return createBlockedScanResponse(tx, {
@@ -334,21 +349,6 @@ async function processScanInTransaction(
       qrPayload,
       message: 'Race control is paused.',
       errorCode: 'RACE_PAUSED',
-      globalScanCountBefore,
-      globalScanCountAfter,
-    });
-  }
-
-  if (blockedTeamInPit) {
-    return createBlockedScanResponse(tx, {
-      eventId: input.eventId,
-      playerId: playerWithTeam.id,
-      teamId: team.id,
-      qrCodeId: qrCode.id,
-      qrCodeLabel: qrCode.label,
-      qrPayload,
-      message: 'Team is currently in pit stop lockout.',
-      errorCode: 'TEAM_IN_PIT',
       globalScanCountBefore,
       globalScanCountAfter,
     });
@@ -645,11 +645,12 @@ interface CreateBlockedScanResponseInput {
   readonly eventId: string;
   readonly playerId: string;
   readonly teamId: string;
-  readonly qrCodeId: string;
+  readonly qrCodeId: string | null;
   readonly qrCodeLabel: string | null;
   readonly qrPayload: string;
   readonly message: string;
   readonly errorCode: Extract<StableErrorCode, 'QR_DISABLED' | 'RACE_PAUSED' | 'TEAM_IN_PIT'>;
+  readonly pitStopExpiresAt?: string | null;
   readonly globalScanCountBefore: number;
   readonly globalScanCountAfter: number;
 }
@@ -700,6 +701,22 @@ async function createBlockedScanResponse(
       errorCode: input.errorCode,
     }),
   });
+
+  if (input.errorCode === 'TEAM_IN_PIT') {
+    return {
+      outcome: 'BLOCKED',
+      eventId: input.eventId,
+      playerId: input.playerId,
+      teamId: input.teamId,
+      qrCodeId: input.qrCodeId,
+      qrPayload: input.qrPayload,
+      scannedAt: scanRecord.createdAt.toISOString(),
+      message: input.message,
+      pointsAwarded: 0,
+      errorCode: input.errorCode,
+      pitStopExpiresAt: input.pitStopExpiresAt ?? null,
+    };
+  }
 
   return {
     outcome: 'BLOCKED',

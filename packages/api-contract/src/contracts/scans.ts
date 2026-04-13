@@ -97,10 +97,17 @@ export interface DuplicateScanResult extends ScanResultBase {
 export interface BlockedScanResult extends ScanResultBase {
   readonly outcome: 'BLOCKED';
   readonly pointsAwarded: 0;
-  readonly errorCode:
-    | Extract<StableErrorCode, 'QR_DISABLED'>
-    | Extract<StableErrorCode, 'RACE_PAUSED'>
-    | Extract<StableErrorCode, 'TEAM_IN_PIT'>;
+  readonly errorCode: Extract<StableErrorCode, 'QR_DISABLED' | 'RACE_PAUSED'>;
+}
+
+/**
+ * Blocked result emitted while a team is under active pit lockout.
+ */
+export interface TeamInPitBlockedScanResult extends ScanResultBase {
+  readonly outcome: 'BLOCKED';
+  readonly pointsAwarded: 0;
+  readonly errorCode: Extract<StableErrorCode, 'TEAM_IN_PIT'>;
+  readonly pitStopExpiresAt: string | null;
 }
 
 /**
@@ -112,7 +119,8 @@ export type SubmitScanResponse =
   | HazardPitScanResult
   | InvalidScanResult
   | DuplicateScanResult
-  | BlockedScanResult;
+  | BlockedScanResult
+  | TeamInPitBlockedScanResult;
 
 /** Legacy fallback interface for legacy endpoints handling scanner events. */
 export interface ScanHazardRequest {

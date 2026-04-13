@@ -46,12 +46,14 @@ export async function resolveScanIdentityForEmail(
   // Successfully derived identity from backend session context
   return {
     status: 'resolved',
-    identity: {
-      eventId: response.data.eventId,
-      playerId: response.data.playerId,
-      teamId: response.data.teamId,
-      teamName: response.data.teamName,
-      email: response.data.email,
-    },
-  };
+      identity: {
+        eventId: response.data.eventId,
+        playerId: response.data.playerId,
+        teamId: response.data.teamId,
+        teamName: response.data.teamName,
+        teamStatus: response.data.teamStatus,
+        pitStopExpiresAt: response.data.pitStopExpiresAt,
+        email: response.data.email,
+      },
+    };
 }

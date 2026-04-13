@@ -26,6 +26,7 @@ describe('roster contract', () => {
     const valid = adminRosterListQuerySchema.safeParse({
       q: 'lina',
       assignmentStatus: 'UNASSIGNED',
+      isFlaggedForReview: 'true',
       teamId: 'team-1',
       limit: '25',
       cursor: 'cursor-1',
@@ -37,6 +38,7 @@ describe('roster contract', () => {
     }
 
     expect(valid.data.limit).toBe(25);
+    expect(valid.data.isFlaggedForReview).toBe(true);
 
     const invalidAssignment = adminRosterListQuerySchema.safeParse({
       assignmentStatus: 'UNKNOWN',

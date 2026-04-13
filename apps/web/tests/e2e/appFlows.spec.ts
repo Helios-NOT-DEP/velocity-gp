@@ -226,6 +226,8 @@ test.describe('Velocity GP web flows', () => {
             playerId: 'player-1',
             teamId: 'team-apex-comets',
             teamName: 'Apex Comets',
+            teamStatus: 'ACTIVE',
+            pitStopExpiresAt: null,
             email: 'lina@velocitygp.dev',
           },
         }),

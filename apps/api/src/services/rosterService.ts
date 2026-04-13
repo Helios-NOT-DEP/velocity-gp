@@ -41,6 +41,7 @@ interface RosterPlayerRecord {
   readonly userId: string;
   readonly teamId: string | null;
   readonly status: 'RACING' | 'IN_PIT' | 'FINISHED';
+  readonly isFlaggedForReview: boolean;
   readonly joinedAt: Date;
   readonly updatedAt: Date;
   readonly user: {
@@ -161,6 +162,7 @@ function mapRosterRow(player: RosterPlayerRecord): AdminRosterRow {
     workEmail: player.user.email,
     displayName: player.user.displayName,
     isHelios: player.user.isHelios,
+    isFlaggedForReview: player.isFlaggedForReview,
     phoneE164: player.user.phoneE164,
     teamId: player.team?.id ?? null,
     teamName: player.team?.name ?? null,
@@ -269,6 +271,10 @@ function buildRosterWhereClause(
     };
   }
 
+  if (typeof query.isFlaggedForReview === 'boolean') {
+    where.isFlaggedForReview = query.isFlaggedForReview;
+  }
+
   return where;
 }
 
@@ -306,6 +312,7 @@ export async function listAdminRoster(
         eventId: true,
         teamId: true,
         status: true,
+        isFlaggedForReview: true,
         joinedAt: true,
         updatedAt: true,
         user: {
@@ -1307,6 +1314,7 @@ export async function getAdminPlayerDetail(
         userId: true,
         joinedAt: true,
         individualScore: true,
+        isFlaggedForReview: true,
         teamId: true,
         user: {
           select: {
@@ -1394,6 +1402,7 @@ export async function getAdminPlayerDetail(
       displayName: player.user.displayName,
       workEmail: player.user.email,
       phoneE164: player.user.phoneE164,
+      isFlaggedForReview: player.isFlaggedForReview,
       joinedAt: player.joinedAt.toISOString(),
       individualScore: player.individualScore,
       globalRank: findRankById(rankedPlayers, player.id),

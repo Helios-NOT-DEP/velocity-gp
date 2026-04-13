@@ -27,6 +27,7 @@ import {
 const UNASSIGNED_OPTION = '__UNASSIGNED__';
 
 type AssignmentFilter = 'ALL' | 'ASSIGNED_PENDING' | 'ASSIGNED_ACTIVE' | 'UNASSIGNED';
+type ReviewFilter = 'ALL' | 'FLAGGED';
 
 function summarizeImportResult(result: RosterImportApplyResponse): string {
   return [
@@ -54,6 +55,14 @@ function assignmentLabel(value: AssignmentFilter): string {
   }
 
   return 'Unassigned';
+}
+
+function reviewLabel(value: ReviewFilter): string {
+  if (value === 'FLAGGED') {
+    return 'Flagged for Review';
+  }
+
+  return 'All Players';
 }
 
 function formatScanOutcome(outcome: AdminPlayerScanHistoryItem['outcome']): string {
@@ -111,6 +120,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('ALL');
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
   const [teamFilter, setTeamFilter] = useState<string>('ALL');
 
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({});
@@ -156,6 +166,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
         limit: 100,
         ...(trimmedSearch.length > 0 ? { q: trimmedSearch } : {}),
         ...(assignmentFilter !== 'ALL' ? { assignmentStatus: assignmentFilter } : {}),
+        ...(reviewFilter === 'FLAGGED' ? { isFlaggedForReview: true } : {}),
         ...(teamFilter !== 'ALL' ? { teamId: teamFilter } : {}),
       };
 
@@ -178,7 +189,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
 
   useEffect(() => {
     void loadRoster();
-  }, [appliedSearch, assignmentFilter, teamFilter]);
+  }, [appliedSearch, assignmentFilter, reviewFilter, teamFilter]);
 
   const rosterRows = roster?.items ?? [];
   const teamSelectOptions = useMemo(() => teamOptions?.teams ?? [], [teamOptions]);
@@ -323,7 +334,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
 
       <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6 space-y-4">
         <h3 className="font-['Space_Grotesk'] text-lg md:text-xl">Roster Filters</h3>
-        <form className="grid grid-cols-1 md:grid-cols-4 gap-3" onSubmit={handleSubmitSearch}>
+        <form className="grid grid-cols-1 md:grid-cols-5 gap-3" onSubmit={handleSubmitSearch}>
           <input
             type="text"
             value={searchInput}
@@ -343,6 +354,17 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                 </option>
               )
             )}
+          </select>
+          <select
+            value={reviewFilter}
+            onChange={(event) => setReviewFilter(event.target.value as ReviewFilter)}
+            className="px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+          >
+            {(['ALL', 'FLAGGED'] as const).map((value) => (
+              <option key={value} value={value}>
+                {reviewLabel(value)}
+              </option>
+            ))}
           </select>
           <select
             value={teamFilter}
@@ -498,6 +520,11 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                       >
                         {row.assignmentStatus}
                       </span>
+                      {row.isFlaggedForReview ? (
+                        <span className="rounded px-2 py-1 text-xs font-semibold border border-[#FF3939]/50 bg-[#FF3939]/20 text-[#FF9B9B]">
+                          FLAGGED
+                        </span>
+                      ) : null}
                       <button
                         type="button"
                         disabled={savingHeliosUserId === row.userId}
@@ -659,7 +686,7 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
               <p className="text-xs text-gray-400 font-mono">{detail.playerId}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
               <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Individual Score</p>
                 <p className="text-xl font-semibold text-[#39FF14] sm:text-2xl">
@@ -686,6 +713,16 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
                 <p className="text-xs uppercase tracking-wide text-gray-400">Joined</p>
                 <p className="text-base font-semibold sm:text-lg">
                   {formatJoinedDate(detail.joinedAt)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Review Flag</p>
+                <p
+                  className={`text-sm font-semibold sm:text-base ${
+                    detail.isFlaggedForReview ? 'text-[#FF9B9B]' : 'text-gray-300'
+                  }`}
+                >
+                  {detail.isFlaggedForReview ? 'Flagged for Review' : 'Clear'}
                 </p>
               </div>
             </div>

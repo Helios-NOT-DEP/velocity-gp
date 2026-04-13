@@ -90,6 +90,7 @@ function getScannerErrorName(error: unknown): string {
 }
 
 const TEAM_ACTIVITY_POLL_INTERVAL_MS = 5_000;
+const IDENTITY_POLL_INTERVAL_MS = 5_000;
 const TEAM_ACTIVITY_LIMIT = 25;
 
 function getActivityIcon(item: TeamActivityFeedItem) {
@@ -155,6 +156,7 @@ export default function RaceHub() {
   const navigate = useNavigate();
 
   const scanIdentityRef = useRef<ScanIdentity | null>(null);
+  const hydrateScanIdentityRef = useRef(hydrateScanIdentity);
   const dedupeRef = useRef<PayloadDedupeState | null>(null);
   const isSubmittingRef = useRef(false);
   const scannerEpochRef = useRef<number>(0);
@@ -184,41 +186,46 @@ export default function RaceHub() {
   }, []);
 
   useEffect(() => {
+    hydrateScanIdentityRef.current = hydrateScanIdentity;
+  }, [hydrateScanIdentity]);
+
+  useEffect(() => {
     return () => {
       isRaceHubMountedRef.current = false;
     };
   }, []);
 
-  const applyIdentityResolution = (
-    resolution: Awaited<ReturnType<typeof resolveScanIdentityForEmail>>
-  ) => {
-    if (resolution.status === 'resolved') {
-      scanIdentityRef.current = resolution.identity;
-      setScanIdentity(resolution.identity);
-      hydrateScanIdentity(resolution.identity);
-      setFeedback((current) => {
-        if (
-          current.title === 'Scan Profile Unavailable' ||
-          current.title === 'Scan Profile Missing'
-        ) {
-          return defaultFeedback();
-        }
+  const applyIdentityResolution = useCallback(
+    (resolution: Awaited<ReturnType<typeof resolveScanIdentityForEmail>>) => {
+      if (resolution.status === 'resolved') {
+        scanIdentityRef.current = resolution.identity;
+        setScanIdentity(resolution.identity);
+        hydrateScanIdentityRef.current(resolution.identity);
+        setFeedback((current) => {
+          if (
+            current.title === 'Scan Profile Unavailable' ||
+            current.title === 'Scan Profile Missing'
+          ) {
+            return defaultFeedback();
+          }
 
-        return current;
+          return current;
+        });
+        return;
+      }
+
+      scanIdentityRef.current = null;
+      setScanIdentity(null);
+      setFeedback({
+        level: 'warning',
+        title: 'Scan Profile Unavailable',
+        message: resolution.message,
+        canRetry: true,
+        showGuidance: true,
       });
-      return;
-    }
-
-    scanIdentityRef.current = null;
-    setScanIdentity(null);
-    setFeedback({
-      level: 'warning',
-      title: 'Scan Profile Unavailable',
-      message: resolution.message,
-      canRetry: true,
-      showGuidance: true,
-    });
-  };
+    },
+    []
+  );
 
   const fetchTeamActivity = useCallback(async (identity: ScanIdentity) => {
     const response = await apiClient.get<ListTeamActivityFeedResponse>(
@@ -270,7 +277,41 @@ export default function RaceHub() {
       isMounted = false;
       stopScanner('idle');
     };
-  }, [gameState.currentUser?.email, stopScanner]);
+  }, [applyIdentityResolution, gameState.currentUser?.email, stopScanner]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let interval: ReturnType<typeof globalThis.setInterval> | null = null;
+
+    const pollIdentity = async () => {
+      const resolution = await resolveScanIdentityForEmail(gameState.currentUser?.email);
+      if (!isMounted || resolution.status !== 'resolved') {
+        return;
+      }
+
+      applyIdentityResolution(resolution);
+    };
+
+    interval = globalThis.setInterval(() => {
+      void pollIdentity();
+    }, IDENTITY_POLL_INTERVAL_MS);
+
+    return () => {
+      isMounted = false;
+      if (interval) {
+        globalThis.clearInterval(interval);
+      }
+    };
+  }, [applyIdentityResolution, gameState.currentUser?.email]);
+
+  useEffect(() => {
+    if (!gameState.currentTeam?.inPitStop) {
+      return;
+    }
+
+    stopScanner('idle');
+    navigate('/pit-stop', { replace: true });
+  }, [gameState.currentTeam?.inPitStop, navigate, stopScanner]);
 
   useEffect(() => {
     if (!scanIdentity) {
