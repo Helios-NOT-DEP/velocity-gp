@@ -802,6 +802,7 @@ export async function applyRosterImport(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -1023,6 +1024,7 @@ export async function applyRosterImport(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -1586,6 +1588,7 @@ export async function resolveAdminPlayerReviewFlag(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
