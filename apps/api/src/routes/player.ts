@@ -5,10 +5,15 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import {
   createPlayerSchema,
+  heliosQrParamsSchema,
   playerParamsSchema,
   updatePlayerSchema,
 } from '@velocity-gp/api-contract/schemas';
 import { createPlayer, getPlayerProfile, updatePlayerProfile } from '../services/playerService.js';
+import { getActiveSuperpowerQR, regenerateSuperpowerQR } from '../services/superpowerQrService.js';
+import { requireHelios } from '../middleware/requireHelios.js';
+import { getRequestAuthContext } from '../lib/requestAuth.js';
+import { ForbiddenError } from '../utils/appError.js';
 
 export const playerRouter = Router();
 
@@ -47,5 +52,72 @@ playerRouter.put(
         requestId: response.locals.requestId,
       })
     );
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Helios Superpower QR endpoints
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /players/:playerId/superpower-qr
+ * Returns the active identity-bound Superpower QR for the requesting Helios player.
+ * Provisions a new asset on first access if none exists yet.
+ */
+playerRouter.get(
+  '/players/:playerId/superpower-qr',
+  requireHelios,
+  validate(heliosQrParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const authContext = getRequestAuthContext(response);
+    const playerId = String(request.params.playerId);
+
+    const { prisma } = await import('../db/client.js');
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { userId: true },
+    });
+
+    if (!player) {
+      throw new ForbiddenError('Player not found.');
+    }
+
+    if (authContext?.role !== 'admin' && authContext?.userId !== player.userId) {
+      throw new ForbiddenError('You may only access your own Superpower QR.');
+    }
+
+    const result = await getActiveSuperpowerQR(player.userId);
+    response.json(successResponse(result, { requestId: response.locals.requestId }));
+  })
+);
+
+/**
+ * POST /players/:playerId/superpower-qr/regenerate
+ * Revokes the current Superpower QR and returns a fresh replacement.
+ */
+playerRouter.post(
+  '/players/:playerId/superpower-qr/regenerate',
+  requireHelios,
+  validate(heliosQrParamsSchema, 'params'),
+  asyncHandler(async (request, response) => {
+    const authContext = getRequestAuthContext(response);
+    const playerId = String(request.params.playerId);
+
+    const { prisma } = await import('../db/client.js');
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { userId: true },
+    });
+
+    if (!player) {
+      throw new ForbiddenError('Player not found.');
+    }
+
+    if (authContext?.role !== 'admin' && authContext?.userId !== player.userId) {
+      throw new ForbiddenError('You may only regenerate your own Superpower QR.');
+    }
+
+    const result = await regenerateSuperpowerQR(player.userId);
+    response.json(successResponse(result, { requestId: response.locals.requestId }));
   })
 );

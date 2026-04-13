@@ -58,3 +58,16 @@ Generated QR codes encode trusted URLs in `/scan/<payload>` form. The web scanne
 - Deleting a QR code sets `deletedAt` and forces status to `DISABLED`.
 - Deleted rows are excluded from admin inventory listing and scan-time payload lookup.
 - Historical data (claims, scans, audits) remains intact for event forensics.
+
+## Helios Superpower QR — Separate Flow
+
+The `SuperpowerQRAsset` model is **not** part of the admin QR inventory. It is an identity-bound, account-scoped asset with its own lifecycle:
+
+- Managed by `superpowerQrService.ts`, not `adminQrCodeService.ts`.
+- Exposed under `GET /players/:playerId/superpower-qr` and `POST /players/:playerId/superpower-qr/regenerate`.
+- Guarded by `requireHelios` middleware; only the owning Helios user or an admin may access it.
+- Payloads use the `VG-SP-{entropy}` prefix (distinct from event QR `VG-{entropy}` payloads).
+- Provisioned automatically on first access — no admin setup required.
+- Safe regeneration: new asset is generated before the old one is revoked.
+
+See [ADR-0007](../adr/0007-helios-superpower-qr-generation.md) for the full rationale.

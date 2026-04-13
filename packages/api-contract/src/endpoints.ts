@@ -216,6 +216,17 @@ export const authEndpoints = {
   logout: '/auth/logout',
 };
 
+/**
+ * Endpoints for the Helios Superpower QR identity surface.
+ * Restricted to authenticated Helios users only.
+ */
+export const heliosEndpoints = {
+  /** Retrieves the active identity-bound Superpower QR asset for a Helios player. */
+  getSuperpowerQr: (playerId: string) => `/players/${playerId}/superpower-qr`,
+  /** Revokes the current Superpower QR and issues a fresh identity-bound replacement. */
+  regenerateSuperpowerQr: (playerId: string) => `/players/${playerId}/superpower-qr/regenerate`,
+};
+
 // ============================================================================
 // Legacy Aliases
 // Retained for backward-compatability with older callers. Treat as deprecrated.

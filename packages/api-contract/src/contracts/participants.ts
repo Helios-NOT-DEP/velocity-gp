@@ -152,3 +152,37 @@ export interface PlayerActiveIdentity {
   readonly pitStopExpiresAt: string | null;
   readonly email: string;
 }
+
+/** Lifecycle states for a Helios user's identity-bound Superpower QR asset. */
+export type SuperpowerQRAssetStatus = 'ACTIVE' | 'REVOKED';
+
+/**
+ * A persistent, identity-bound QR asset issued exclusively to Helios users.
+ * Encodes a unique payload that can be scanned to initiate a rescue flow.
+ * Only one ACTIVE asset exists per user at any time.
+ */
+export interface HeliosSuperpowerQRAsset {
+  readonly id: string;
+  readonly userId: string;
+  readonly payload: string;
+  readonly qrImageUrl: string;
+  readonly status: SuperpowerQRAssetStatus;
+  readonly createdAt: string;
+  readonly regeneratedAt: string | null;
+}
+
+/**
+ * Response shape returned when a Helios user fetches their active Superpower QR.
+ */
+export interface GetSuperpowerQRResponse {
+  readonly asset: HeliosSuperpowerQRAsset;
+}
+
+/**
+ * Response shape returned after a successful Superpower QR regeneration.
+ * The previous asset is immediately revoked and replaced.
+ */
+export interface RegenerateSuperpowerQRResponse {
+  readonly asset: HeliosSuperpowerQRAsset;
+  readonly revokedAssetId: string | null;
+}

@@ -33,6 +33,8 @@ describe('velocity gp backend', () => {
     adminUserId: `user-admin-app-${token}`,
     qrCodeId: `qr-app-${token}`,
     qrPayload: `VG-APP-${token.toUpperCase()}`,
+    heliosUserId: `user-helios-app-${token}`,
+    heliosPlayerId: `player-helios-app-${token}`,
   };
 
   function buildMailtrapSignatureHeaders(payload: unknown): Record<string, string> {
@@ -90,6 +92,14 @@ describe('velocity gp backend', () => {
           displayName: 'Unassigned Fixture',
           role: 'PLAYER',
           isHelios: false,
+        },
+        {
+          id: fixtureIds.heliosUserId,
+          email: `helios-${token}@velocitygp.dev`,
+          displayName: 'Helios Fixture',
+          role: 'HELIOS',
+          isHelios: true,
+          isHeliosMember: true,
         },
       ],
     });
@@ -162,6 +172,19 @@ describe('velocity gp backend', () => {
       },
     });
 
+    await prisma.player.create({
+      data: {
+        id: fixtureIds.heliosPlayerId,
+        userId: fixtureIds.heliosUserId,
+        eventId: fixtureIds.eventId,
+        teamId: fixtureIds.teamId,
+        status: 'RACING',
+        individualScore: 0,
+        isFlaggedForReview: false,
+        joinedAt: now,
+      },
+    });
+
     await prisma.qRCode.create({
       data: {
         id: fixtureIds.qrCodeId,
@@ -218,6 +241,11 @@ describe('velocity gp backend', () => {
     await prisma.player.deleteMany({
       where: {
         eventId: fixtureIds.eventId,
+      },
+    });
+    await prisma.superpowerQRAsset.deleteMany({
+      where: {
+        userId: fixtureIds.heliosUserId,
       },
     });
     await prisma.qRCode.deleteMany({
@@ -2324,5 +2352,124 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Helios Superpower QR
+  // ---------------------------------------------------------------------------
+
+  it('provisions and returns a Superpower QR for a Helios user on first access', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes('/webhook/')) {
+        return new Response(
+          JSON.stringify({ qrImageURL: 'https://cdn.velocitygp.app/qr/superpower-test.png' }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return fetch(input as string);
+    });
+
+    try {
+      const response = await request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.asset.qrImageUrl).toBe(
+        'https://cdn.velocitygp.app/qr/superpower-test.png'
+      );
+      expect(response.body.data.asset.status).toBe('ACTIVE');
+      expect(typeof response.body.data.asset.payload).toBe('string');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('returns the same active Superpower QR on repeat requests', async () => {
+    // No fetch mock needed — asset was provisioned in prior test and should be returned from DB.
+    const [first, second] = await Promise.all([
+      request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios'),
+      request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios'),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.body.data.asset.id).toBe(second.body.data.asset.id);
+  });
+
+  it('regenerates the Superpower QR and revokes the previous one', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes('/webhook/')) {
+        return new Response(
+          JSON.stringify({ qrImageURL: 'https://cdn.velocitygp.app/qr/superpower-regen.png' }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return fetch(input as string);
+    });
+
+    try {
+      // Capture the current asset ID before regeneration.
+      const beforeResponse = await request(app)
+        .get(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios');
+      const oldAssetId = beforeResponse.body.data.asset.id as string;
+
+      const regenResponse = await request(app)
+        .post(`${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr/regenerate`)
+        .set('x-user-id', fixtureIds.heliosUserId)
+        .set('x-user-role', 'helios');
+
+      expect(regenResponse.status).toBe(200);
+      expect(regenResponse.body.success).toBe(true);
+      expect(regenResponse.body.data.asset.status).toBe('ACTIVE');
+      expect(regenResponse.body.data.asset.id).not.toBe(oldAssetId);
+      expect(regenResponse.body.data.revokedAssetId).toBe(oldAssetId);
+      expect(regenResponse.body.data.asset.qrImageUrl).toBe(
+        'https://cdn.velocitygp.app/qr/superpower-regen.png'
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('rejects a non-Helios player requesting a Superpower QR', async () => {
+    const response = await request(app)
+      .get(`${apiPrefix}/players/${fixtureIds.playerId}/superpower-qr`)
+      .set('x-user-id', fixtureIds.playerUserId)
+      .set('x-user-role', 'player');
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+  });
+
+  it('rejects an unauthenticated request for a Superpower QR', async () => {
+    const response = await request(app).get(
+      `${apiPrefix}/players/${fixtureIds.heliosPlayerId}/superpower-qr`
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+  });
+
+  it('rejects a Helios user from accessing another player Superpower QR', async () => {
+    const response = await request(app)
+      .get(`${apiPrefix}/players/${fixtureIds.playerId}/superpower-qr`)
+      .set('x-user-id', fixtureIds.heliosUserId)
+      .set('x-user-role', 'helios');
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
   });
 });
