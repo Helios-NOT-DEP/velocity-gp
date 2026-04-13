@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
+  AdminPlayerReviewDecision,
   AdminPlayerScanHistoryItem,
   ListAdminRosterQuery,
   ListAdminRosterResponse,
@@ -29,7 +30,6 @@ const UNASSIGNED_OPTION = '__UNASSIGNED__';
 
 type AssignmentFilter = 'ALL' | 'ASSIGNED_PENDING' | 'ASSIGNED_ACTIVE' | 'UNASSIGNED';
 type ReviewFilter = 'ALL' | 'FLAGGED';
-type ReviewDecision = 'APPROVED' | 'WARNED' | 'DISQUALIFIED';
 
 function summarizeImportResult(result: RosterImportApplyResponse): string {
   return [
@@ -605,7 +605,7 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
   const [scanHistory, setScanHistory] = useState<readonly AdminPlayerScanHistoryItem[]>([]);
   const [workEmailDraft, setWorkEmailDraft] = useState('');
   const [phoneDraft, setPhoneDraft] = useState('');
-  const [reviewDecision, setReviewDecision] = useState<ReviewDecision>('APPROVED');
+  const [reviewDecision, setReviewDecision] = useState<AdminPlayerReviewDecision>('APPROVED');
   const [reviewReasonDraft, setReviewReasonDraft] = useState('');
 
   const loadDetail = async (overrideEventId?: string) => {
@@ -814,7 +814,9 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
                   <span className="text-xs text-gray-400">Decision</span>
                   <select
                     value={reviewDecision}
-                    onChange={(event) => setReviewDecision(event.target.value as ReviewDecision)}
+                    onChange={(event) =>
+                      setReviewDecision(event.target.value as AdminPlayerReviewDecision)
+                    }
                     className="w-full rounded bg-black/40 border border-gray-700 px-3 py-2 text-sm focus:outline-none focus:border-[#00D4FF]"
                   >
                     <option value="APPROVED">Approved</option>

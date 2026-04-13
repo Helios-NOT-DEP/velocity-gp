@@ -288,7 +288,11 @@ export default function RaceHub() {
       const currentRequestSeq = ++requestSeq;
       try {
         const resolution = await resolveScanIdentityForEmail(gameState.currentUser?.email);
-        if (!isMounted || currentRequestSeq !== requestSeq || resolution.status !== 'resolved') {
+        if (!isMounted || currentRequestSeq !== requestSeq) {
+          return;
+        }
+
+        if (resolution.status === 'event_unavailable') {
           return;
         }
 

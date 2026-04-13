@@ -526,6 +526,7 @@ export async function updateRosterAssignment(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -801,6 +802,7 @@ export async function applyRosterImport(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -1022,6 +1024,7 @@ export async function applyRosterImport(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -1585,6 +1588,7 @@ export async function resolveAdminPlayerReviewFlag(
         },
         select: {
           id: true,
+          createdAt: true,
         },
       });
 
@@ -1594,7 +1598,7 @@ export async function resolveAdminPlayerReviewFlag(
         isFlaggedForReview: updatedPlayer.isFlaggedForReview,
         decision: request.decision,
         reason: request.reason,
-        resolvedAt: updatedPlayer.updatedAt.toISOString(),
+        resolvedAt: audit.createdAt.toISOString(),
         auditId: audit.id,
       };
     });
