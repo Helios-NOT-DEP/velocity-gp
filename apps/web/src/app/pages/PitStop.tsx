@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { useGame } from '../context/GameContext';
 import { AlertTriangle, Clock, Zap } from 'lucide-react';
@@ -10,6 +10,7 @@ export default function PitStop() {
   const { gameState, clearPitStop, hydrateScanIdentity } = useGame();
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const pitSyncInFlightRef = useRef(false);
 
   useEffect(() => {
     if (gameState.currentTeam?.inPitStop) {
@@ -53,15 +54,24 @@ export default function PitStop() {
     let interval: ReturnType<typeof globalThis.setInterval> | null = null;
 
     const syncPitState = async () => {
-      const resolution = await resolveScanIdentityForEmail(gameState.currentUser?.email);
-      if (!isMounted || resolution.status !== 'resolved') {
+      if (pitSyncInFlightRef.current) {
         return;
       }
 
-      hydrateScanIdentity(resolution.identity);
-      if (resolution.identity.teamStatus !== 'IN_PIT') {
-        clearPitStop(resolution.identity.teamId);
-        navigate('/race', { replace: true });
+      pitSyncInFlightRef.current = true;
+      const resolution = await resolveScanIdentityForEmail(gameState.currentUser?.email);
+      try {
+        if (!isMounted || resolution.status !== 'resolved') {
+          return;
+        }
+
+        hydrateScanIdentity(resolution.identity);
+        if (resolution.identity.teamStatus !== 'IN_PIT') {
+          clearPitStop(resolution.identity.teamId);
+          navigate('/race', { replace: true });
+        }
+      } finally {
+        pitSyncInFlightRef.current = false;
       }
     };
 
@@ -72,6 +82,7 @@ export default function PitStop() {
 
     return () => {
       isMounted = false;
+      pitSyncInFlightRef.current = false;
       if (interval) {
         globalThis.clearInterval(interval);
       }
@@ -134,9 +145,9 @@ export default function PitStop() {
           </div>
 
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-              <p className="text-center text-red-400 text-sm font-medium">Scanner Disabled</p>
-            </div>
+            <p className="text-center text-red-400 text-sm font-medium">Scanner Disabled</p>
           </div>
+        </div>
 
         {/* Help Text */}
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-2xl p-6 mb-6">

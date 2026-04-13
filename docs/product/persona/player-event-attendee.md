@@ -81,6 +81,12 @@ _The core game loop involving point collection, global QR code hazard ratios, an
 - **And** the team status should change to "IN_PIT" for all members
 - **And** a global lockout timer (e.g., 15 minutes) should begin for the entire team, disabling their scanners.
 
+Implementation note (current):
+
+- Pit-stop countdown is derived from backend `pitStopExpiresAt` and periodically refreshed from session-backed player identity.
+- Team scanner lockout is enforced server-side; teammate clients reflect lockout state from backend identity sync.
+- Full push-based realtime fanout is planned separately; current behavior is backend-authoritative sync with periodic refresh.
+
 #### Scenario: Seeking Rescue from a Helios Member
 
 - **Given** my team is "IN_PIT"

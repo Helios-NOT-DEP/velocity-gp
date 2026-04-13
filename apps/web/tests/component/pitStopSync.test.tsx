@@ -31,17 +31,48 @@ vi.mock('react-router', async () => {
 
 const baseTime = new Date('2026-04-13T00:00:00.000Z');
 
-function buildIdentity(overrides?: Partial<{
-  teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null;
-  pitStopExpiresAt: string | null;
-}>) {
+interface MockGameState {
+  currentUser: {
+    name: string;
+    email: string;
+    teamId: string;
+    isHelios: boolean;
+  };
+  currentTeam: {
+    id: string;
+    name: string;
+    score: number;
+    rank: number;
+    inPitStop: boolean;
+    pitStopExpiresAt?: string;
+  };
+  teams: [];
+  scans: [];
+}
+
+function createDeferredPromise<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
+
+function buildIdentity(
+  overrides?: Partial<{
+    teamStatus: 'PENDING' | 'ACTIVE' | 'IN_PIT' | null;
+    pitStopExpiresAt: string | null;
+  }>
+) {
   return {
     eventId: 'event-velocity-active',
     playerId: 'player-lina-active',
     teamId: 'team-apex-comets',
     teamName: 'Apex Comets',
     teamStatus: overrides?.teamStatus ?? 'IN_PIT',
-    pitStopExpiresAt: overrides?.pitStopExpiresAt ?? new Date(baseTime.getTime() + 20_000).toISOString(),
+    pitStopExpiresAt:
+      overrides?.pitStopExpiresAt ?? new Date(baseTime.getTime() + 20_000).toISOString(),
     email: 'lina@velocitygp.dev',
   };
 }
@@ -58,7 +89,7 @@ describe('PitStop backend sync behavior', () => {
   });
 
   it('polls backend pit state, updates countdown, and exits when pit lockout is released', async () => {
-    let mockGameState = {
+    let mockGameState: MockGameState = {
       currentUser: {
         name: 'Lina',
         email: 'lina@velocitygp.dev',
@@ -146,6 +177,10 @@ describe('PitStop backend sync behavior', () => {
       </MemoryRouter>
     );
 
+    await act(async () => {
+      await Promise.resolve();
+    });
+
     expect(screen.getByText('00:20')).toBeTruthy();
 
     await act(async () => {
@@ -163,5 +198,72 @@ describe('PitStop backend sync behavior', () => {
     expect(clearPitStopMock).toHaveBeenCalledWith('team-apex-comets');
     expect(navigateMock).toHaveBeenCalledWith('/race', { replace: true });
     expect(resolveScanIdentityForEmailMock.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('does not start a new sync request while a prior pit-state sync is still in flight', async () => {
+    const mockGameState: MockGameState = {
+      currentUser: {
+        name: 'Lina',
+        email: 'lina@velocitygp.dev',
+        teamId: 'team-apex-comets',
+        isHelios: false,
+      },
+      currentTeam: {
+        id: 'team-apex-comets',
+        name: 'Apex Comets',
+        score: 420,
+        rank: 1,
+        inPitStop: true,
+        pitStopExpiresAt: new Date(baseTime.getTime() + 20_000).toISOString(),
+      },
+      teams: [],
+      scans: [],
+    };
+
+    const hydrateScanIdentityMock = vi.fn();
+    const clearPitStopMock = vi.fn();
+
+    useGameMock.mockImplementation(() => ({
+      gameState: mockGameState,
+      clearPitStop: clearPitStopMock,
+      hydrateScanIdentity: hydrateScanIdentityMock,
+    }));
+
+    const deferredResolution = createDeferredPromise<{
+      status: 'resolved';
+      identity: ReturnType<typeof buildIdentity>;
+    }>();
+
+    resolveScanIdentityForEmailMock.mockImplementation(() => deferredResolution.promise);
+
+    render(
+      <MemoryRouter>
+        <PitStop />
+      </MemoryRouter>
+    );
+
+    expect(resolveScanIdentityForEmailMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+    });
+
+    expect(resolveScanIdentityForEmailMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      deferredResolution.resolve({
+        status: 'resolved',
+        identity: buildIdentity(),
+      });
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+      await Promise.resolve();
+    });
+
+    expect(resolveScanIdentityForEmailMock).toHaveBeenCalledTimes(2);
   });
 });

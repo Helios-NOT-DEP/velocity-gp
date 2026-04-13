@@ -52,3 +52,9 @@ _The system must strictly enforce team assignments, statuses, and hazard ratios 
 - **When** the server time surpasses Team Alpha's pitStopExpiresAt timestamp
 - **Then** the System should automatically update Team Alpha's status to "ACTIVE"
 - **And** push a WebSocket update to all Team Alpha devices to re-enable their scanners.
+
+Current implementation note:
+
+- Team release is performed by backend pit-release services/scheduler using `pitStopExpiresAt` as the authoritative cutoff.
+- `TEAM_IN_PIT` scan blocking and `ACTIVE` recovery are enforced on the backend and exposed through identity/scan APIs.
+- Until transport work is completed, clients rehydrate identity on a polling cadence to pick up release transitions.
