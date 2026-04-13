@@ -501,3 +501,19 @@ model GarageSubmission {
     @@index([teamId, status])
     @@index([eventId])
 }
+
+model SuperpowerQRAsset {
+    id            String                     @id @default(cuid())
+    userId        String
+    payload       String                     @unique
+    qrImageUrl    String
+    status        SuperpowerQRAssetStatus   @default(ACTIVE)
+    createdAt     DateTime                   @default(now())
+    revokedAt     DateTime?
+    regeneratedAt DateTime?
+
+    user User @relation(fields: [userId], references: [id])
+
+    @@index([userId, status])
+    @@index([userId, createdAt])
+}
