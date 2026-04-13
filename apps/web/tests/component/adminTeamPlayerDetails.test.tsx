@@ -512,6 +512,64 @@ describe('Admin team/player detail routes', () => {
             nextCursor: null,
           },
         })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            eventId: 'event-1',
+            playerId: 'player-1',
+            isFlaggedForReview: false,
+            decision: 'APPROVED',
+            reason: 'Reviewed and cleared.',
+            resolvedAt: '2026-04-07T10:50:00.000Z',
+            auditId: 'audit-review-flag',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            eventId: 'event-1',
+            playerId: 'player-1',
+            userId: 'user-1',
+            displayName: 'Player One',
+            workEmail: 'player.updated@velocitygp.dev',
+            phoneE164: '+14155550155',
+            joinedAt: '2026-04-07T10:00:00.000Z',
+            individualScore: 330,
+            globalRank: 2,
+            teamId: 'team-1',
+            teamName: 'Apex Team',
+            teamScore: 1180,
+            teamRank: 1,
+            isFlaggedForReview: false,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [
+              {
+                scanId: 'scan-1',
+                eventId: 'event-1',
+                playerId: 'player-1',
+                teamId: 'team-1',
+                qrCodeId: 'qr-1',
+                qrCodeLabel: 'Checkpoint 1',
+                qrPayload: 'payload-1',
+                outcome: 'HAZARD_PIT',
+                pointsAwarded: 0,
+                scannedAt: '2026-04-07T10:30:00.000Z',
+                message: 'hazard',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
       );
 
     const { router } = renderWithRoutes(
@@ -559,6 +617,29 @@ describe('Admin team/player detail routes', () => {
     expect(JSON.parse(String((contactCall?.[1] as RequestInit).body))).toEqual({
       workEmail: 'player.updated@velocitygp.dev',
       phoneE164: '+14155550155',
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Document why this flag is being resolved.'), {
+      target: { value: 'Reviewed and cleared.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Resolve Review Flag' }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes('/admin/events/event-1/players/player-1/review-flag')
+        )
+      ).toBe(true);
+      expect(screen.getByText('Clear')).toBeTruthy();
+    });
+
+    const reviewCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/admin/events/event-1/players/player-1/review-flag')
+    );
+    expect(reviewCall).toBeTruthy();
+    expect(JSON.parse(String((reviewCall?.[1] as RequestInit).body))).toEqual({
+      decision: 'APPROVED',
+      reason: 'Reviewed and cleared.',
     });
   });
 });

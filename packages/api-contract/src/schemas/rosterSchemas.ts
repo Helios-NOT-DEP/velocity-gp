@@ -101,6 +101,12 @@ export const updateAdminPlayerContactSchema = z.object({
   reason: z.string().min(2).max(500).optional(),
 });
 
+/** Validates admin review resolution payloads for flagged players. */
+export const resolveAdminPlayerReviewFlagSchema = z.object({
+  decision: z.enum(['APPROVED', 'WARNED', 'DISQUALIFIED']),
+  reason: z.string().min(2).max(500),
+});
+
 /** Validates query options for player scan-history pagination. */
 export const adminPlayerScanHistoryQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(100),

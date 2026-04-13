@@ -149,6 +149,9 @@ export const adminEndpoints = {
   /** Updates admin-managed player contact information. */
   updatePlayerContact: (eventId: string, playerId: string) =>
     `/admin/events/${eventId}/players/${playerId}/contact`,
+  /** Resolves and clears the review flag for a player. */
+  resolvePlayerReviewFlag: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/review-flag`,
   /** Lists scan history rows for a specific player in an event. */
   listPlayerScanHistory: (eventId: string, playerId: string) =>
     `/admin/events/${eventId}/players/${playerId}/scan-history`,

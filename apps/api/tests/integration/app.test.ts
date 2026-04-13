@@ -341,6 +341,7 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.outcome).toBe('INVALID');
     expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
+    expect(response.body.data.flaggedForReview).toBe(true);
   });
 
   it('records onboarding and scan events in the team activity feed endpoint', async () => {
@@ -509,6 +510,7 @@ describe('velocity gp backend', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.outcome).toBe('INVALID');
     expect(response.body.data.errorCode).toBe('QR_NOT_FOUND');
+    expect(response.body.data.flaggedForReview).toBe(true);
   });
 
   it('returns duplicate scan outcomes with HTTP 200 for successful processing', async () => {
@@ -1061,6 +1063,67 @@ describe('velocity gp backend', () => {
         (item: { playerId: string }) => item.playerId === fixtureIds.unassignedPlayerId
       )
     ).toBe(true);
+  });
+
+  it('resolves flagged players through admin review endpoint and records an audit row', async () => {
+    await prisma.player.update({
+      where: {
+        id: fixtureIds.playerId,
+      },
+      data: {
+        isFlaggedForReview: true,
+      },
+    });
+
+    const response = await request(app)
+      .patch(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/review-flag`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({
+        decision: 'APPROVED',
+        reason: 'Confirmed accidental scan and completed review.',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.playerId).toBe(fixtureIds.playerId);
+    expect(response.body.data.isFlaggedForReview).toBe(false);
+    expect(response.body.data.decision).toBe('APPROVED');
+    expect(response.body.data.reason).toContain('completed review');
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const [player, audit] = await Promise.all([
+      prisma.player.findUnique({
+        where: {
+          id: fixtureIds.playerId,
+        },
+        select: {
+          isFlaggedForReview: true,
+        },
+      }),
+      prisma.adminActionAudit.findFirst({
+        where: {
+          eventId: fixtureIds.eventId,
+          actionType: 'ROSTER_REASSIGNED',
+          targetId: fixtureIds.playerId,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          details: true,
+        },
+      }),
+    ]);
+
+    expect(player?.isFlaggedForReview).toBe(false);
+    expect(audit).not.toBeNull();
+    expect(audit?.details).toMatchObject({
+      reviewResolution: true,
+      decision: 'APPROVED',
+    });
   });
 
   it('updates roster assignments and writes roster audit rows', async () => {

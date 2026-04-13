@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { ListAdminRosterQuery } from '@velocity-gp/api-contract';
 import { successResponse } from '@velocity-gp/api-contract/http';
+import { z } from 'zod';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { getRequestAuthContext } from '../lib/requestAuth.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
@@ -67,10 +68,16 @@ import {
   listAdminRoster,
   listAdminRosterTeams,
   previewRosterImport,
+  resolveAdminPlayerReviewFlag,
   updateAdminPlayerContact,
   updateAdminTeamScore,
   updateRosterAssignment,
 } from '../services/rosterService.js';
+
+const resolveAdminPlayerReviewFlagSchema = z.object({
+  decision: z.enum(['APPROVED', 'WARNED', 'DISQUALIFIED']),
+  reason: z.string().min(2).max(500),
+});
 
 export const adminRouter = Router();
 
@@ -225,6 +232,26 @@ adminRouter.patch(
     response.json(
       successResponse(
         await updateAdminPlayerContact(eventId, playerId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/players/:playerId/review-flag',
+  validate(adminEventRosterPlayerParamsSchema, 'params'),
+  validate(resolveAdminPlayerReviewFlagSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const playerId = String(request.params.playerId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await resolveAdminPlayerReviewFlag(eventId, playerId, request.body, {
           actorUserId: authContext?.userId,
         }),
         { requestId: response.locals.requestId }

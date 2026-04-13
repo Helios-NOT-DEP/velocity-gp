@@ -109,4 +109,6 @@ Implementation note (current):
 - **Given** a Player attempts to scan a QR code
 - **When** the scanned code is not recognized by the Velocity GP system
 - **Then** the team's Fuel Level should decrease by 1 point
-- **And** the user record should be marked with a "Flagged for Review" status in the Admin Dashboard.
+- **And** the user record should be marked with a "Flagged for Review" status in the Admin Dashboard
+- **And** the Player should see clear warning feedback that the scan was rejected as invalid
+- **And** the scanner should remain available so the Player can continue scanning official markers.

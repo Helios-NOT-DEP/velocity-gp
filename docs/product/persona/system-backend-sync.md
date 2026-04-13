@@ -58,3 +58,19 @@ Current implementation note:
 - Team release is performed by backend pit-release services/scheduler using `pitStopExpiresAt` as the authoritative cutoff.
 - `TEAM_IN_PIT` scan blocking and `ACTIVE` recovery are enforced on the backend and exposed through identity/scan APIs.
 - Until transport work is completed, clients rehydrate identity on a polling cadence to pick up release transitions.
+
+#### Scenario: Invalid Scan Enforcement and Review Flagging
+
+- **Given** a scan payload is submitted for an event/player
+- **When** no active QR record matches the payload
+- **Then** the System should persist an `INVALID` scan outcome with `QR_NOT_FOUND`
+- **And** decrement team score by the configured invalid scan penalty
+- **And** set `isFlaggedForReview=true` on the player record
+- **And** record activity-feed data that explains the invalid scan and review-flag action.
+
+#### Scenario: Admin Review Resolution Clears Player Flag
+
+- **Given** a player is marked `isFlaggedForReview=true`
+- **When** an admin submits a review decision with a reason from the Admin Players detail view
+- **Then** the System should clear the player review flag (`isFlaggedForReview=false`)
+- **And** record an admin audit entry containing the decision, reason, and actor identity.

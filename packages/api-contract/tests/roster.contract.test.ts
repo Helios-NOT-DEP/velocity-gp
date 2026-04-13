@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { adminEndpoints } from '../src/endpoints.js';
 import {
   adminRosterListQuerySchema,
+  resolveAdminPlayerReviewFlagSchema,
   rosterImportApplySchema,
   rosterImportPreviewSchema,
   updateRosterAssignmentSchema,
@@ -13,6 +14,9 @@ describe('roster contract', () => {
     expect(adminEndpoints.listRosterTeams('event-1')).toBe('/admin/events/event-1/roster/teams');
     expect(adminEndpoints.updateRosterAssignment('event-1', 'player-1')).toBe(
       '/admin/events/event-1/roster/players/player-1/assignment'
+    );
+    expect(adminEndpoints.resolvePlayerReviewFlag('event-1', 'player-1')).toBe(
+      '/admin/events/event-1/players/player-1/review-flag'
     );
     expect(adminEndpoints.previewRosterImport('event-1')).toBe(
       '/admin/events/event-1/roster/import/preview'
@@ -97,5 +101,17 @@ describe('roster contract', () => {
       reason: 'x',
     });
     expect(assignmentInvalid.success).toBe(false);
+
+    const resolveValid = resolveAdminPlayerReviewFlagSchema.safeParse({
+      decision: 'APPROVED',
+      reason: 'Reviewed scan history and confirmed accidental scan.',
+    });
+    expect(resolveValid.success).toBe(true);
+
+    const resolveInvalid = resolveAdminPlayerReviewFlagSchema.safeParse({
+      decision: 'INVALID_DECISION',
+      reason: 'x',
+    });
+    expect(resolveInvalid.success).toBe(false);
   });
 });

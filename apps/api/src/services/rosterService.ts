@@ -15,6 +15,8 @@ import type {
   RosterImportPreviewRequest,
   RosterImportPreviewResponse,
   RosterImportPreviewRow,
+  ResolveAdminPlayerReviewFlagRequest,
+  ResolveAdminPlayerReviewFlagResponse,
   UpdateAdminPlayerContactRequest,
   UpdateAdminPlayerContactResponse,
   UpdateAdminTeamScoreRequest,
@@ -1513,6 +1515,86 @@ export async function updateAdminPlayerContact(
         workEmail: updatedUser.email,
         phoneE164: updatedUser.phoneE164,
         updatedAt: updatedUser.updatedAt.toISOString(),
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+/**
+ * Resolves a flagged-player review item and clears the review flag.
+ */
+export async function resolveAdminPlayerReviewFlag(
+  eventId: string,
+  playerId: string,
+  request: ResolveAdminPlayerReviewFlagRequest,
+  context: AdminActionContext = {}
+): Promise<ResolveAdminPlayerReviewFlagResponse> {
+  return withTraceSpan('admin.player.review_flag.resolve', { eventId, playerId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorUserId = await resolveActorUserId(tx, context.actorUserId);
+
+      const existing = await tx.player.findFirst({
+        where: {
+          id: playerId,
+          eventId,
+        },
+        select: {
+          id: true,
+          eventId: true,
+          isFlaggedForReview: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!existing) {
+        throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
+      }
+
+      const updatedPlayer = existing.isFlaggedForReview
+        ? await tx.player.update({
+            where: {
+              id: existing.id,
+            },
+            data: {
+              isFlaggedForReview: false,
+            },
+            select: {
+              id: true,
+              eventId: true,
+              isFlaggedForReview: true,
+              updatedAt: true,
+            },
+          })
+        : existing;
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId,
+          actionType: 'ROSTER_REASSIGNED',
+          targetType: 'PLAYER',
+          targetId: existing.id,
+          details: {
+            reviewResolution: true,
+            wasFlaggedForReview: existing.isFlaggedForReview,
+            isFlaggedForReview: updatedPlayer.isFlaggedForReview,
+            decision: request.decision,
+            reason: request.reason,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        eventId: updatedPlayer.eventId,
+        playerId: updatedPlayer.id,
+        isFlaggedForReview: updatedPlayer.isFlaggedForReview,
+        decision: request.decision,
+        reason: request.reason,
+        resolvedAt: updatedPlayer.updatedAt.toISOString(),
         auditId: audit.id,
       };
     });

@@ -12,6 +12,8 @@ import type {
   RosterImportApplyResponse,
   RosterImportPreviewResponse,
   RosterImportRowInput,
+  ResolveAdminPlayerReviewFlagRequest,
+  ResolveAdminPlayerReviewFlagResponse,
   UpdateAdminPlayerContactRequest,
   UpdateAdminPlayerContactResponse,
   UpdateAdminTeamScoreRequest,
@@ -137,7 +139,7 @@ export async function listAdminRoster(
 ): Promise<ListAdminRosterResponse> {
   const response = await apiClient.get<ListAdminRosterResponse>(
     adminEndpoints.listRoster(eventId),
-    query
+    query as Record<string, string | number | boolean | null | undefined>
   );
   if (!response.ok) {
     throw new Error(`Unable to load roster (${response.status}).`);
@@ -290,6 +292,26 @@ export async function updateAdminPlayerContact(
   return response.data;
 }
 
+export async function resolveAdminPlayerReviewFlag(
+  eventId: string,
+  playerId: string,
+  request: ResolveAdminPlayerReviewFlagRequest
+): Promise<ResolveAdminPlayerReviewFlagResponse> {
+  const response = await apiClient.request<ResolveAdminPlayerReviewFlagResponse>(
+    adminEndpoints.resolvePlayerReviewFlag(eventId, playerId),
+    {
+      method: 'PATCH',
+      body: request,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to resolve player review flag (${response.status}).`);
+  }
+
+  return response.data;
+}
+
 export async function listAdminPlayerScanHistory(
   eventId: string,
   playerId: string,
@@ -297,7 +319,7 @@ export async function listAdminPlayerScanHistory(
 ): Promise<ListAdminPlayerScanHistoryResponse> {
   const response = await apiClient.get<ListAdminPlayerScanHistoryResponse>(
     adminEndpoints.listPlayerScanHistory(eventId, playerId),
-    query
+    query as Record<string, string | number | boolean | null | undefined>
   );
 
   if (!response.ok) {

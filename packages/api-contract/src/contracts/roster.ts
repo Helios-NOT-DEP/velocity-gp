@@ -296,6 +296,32 @@ export interface UpdateAdminPlayerContactResponse {
 }
 
 /**
+ * Supported admin review outcomes when resolving a flagged player.
+ */
+export type AdminPlayerReviewDecision = 'APPROVED' | 'WARNED' | 'DISQUALIFIED';
+
+/**
+ * Admin payload for resolving a flagged-player review item.
+ */
+export interface ResolveAdminPlayerReviewFlagRequest {
+  readonly decision: AdminPlayerReviewDecision;
+  readonly reason: string;
+}
+
+/**
+ * Response payload after resolving (clearing) a player review flag.
+ */
+export interface ResolveAdminPlayerReviewFlagResponse {
+  readonly eventId: string;
+  readonly playerId: string;
+  readonly isFlaggedForReview: boolean;
+  readonly decision: AdminPlayerReviewDecision;
+  readonly reason: string;
+  readonly resolvedAt: string;
+  readonly auditId: string;
+}
+
+/**
  * Single scan-history row for Admin player-detail views.
  */
 export interface AdminPlayerScanHistoryItem {

@@ -20,6 +20,7 @@ import {
   listAdminRosterTeams,
   parseRosterCsvFile,
   previewAdminRosterImport,
+  resolveAdminPlayerReviewFlag,
   updateAdminPlayerContact,
   updateAdminRosterAssignment,
 } from '@/services/admin/roster';
@@ -28,6 +29,7 @@ const UNASSIGNED_OPTION = '__UNASSIGNED__';
 
 type AssignmentFilter = 'ALL' | 'ASSIGNED_PENDING' | 'ASSIGNED_ACTIVE' | 'UNASSIGNED';
 type ReviewFilter = 'ALL' | 'FLAGGED';
+type ReviewDecision = 'APPROVED' | 'WARNED' | 'DISQUALIFIED';
 
 function summarizeImportResult(result: RosterImportApplyResponse): string {
   return [
@@ -596,12 +598,15 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSavingContact, setIsSavingContact] = useState(false);
+  const [isResolvingReview, setIsResolvingReview] = useState(false);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getAdminPlayerDetail>> | null>(
     null
   );
   const [scanHistory, setScanHistory] = useState<readonly AdminPlayerScanHistoryItem[]>([]);
   const [workEmailDraft, setWorkEmailDraft] = useState('');
   const [phoneDraft, setPhoneDraft] = useState('');
+  const [reviewDecision, setReviewDecision] = useState<ReviewDecision>('APPROVED');
+  const [reviewReasonDraft, setReviewReasonDraft] = useState('');
 
   const loadDetail = async (overrideEventId?: string) => {
     setIsLoading(true);
@@ -621,6 +626,8 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
       setScanHistory(nextScanHistory.items);
       setWorkEmailDraft(nextDetail.workEmail);
       setPhoneDraft(nextDetail.phoneE164 ?? '');
+      setReviewDecision('APPROVED');
+      setReviewReasonDraft('');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load player detail.');
       setDetail(null);
@@ -651,6 +658,36 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save contact details.');
     } finally {
       setIsSavingContact(false);
+    }
+  }
+
+  async function handleResolveReviewFlag() {
+    if (!eventId || !detail || !detail.isFlaggedForReview) {
+      return;
+    }
+
+    const normalizedReason = reviewReasonDraft.trim();
+    if (normalizedReason.length < 2) {
+      setError('Provide a short reason (at least 2 characters) before resolving the review flag.');
+      return;
+    }
+
+    setIsResolvingReview(true);
+    setError(null);
+    try {
+      await resolveAdminPlayerReviewFlag(eventId, playerId, {
+        decision: reviewDecision,
+        reason: normalizedReason,
+      });
+      await loadDetail(eventId);
+    } catch (resolveError) {
+      setError(
+        resolveError instanceof Error
+          ? resolveError.message
+          : 'Unable to resolve player review flag.'
+      );
+    } finally {
+      setIsResolvingReview(false);
     }
   }
 
@@ -765,6 +802,47 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
               {isSavingContact ? 'Saving…' : 'Save Contact'}
             </button>
           </article>
+
+          {detail.isFlaggedForReview ? (
+            <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-[#FF3939]/30 rounded-xl p-4 md:p-6 space-y-4">
+              <h3 className="font-['Space_Grotesk'] text-lg md:text-xl">Review Resolution</h3>
+              <p className="text-sm text-gray-300">
+                This player is currently flagged for review due to invalid scan activity.
+              </p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-xs text-gray-400">Decision</span>
+                  <select
+                    value={reviewDecision}
+                    onChange={(event) => setReviewDecision(event.target.value as ReviewDecision)}
+                    className="w-full rounded bg-black/40 border border-gray-700 px-3 py-2 text-sm focus:outline-none focus:border-[#00D4FF]"
+                  >
+                    <option value="APPROVED">Approved</option>
+                    <option value="WARNED">Warned</option>
+                    <option value="DISQUALIFIED">Disqualified</option>
+                  </select>
+                </label>
+                <label className="space-y-1 md:col-span-2">
+                  <span className="text-xs text-gray-400">Reason</span>
+                  <textarea
+                    value={reviewReasonDraft}
+                    onChange={(event) => setReviewReasonDraft(event.target.value)}
+                    placeholder="Document why this flag is being resolved."
+                    rows={3}
+                    className="w-full rounded bg-black/40 border border-gray-700 px-3 py-2 text-sm focus:outline-none focus:border-[#00D4FF]"
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                disabled={isResolvingReview}
+                onClick={() => void handleResolveReviewFlag()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded bg-[#FF3939] px-3 py-2 font-semibold text-white disabled:opacity-50 sm:w-auto"
+              >
+                {isResolvingReview ? 'Resolving…' : 'Resolve Review Flag'}
+              </button>
+            </article>
+          ) : null}
 
           <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6">
             <h3 className="font-['Space_Grotesk'] text-lg md:text-xl mb-3">Scan History</h3>
