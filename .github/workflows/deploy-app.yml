@@ -8,6 +8,11 @@ on:
         description: "Environment to run against"
         type: environment
         required: true
+      reseed_data:
+        description: "Reseed the database data"
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: read
   id-token: write
@@ -92,11 +97,10 @@ jobs:
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
         run: |
             npm run db:deploy
-            echo "Running seed script for dev environment"
 
 
-      - name: Run Database Migrations
-        if: ${{ inputs.environment == 'dev' }}
+      - name: Run Database Seed for dev
+        if: ${{ inputs.environment == 'dev' && inputs.reseed_data == 'true' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SEED_DATABASE_URL: ${{ secrets.SEED_DATABASE_URL }}
