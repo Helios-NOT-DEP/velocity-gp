@@ -14,7 +14,7 @@ import { createPlayer, getPlayerProfile, updatePlayerProfile } from '../services
 import { getActiveSuperpowerQR, regenerateSuperpowerQR } from '../services/superpowerQrService.js';
 import { requireHelios } from '../middleware/requireHelios.js';
 import { getRequestAuthContext, resolveRequestAuthContext } from '../lib/requestAuth.js';
-import { ForbiddenError } from '../utils/appError.js';
+import { ForbiddenError, NotFoundError } from '../utils/appError.js';
 
 export const playerRouter = Router();
 
@@ -106,7 +106,7 @@ playerRouter.get(
     });
 
     if (!player) {
-      throw new ForbiddenError('Player not found.');
+      throw new NotFoundError('Player not found.');
     }
 
     if (authContext?.role !== 'admin' && authContext?.userId !== player.userId) {
@@ -138,7 +138,7 @@ playerRouter.post(
     });
 
     if (!player) {
-      throw new ForbiddenError('Player not found.');
+      throw new NotFoundError('Player not found.');
     }
 
     if (authContext?.role !== 'admin' && authContext?.userId !== player.userId) {

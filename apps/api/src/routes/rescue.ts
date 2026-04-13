@@ -2,11 +2,15 @@ import { Router } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 import { successResponse } from '@velocity-gp/api-contract/http';
+import {
+  initiateRescueSchema,
+  rescueLogQuerySchema,
+  rescuePlayerParamsSchema,
+} from '@velocity-gp/api-contract/schemas';
 import { resolveRequestAuthContext } from '../lib/requestAuth.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import { requirePlayer } from '../middleware/requirePlayer.js';
-import { initiateRescueSchema, rescuePlayerParamsSchema } from '@velocity-gp/api-contract/schemas';
 import {
   completeRescue,
   getRescueStatus,
@@ -14,12 +18,6 @@ import {
   listRescueLogByRescuer,
 } from '../services/rescueService.js';
 import { UnauthorizedError } from '../utils/appError.js';
-import { z } from 'zod';
-
-const rescueLogQuerySchema = z.object({
-  eventId: z.string().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-});
 
 export const rescueRouter = Router();
 
@@ -72,11 +70,10 @@ rescueRouter.get(
       throw new UnauthorizedError('Authentication is required.');
     }
 
-    const eventId =
-      typeof request.query.eventId === 'string' && request.query.eventId.length > 0
-        ? request.query.eventId
-        : undefined;
-    const limit = typeof request.query.limit === 'number' ? request.query.limit : undefined;
+    const { eventId, limit } = request.query as {
+      eventId?: string;
+      limit?: number;
+    };
 
     const rescues = await listRescueLogByRescuer(authContext.userId, {
       eventId,

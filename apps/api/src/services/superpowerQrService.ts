@@ -5,6 +5,7 @@ import type {
   HeliosSuperpowerQRAsset,
   RegenerateSuperpowerQRResponse,
 } from '@velocity-gp/api-contract';
+import { Prisma } from '../../prisma/generated/client.js';
 
 import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
@@ -28,6 +29,18 @@ interface QrGenerationRequest {
 
 interface QrGenerationResponse {
   readonly qrImageURL?: string;
+}
+
+const SUPERPOWER_REGEN_RETRY_LIMIT = 3;
+
+function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+  return error instanceof Prisma.PrismaClientKnownRequestError;
+}
+
+function isRetryableTransactionError(
+  error: unknown
+): error is Prisma.PrismaClientKnownRequestError {
+  return isKnownPrismaError(error) && (error.code === 'P2002' || error.code === 'P2034');
 }
 
 function getN8nWebhookUrl(): string {
@@ -205,15 +218,16 @@ export async function getActiveSuperpowerQR(userId: string): Promise<GetSuperpow
   }
 
   // Provision on first access.
-  const asset = await provisionNewAsset(userId);
+  const asset = await provisionNewAssetIdempotent(userId);
   return { asset: toAssetDto(asset) };
 }
 
 /**
  * Revokes the current active Superpower QR and provisions a fresh replacement.
  *
- * The old asset is immediately transitioned to `REVOKED` within the same DB
- * transaction to prevent a window where no active asset exists.
+ * QR image generation happens before the DB write so webhook failures do not
+ * alter the existing active asset. The subsequent revoke-and-create happens
+ * in a single DB transaction.
  *
  * @param userId - The authenticated user's DB identifier.
  * @returns The new {@link RegenerateSuperpowerQRResponse} with the fresh QR asset.
@@ -236,35 +250,71 @@ export async function regenerateSuperpowerQR(
     throw new ForbiddenError('Superpower QR is only available to Helios users.');
   }
 
-  const oldAsset = await prisma.superpowerQRAsset.findFirst({
-    where: { userId, status: 'ACTIVE' },
-    orderBy: { createdAt: 'desc' },
-    select: { id: true },
-  });
+  for (let attempt = 1; attempt <= SUPERPOWER_REGEN_RETRY_LIMIT; attempt += 1) {
+    const payload = buildSuperpowerPayload();
+    const scanUrl = buildTrustedScanUrl(payload);
+    const correlationId = randomUUID();
+    const qrImageUrl = await generateQrAsset({ id: correlationId, url: scanUrl });
 
-  const newAsset = await provisionNewAsset(userId);
+    const now = new Date();
+    try {
+      const transactionResult = await prisma.$transaction(
+        async (tx) => {
+          const currentActive = await tx.superpowerQRAsset.findFirst({
+            where: { userId, status: 'ACTIVE' },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
+          });
 
-  // Revoke the previous asset after generating the new one so that a webhook failure
-  // does not leave the user without any active asset.
-  if (oldAsset) {
-    await prisma.superpowerQRAsset.update({
-      where: { id: oldAsset.id },
-      data: { status: 'REVOKED', revokedAt: new Date() },
-    });
+          if (currentActive) {
+            await tx.superpowerQRAsset.update({
+              where: { id: currentActive.id },
+              data: {
+                status: 'REVOKED',
+                revokedAt: now,
+              },
+            });
+          }
+
+          const created = await tx.superpowerQRAsset.create({
+            data: {
+              userId,
+              payload,
+              qrImageUrl,
+              status: 'ACTIVE',
+              regeneratedAt: currentActive ? now : null,
+            },
+          });
+
+          return {
+            asset: created,
+            revokedAssetId: currentActive?.id ?? null,
+          };
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        }
+      );
+
+      return {
+        asset: toAssetDto(transactionResult.asset),
+        revokedAssetId: transactionResult.revokedAssetId,
+      };
+    } catch (error) {
+      if (isRetryableTransactionError(error) && attempt < SUPERPOWER_REGEN_RETRY_LIMIT) {
+        logger.warn('Retrying Superpower QR regeneration after transaction conflict.', {
+          userId,
+          attempt,
+          errorCode: error.code,
+        });
+        continue;
+      }
+
+      throw error;
+    }
   }
 
-  // Mark the new asset with a regeneratedAt timestamp when it replaced an existing one.
-  const returnedAsset = oldAsset
-    ? await prisma.superpowerQRAsset.update({
-        where: { id: newAsset.id },
-        data: { regeneratedAt: new Date() },
-      })
-    : newAsset;
-
-  return {
-    asset: toAssetDto(returnedAsset),
-    revokedAssetId: oldAsset?.id ?? null,
-  };
+  throw new DependencyError('Failed to regenerate Superpower QR after retry attempts.');
 }
 
 // ---------------------------------------------------------------------------
@@ -287,4 +337,29 @@ async function provisionNewAsset(userId: string) {
       status: 'ACTIVE',
     },
   });
+}
+
+/**
+ * Best-effort idempotent provisioning for first-load races.
+ *
+ * A DB-level unique index enforces one ACTIVE row per user; concurrent callers
+ * that lose the insert race return the ACTIVE row that won.
+ */
+async function provisionNewAssetIdempotent(userId: string) {
+  try {
+    return await provisionNewAsset(userId);
+  } catch (error) {
+    if (isKnownPrismaError(error) && error.code === 'P2002') {
+      const existing = await prisma.superpowerQRAsset.findFirst({
+        where: { userId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (existing) {
+        return existing;
+      }
+    }
+
+    throw error;
+  }
 }

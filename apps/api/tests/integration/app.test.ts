@@ -2359,7 +2359,8 @@ describe('velocity gp backend', () => {
   // ---------------------------------------------------------------------------
 
   it('provisions and returns a Superpower QR for a Helios user on first access', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: unknown) => {
+    const upstreamFetch: typeof globalThis.fetch = globalThis.fetch.bind(globalThis);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes('/webhook/')) {
         return new Response(
@@ -2367,7 +2368,7 @@ describe('velocity gp backend', () => {
           { status: 200, headers: { 'content-type': 'application/json' } }
         );
       }
-      return fetch(input as string);
+      return upstreamFetch(input, init);
     });
 
     try {
@@ -2407,7 +2408,8 @@ describe('velocity gp backend', () => {
   });
 
   it('regenerates the Superpower QR and revokes the previous one', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: unknown) => {
+    const upstreamFetch: typeof globalThis.fetch = globalThis.fetch.bind(globalThis);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes('/webhook/')) {
         return new Response(
@@ -2415,7 +2417,7 @@ describe('velocity gp backend', () => {
           { status: 200, headers: { 'content-type': 'application/json' } }
         );
       }
-      return fetch(input as string);
+      return upstreamFetch(input, init);
     });
 
     try {
