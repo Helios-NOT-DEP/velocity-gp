@@ -299,13 +299,27 @@ test.describe('Velocity GP web flows', () => {
         body: JSON.stringify({
           success: true,
           data: {
-            userId: 'helios-e2e-user-1',
-            playerId: 'player-helios-e2e-1',
-            role: 'helios',
-            email: 'helios-e2e@velocitygp.app',
-            displayName: 'Helios Creator',
-            capabilities: { heliosMember: true, player: true, admin: false },
+            session: {
+              userId: 'helios-e2e-user-1',
+              playerId: 'player-helios-e2e-1',
+              role: 'helios',
+              isAuthenticated: true,
+              email: 'helios-e2e@velocitygp.app',
+              displayName: 'Helios Creator',
+              capabilities: { heliosMember: true, player: true, admin: false },
+            },
           },
+        }),
+      });
+    });
+
+    await page.route('**/api/rescue/log**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { rescues: [] },
         }),
       });
     });
@@ -363,12 +377,15 @@ test.describe('Velocity GP web flows', () => {
         body: JSON.stringify({
           success: true,
           data: {
-            userId: 'player-e2e-regular-1',
-            playerId: 'player-e2e-regular-1',
-            role: 'player',
-            email: 'player-e2e@velocitygp.app',
-            displayName: 'Regular Player',
-            capabilities: { heliosMember: false, player: true, admin: false },
+            session: {
+              userId: 'player-e2e-regular-1',
+              playerId: 'player-e2e-regular-1',
+              role: 'player',
+              isAuthenticated: true,
+              email: 'player-e2e@velocitygp.app',
+              displayName: 'Regular Player',
+              capabilities: { heliosMember: false, player: true, admin: false },
+            },
           },
         }),
       });

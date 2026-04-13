@@ -97,7 +97,17 @@ export default function HeliosProfile() {
   }, [playerId, isRegenerating]);
 
   if (!gameState.currentUser) {
-    return <Navigate to="/" replace />;
+    return (
+      <main
+        className="min-h-screen bg-black p-6 flex items-center justify-center"
+        style={{ fontFamily: 'var(--font-body)' }}
+      >
+        <div className="flex items-center gap-2 text-gray-400 text-sm" role="status">
+          <Loader2 className="w-4 h-4 animate-spin" aria-label="Loading Helios profile" />
+          Loading Helios profile...
+        </div>
+      </main>
+    );
   }
 
   if (!gameState.currentUser.isHelios) {
