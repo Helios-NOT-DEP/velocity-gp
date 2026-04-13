@@ -104,7 +104,7 @@ packages/api-contract/
 apps/api/
   prisma/schema.prisma             ← GarageSubmission model + Team garage fields
   src/config/env.ts                ← Garage env vars: N8N_IMAGE_API_URL, N8N_IMAGE_API_KEY,
-                                     OPENAI_API_KEY, STORAGE_BASE_URL, GARAGE_REQUIRED_PLAYER_COUNT
+                                     OPENAI_API_KEY, GARAGE_REQUIRED_PLAYER_COUNT
   src/services/moderationService.ts  ← OpenAI /v1/moderations call (keyword fallback in dev)
   src/services/garageService.ts      ← core business logic: submit, quota check, logo trigger
   src/services/n8nService.ts         ← n8n webhook client for logo generation (JWT-signed, dev fallback)
