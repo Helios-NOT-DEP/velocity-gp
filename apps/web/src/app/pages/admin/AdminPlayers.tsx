@@ -73,6 +73,32 @@ function formatJoinedDate(value: string): string {
   return parsed.toLocaleDateString();
 }
 
+type RosterRow = ListAdminRosterResponse['items'][number];
+
+function assignmentStatusPillClass(status: RosterRow['assignmentStatus']): string {
+  if (status === 'ASSIGNED_ACTIVE') {
+    return 'border border-[#39FF14]/40 bg-[#39FF14]/15 text-[#39FF14]';
+  }
+
+  if (status === 'ASSIGNED_PENDING') {
+    return 'border border-[#FACC15]/40 bg-[#FACC15]/15 text-[#FACC15]';
+  }
+
+  return 'border border-gray-700 bg-black/40 text-gray-300';
+}
+
+function scanOutcomePillClass(outcome: AdminPlayerScanHistoryItem['outcome']): string {
+  if (outcome === 'SAFE') {
+    return 'border border-[#39FF14]/40 bg-[#39FF14]/15 text-[#39FF14]';
+  }
+
+  if (outcome === 'HAZARD_PIT') {
+    return 'border border-[#FF3939]/40 bg-[#FF3939]/15 text-[#FF3939]';
+  }
+
+  return 'border border-gray-700 bg-black/40 text-gray-300';
+}
+
 function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
   const { onOpenDetail } = props;
 
@@ -279,9 +305,9 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-end justify-between gap-3 flex-wrap">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="font-['Space_Grotesk'] text-2xl md:text-3xl">Players</h2>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
           <Users className="w-4 h-4" />
           <span>{rosterRows.length} roster rows</span>
           {teamOptions ? <span>• {teamOptions.unassignedCount} unassigned</span> : null}
@@ -332,7 +358,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
           </select>
           <button
             type="submit"
-            className="px-3 py-2 rounded-lg bg-[#00D4FF] text-black font-semibold hover:opacity-90"
+            className="rounded-lg bg-[#00D4FF] px-3 py-2 font-semibold text-black hover:opacity-90 md:col-span-1"
           >
             Apply Filters
           </button>
@@ -356,7 +382,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
             type="button"
             onClick={() => void handlePreviewImport()}
             disabled={!importRows || isPreviewingImport}
-            className="px-3 py-2 rounded-lg bg-[#00D4FF] text-black font-semibold disabled:opacity-50"
+            className="w-full rounded-lg bg-[#00D4FF] px-3 py-2 font-semibold text-black disabled:opacity-50 sm:w-auto"
           >
             {isPreviewingImport ? 'Previewing…' : 'Preview Import'}
           </button>
@@ -364,14 +390,14 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
             type="button"
             onClick={() => void handleApplyImport()}
             disabled={!importRows || isApplyingImport}
-            className="px-3 py-2 rounded-lg bg-[#39FF14] text-black font-semibold disabled:opacity-50"
+            className="w-full rounded-lg bg-[#39FF14] px-3 py-2 font-semibold text-black disabled:opacity-50 sm:w-auto"
           >
             {isApplyingImport ? 'Applying…' : 'Apply Import'}
           </button>
           <button
             type="button"
             onClick={() => void loadRoster(eventId ?? undefined)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 hover:border-[#00D4FF]"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 hover:border-[#00D4FF] sm:w-auto"
           >
             <RefreshCcw className="w-4 h-4" />
             Refresh
@@ -402,32 +428,24 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
               Preview summary: {importPreview.summary.total} rows, {importPreview.summary.valid}{' '}
               valid, {importPreview.summary.invalid} invalid.
             </p>
-            <div className="max-h-56 overflow-auto rounded-lg border border-gray-800">
-              <table className="w-full text-sm">
-                <thead className="bg-black/40 text-gray-300">
-                  <tr>
-                    <th className="text-left px-3 py-2">Row</th>
-                    <th className="text-left px-3 py-2">Email</th>
-                    <th className="text-left px-3 py-2">Action</th>
-                    <th className="text-left px-3 py-2">Errors</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {importPreview.rows.map((row) => (
-                    <tr
-                      key={`${row.normalizedWorkEmail}-${row.rowNumber}`}
-                      className="border-t border-gray-800"
-                    >
-                      <td className="px-3 py-2">{row.rowNumber}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{row.normalizedWorkEmail}</td>
-                      <td className="px-3 py-2">{row.action}</td>
-                      <td className="px-3 py-2 text-xs text-red-300">
-                        {row.errors.join('; ') || '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="max-h-72 space-y-2 overflow-auto rounded-lg border border-gray-800 p-2">
+              {importPreview.rows.map((row) => (
+                <div
+                  key={`${row.normalizedWorkEmail}-${row.rowNumber}`}
+                  className="rounded-lg border border-gray-700 bg-black/40 p-3 text-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs text-gray-400">Row {row.rowNumber}</span>
+                    <span className="rounded border border-gray-700 bg-black/40 px-2 py-0.5 text-xs uppercase tracking-wide text-gray-300">
+                      {row.action}
+                    </span>
+                  </div>
+                  <p className="mt-2 break-all font-mono text-xs text-gray-200">
+                    {row.normalizedWorkEmail}
+                  </p>
+                  <p className="mt-2 text-xs text-red-300">{row.errors.join('; ') || '—'}</p>
+                </div>
+              ))}
             </div>
           </div>
         ) : null}
@@ -441,96 +459,103 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
             <Loader2 className="w-4 h-4 animate-spin" />
             Loading roster…
           </div>
+        ) : rosterRows.length === 0 ? (
+          <p className="rounded-lg border border-gray-800 bg-black/30 p-4 text-sm text-gray-400">
+            No players match the current filters.
+          </p>
         ) : (
-          <div className="overflow-auto rounded-lg border border-gray-800">
-            <table className="w-full text-sm">
-              <thead className="bg-black/40 text-gray-300">
-                <tr>
-                  <th className="text-left px-3 py-2">Player</th>
-                  <th className="text-left px-3 py-2">Work Email</th>
-                  <th className="text-left px-3 py-2">Helios</th>
-                  <th className="text-left px-3 py-2">Phone</th>
-                  <th className="text-left px-3 py-2">Assignment</th>
-                  <th className="text-left px-3 py-2">Team</th>
-                  <th className="text-left px-3 py-2">Update</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rosterRows.map((row) => {
-                  const selectedTeamId =
-                    assignmentDrafts[row.playerId] ?? row.teamId ?? UNASSIGNED_OPTION;
-                  const hasChanges =
-                    (selectedTeamId === UNASSIGNED_OPTION ? null : selectedTeamId) !== row.teamId;
-                  const isSaving = savingPlayerId === row.playerId;
+          <div className="space-y-3">
+            {rosterRows.map((row) => {
+              const selectedTeamId =
+                assignmentDrafts[row.playerId] ?? row.teamId ?? UNASSIGNED_OPTION;
+              const hasChanges =
+                (selectedTeamId === UNASSIGNED_OPTION ? null : selectedTeamId) !== row.teamId;
+              const isSaving = savingPlayerId === row.playerId;
 
-                  return (
-                    <tr key={row.playerId} className="border-t border-gray-800 align-top">
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => onOpenDetail(row.playerId)}
-                          className="font-semibold text-left hover:text-[#00D4FF]"
-                        >
-                          {row.displayName}
-                        </button>
-                        <p className="text-xs text-gray-500">{row.playerId}</p>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs">{row.workEmail}</td>
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          disabled={savingHeliosUserId === row.userId}
-                          onClick={() => void handleToggleHeliosRole(row.userId, row.isHelios)}
-                          className={`px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 ${
-                            row.isHelios
-                              ? 'bg-[#39FF14]/20 border border-[#39FF14]/40 text-[#39FF14]'
-                              : 'bg-black/40 border border-gray-700 text-gray-300'
-                          }`}
-                        >
-                          {savingHeliosUserId === row.userId
-                            ? 'Saving…'
-                            : row.isHelios
-                              ? 'Revoke'
-                              : 'Assign'}
-                        </button>
-                      </td>
-                      <td className="px-3 py-2">{row.phoneE164 ?? '—'}</td>
-                      <td className="px-3 py-2">{row.assignmentStatus}</td>
-                      <td className="px-3 py-2">
-                        <select
-                          aria-label={`Assign team for ${row.displayName}`}
-                          value={selectedTeamId}
-                          onChange={(event) =>
-                            setAssignmentDrafts((existing) => ({
-                              ...existing,
-                              [row.playerId]: event.target.value,
-                            }))
-                          }
-                          className="px-2 py-1 rounded bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
-                        >
-                          <option value={UNASSIGNED_OPTION}>Unassigned</option>
-                          {teamSelectOptions.map((team) => (
-                            <option key={team.teamId} value={team.teamId}>
-                              {team.teamName}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          disabled={!hasChanges || isSaving}
-                          onClick={() => void handleSaveAssignment(row.playerId, row.teamId)}
-                          className="px-2 py-1 rounded bg-[#00D4FF] text-black font-semibold disabled:opacity-50"
-                        >
-                          {isSaving ? 'Saving…' : 'Save'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+              return (
+                <article
+                  key={row.playerId}
+                  className="rounded-lg border border-gray-800 bg-black/30 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => onOpenDetail(row.playerId)}
+                        className="font-['Space_Grotesk'] text-left text-lg font-semibold hover:text-[#00D4FF]"
+                      >
+                        {row.displayName}
+                      </button>
+                      <p className="break-all font-mono text-xs text-gray-300">{row.workEmail}</p>
+                      <p className="text-xs text-gray-500">{row.playerId}</p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <span
+                        className={`rounded px-2 py-1 text-xs font-semibold ${assignmentStatusPillClass(
+                          row.assignmentStatus
+                        )}`}
+                      >
+                        {row.assignmentStatus}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={savingHeliosUserId === row.userId}
+                        onClick={() => void handleToggleHeliosRole(row.userId, row.isHelios)}
+                        className={`rounded px-2 py-1 text-xs font-semibold disabled:opacity-50 ${
+                          row.isHelios
+                            ? 'border border-[#39FF14]/40 bg-[#39FF14]/20 text-[#39FF14]'
+                            : 'border border-gray-700 bg-black/40 text-gray-300'
+                        }`}
+                      >
+                        {savingHeliosUserId === row.userId
+                          ? 'Saving…'
+                          : row.isHelios
+                            ? 'Revoke'
+                            : 'Assign'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400">
+                        Team: {row.teamName ?? 'Unassigned'}
+                        {row.teamStatus ? ` (${row.teamStatus})` : ''}
+                      </p>
+                      <p className="text-xs text-gray-400">Phone: {row.phoneE164 ?? '—'}</p>
+                      <select
+                        aria-label={`Assign team for ${row.displayName}`}
+                        value={selectedTeamId}
+                        onChange={(event) =>
+                          setAssignmentDrafts((existing) => ({
+                            ...existing,
+                            [row.playerId]: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded bg-black/40 border border-gray-700 px-3 py-2 text-sm focus:outline-none focus:border-[#00D4FF]"
+                      >
+                        <option value={UNASSIGNED_OPTION}>Unassigned</option>
+                        {teamSelectOptions.map((team) => (
+                          <option key={team.teamId} value={team.teamId}>
+                            {team.teamName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!hasChanges || isSaving}
+                      onClick={() => void handleSaveAssignment(row.playerId, row.teamId)}
+                      className="w-full rounded bg-[#00D4FF] px-3 py-2 text-sm font-semibold text-black disabled:opacity-50 md:w-auto"
+                    >
+                      {isSaving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </article>
@@ -627,35 +652,41 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
       ) : detail ? (
         <>
           <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6 space-y-4">
-            <div>
-              <h2 className="font-['Space_Grotesk'] text-2xl md:text-3xl">{detail.displayName}</h2>
+            <div className="space-y-1">
+              <h2 className="font-['Space_Grotesk'] text-2xl break-words md:text-3xl">
+                {detail.displayName}
+              </h2>
               <p className="text-xs text-gray-400 font-mono">{detail.playerId}</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
               <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Individual Score</p>
-                <p className="text-2xl font-semibold text-[#39FF14]">{detail.individualScore}</p>
+                <p className="text-xl font-semibold text-[#39FF14] sm:text-2xl">
+                  {detail.individualScore}
+                </p>
               </div>
               <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Global Rank</p>
-                <p className="text-2xl font-semibold">
+                <p className="text-xl font-semibold sm:text-2xl">
                   {detail.globalRank !== null ? `#${detail.globalRank}` : '—'}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Team Rank</p>
-                <p className="text-2xl font-semibold">
+                <p className="text-xl font-semibold sm:text-2xl">
                   {detail.teamRank !== null ? `#${detail.teamRank}` : '—'}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Team Points</p>
-                <p className="text-2xl font-semibold">{detail.teamScore ?? '—'}</p>
+                <p className="text-xl font-semibold sm:text-2xl">{detail.teamScore ?? '—'}</p>
               </div>
               <div className="rounded-lg border border-gray-800 bg-black/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Joined</p>
-                <p className="text-2xl font-semibold">{formatJoinedDate(detail.joinedAt)}</p>
+                <p className="text-base font-semibold sm:text-lg">
+                  {formatJoinedDate(detail.joinedAt)}
+                </p>
               </div>
             </div>
 
@@ -691,7 +722,7 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
               type="button"
               disabled={isSavingContact}
               onClick={() => void handleSaveContact()}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-[#00D4FF] text-black font-semibold disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded bg-[#00D4FF] px-3 py-2 font-semibold text-black disabled:opacity-50 sm:w-auto"
             >
               <Save className="w-4 h-4" />
               {isSavingContact ? 'Saving…' : 'Save Contact'}
@@ -703,31 +734,31 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
             {scanHistory.length === 0 ? (
               <p className="text-sm text-gray-400">No scans recorded for this player yet.</p>
             ) : (
-              <div className="overflow-auto rounded-lg border border-gray-800">
-                <table className="w-full text-sm">
-                  <thead className="bg-black/40 text-gray-300">
-                    <tr>
-                      <th className="text-left px-3 py-2">Outcome</th>
-                      <th className="text-left px-3 py-2">Timestamp</th>
-                      <th className="text-left px-3 py-2">QR Label</th>
-                      <th className="text-left px-3 py-2">Points</th>
-                      <th className="text-left px-3 py-2">Message</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scanHistory.map((scan) => (
-                      <tr key={scan.scanId} className="border-t border-gray-800">
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {formatScanOutcome(scan.outcome)}
-                        </td>
-                        <td className="px-3 py-2">{new Date(scan.scannedAt).toLocaleString()}</td>
-                        <td className="px-3 py-2">{scan.qrCodeLabel ?? scan.qrPayload}</td>
-                        <td className="px-3 py-2">{scan.pointsAwarded}</td>
-                        <td className="px-3 py-2">{scan.message ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-2">
+                {scanHistory.map((scan) => (
+                  <article
+                    key={scan.scanId}
+                    className="rounded-lg border border-gray-800 bg-black/30 p-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span
+                        className={`rounded px-2 py-0.5 font-mono text-xs ${scanOutcomePillClass(scan.outcome)}`}
+                      >
+                        {formatScanOutcome(scan.outcome)}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {new Date(scan.scannedAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-200">
+                      {scan.qrCodeLabel ?? scan.qrPayload}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-300">
+                      <span>Points: {scan.pointsAwarded}</span>
+                      <span>{scan.message ?? '—'}</span>
+                    </div>
+                  </article>
+                ))}
               </div>
             )}
           </article>
