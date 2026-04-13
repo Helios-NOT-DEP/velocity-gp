@@ -33,7 +33,11 @@
  *  the status-flip and dispatch n8n.  The loser sees GENERATING already set
  *  and returns without a second call.
  */
-import type { GarageSubmitRequest, GarageSubmitResponse, TeamGarageStatus } from '@velocity-gp/api-contract';
+import type {
+  GarageSubmitRequest,
+  GarageSubmitResponse,
+  TeamGarageStatus,
+} from '@velocity-gp/api-contract';
 
 import { prisma } from '../db/client.js';
 import { env } from '../config/env.js';
@@ -67,7 +71,9 @@ export async function submitDescription(
 
   if (!moderation.safe) {
     logger.info('[garageService] Description rejected by moderation', {
-      playerId, teamId, flaggedCategory: moderation.flaggedCategory,
+      playerId,
+      teamId,
+      flaggedCategory: moderation.flaggedCategory,
     });
 
     // Upsert a REJECTED row so the admin audit trail captures the attempt,
@@ -184,7 +190,11 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
   const requiredCount = env.GARAGE_REQUIRED_PLAYER_COUNT ?? team.requiredPlayerCount;
 
   logger.debug('[garageService] maybeEnqueueLogoGeneration — quota check', {
-    teamId, approvedCount, required: requiredCount, dbRequired: team.requiredPlayerCount, logoStatus: team.logoStatus,
+    teamId,
+    approvedCount,
+    required: requiredCount,
+    dbRequired: team.requiredPlayerCount,
+    logoStatus: team.logoStatus,
   });
 
   // Has the quota been reached?
@@ -200,9 +210,14 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
     : (['PENDING', 'FAILED'] as const);
 
   if (isLateJoiner) {
-    logger.info('[garageService] Late joiner detected — re-triggering logo generation to include new description', {
-      teamId, approvedCount, required: requiredCount,
-    });
+    logger.info(
+      '[garageService] Late joiner detected — re-triggering logo generation to include new description',
+      {
+        teamId,
+        approvedCount,
+        required: requiredCount,
+      }
+    );
   }
 
   // ── Atomic status-flip: claim GENERATING ──────────────────────────────────
@@ -259,7 +274,12 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
     // Log each description being incorporated so the prompt build is fully traceable
     descriptions.forEach((desc, i) => {
       logger.info('[garageService] Including member description in logo prompt', {
-        teamId, teamName, memberIndex: i + 1, total: descriptions.length, playerId: submissions[i].playerId, description: desc,
+        teamId,
+        teamName,
+        memberIndex: i + 1,
+        total: descriptions.length,
+        playerId: submissions[i].playerId,
+        description: desc,
       });
     });
 
@@ -267,7 +287,10 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
     const prompt = buildLogoPrompt(teamName, descriptions);
 
     logger.info('[garageService] Final logo prompt constructed — dispatching to n8n', {
-      teamId, teamName, descriptionCount: descriptions.length, prompt,
+      teamId,
+      teamName,
+      descriptionCount: descriptions.length,
+      prompt,
     });
 
     // generateTeamLogo calls the n8n webhook which runs an OpenAI image
@@ -315,18 +338,9 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
  * future prompt versioning/A–B testing stays in the business-logic layer.
  */
 function buildLogoPrompt(teamName: string, descriptions: string[]): string {
-  const memberTraits = descriptions
-    .map((d, i) => `member ${i + 1}: ${d}`)
-    .join('; ');
+  const memberTraits = descriptions.map((d, i) => `member ${i + 1}: ${d}`).join('\n');
 
-  return (
-    `Create a bold motorsport team logo for a racing team called "${teamName}". ` +
-    `The team is made up of ${descriptions.length} member(s) with these traits — ${memberTraits}. ` +
-    `Visual style: futuristic Formula 1 racing aesthetic, vivid neon accents (cyan and orange) ` +
-    `on a deep dark background, sharp geometric shapes, high contrast. ` +
-    `The team name "${teamName}" must appear prominently in the logo. ` +
-    `No text other than the team name. Square format, suitable as a team badge.`
-  );
+  return memberTraits;
 }
 
 // ── Internal: status snapshot builder ────────────────────────────────────────
@@ -336,10 +350,7 @@ function buildLogoPrompt(teamName: string, descriptions: string[]): string {
  * status poll responses.  Fetches team metadata and player-specific submission
  * in two parallel queries.
  */
-async function buildTeamGarageStatus(
-  teamId: string,
-  playerId: string
-): Promise<TeamGarageStatus> {
+async function buildTeamGarageStatus(teamId: string, playerId: string): Promise<TeamGarageStatus> {
   // Fetch team info + count APPROVED rows in parallel
   const [team, approvedCount, mySubmission] = await Promise.all([
     prisma.team.findUnique({
