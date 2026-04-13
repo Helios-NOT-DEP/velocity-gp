@@ -21,9 +21,9 @@ export const garageSubmitSchema = z.object({
   eventId: z.string().min(1, 'eventId is required'),
   description: z
     .string()
+    .trim()
     .min(3, 'Description must be at least 3 characters')
-    .max(200, 'Description must be 200 characters or fewer')
-    .trim(),
+    .max(200, 'Description must be 200 characters or fewer'),
 });
 
 /**
