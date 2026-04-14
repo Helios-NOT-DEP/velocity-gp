@@ -29,17 +29,11 @@ interface SeedSummary {
   readonly rescues: number;
   readonly teamStateTransitions: number;
   readonly adminActionAudits: number;
-  // Garage workflow
-  readonly garageSubmissions: number;
 }
 
 const now = new Date('2026-04-06T12:00:00.000Z');
 const minutes = (value: number) => 60_000 * value;
 const hours = (value: number) => 60 * minutes(value);
-
-// How many approved descriptions a team needs before logo generation fires.
-// Set GARAGE_REQUIRED_PLAYER_COUNT=1 in .env so a single submission triggers it during local testing.
-const garageRequiredCount = Number(process.env['GARAGE_REQUIRED_PLAYER_COUNT'] ?? 2);
 
 const ids = {
   users: {
@@ -93,8 +87,10 @@ async function clearDatabase(): Promise<void> {
   await prisma.rescue.deleteMany();
   await prisma.scanRecord.deleteMany();
   await prisma.qRCodeClaim.deleteMany();
-  // Garage submissions must be deleted before players/teams (FK constraint)
+  // Garage submissions reference Player/Team and must be removed first.
   await prisma.garageSubmission.deleteMany();
+  // SuperpowerQRAsset references User with ON DELETE RESTRICT, remove assets first
+  await prisma.superpowerQRAsset.deleteMany();
   await prisma.player.deleteMany();
   await prisma.qRCode.deleteMany();
   await prisma.team.deleteMany();
@@ -280,13 +276,6 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         score: 1260,
         status: 'ACTIVE',
         pitStopExpiresAt: null,
-        // Garage: requires N approved descriptions before logo generation fires.
-        // Controlled by GARAGE_REQUIRED_PLAYER_COUNT env var (default 2).
-        // Set to 1 in .env to trigger generation from a single submission.
-        requiredPlayerCount: garageRequiredCount,
-        logoStatus: 'READY',
-        logoUrl: 'https://placehold.co/512x512/0B1E3B/00D4FF?text=Apex+Comets',
-        logoGeneratedAt: new Date(now.getTime() - minutes(90)),
       },
       {
         id: ids.teams.nova,
@@ -295,11 +284,6 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         score: 920,
         status: 'IN_PIT',
         pitStopExpiresAt: new Date(now.getTime() + minutes(11)),
-        // Garage: one submission in, one still pending — useful for testing WAITING state.
-        requiredPlayerCount: garageRequiredCount,
-        logoStatus: 'PENDING',
-        logoUrl: null,
-        logoGeneratedAt: null,
       },
       {
         id: ids.teams.drift,
@@ -308,11 +292,6 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
         score: 1110,
         status: 'ACTIVE',
         pitStopExpiresAt: new Date(now.getTime() - minutes(4)),
-        // Garage: all descriptions in but logo generation not yet complete.
-        requiredPlayerCount: garageRequiredCount,
-        logoStatus: 'GENERATING',
-        logoUrl: null,
-        logoGeneratedAt: null,
       },
     ],
   });
@@ -466,6 +445,131 @@ async function seedTeamsPlayersAndQrCodes(): Promise<void> {
       },
     ],
   });
+}
+
+async function seedGeneratedTeamsAndPlayers(numTeams = 10, playersPerTeam = 8): Promise<void> {
+  // Generate teams, users and players programmatically.
+  const teamsData: Array<{
+    id: string;
+    eventId: string;
+    name: string;
+    score: number;
+    status: string;
+    pitStopExpiresAt: Date | null;
+  }> = [];
+
+  const usersData: Array<{
+    id: string;
+    email: string;
+    displayName: string;
+    role: string;
+    canAdmin: boolean;
+    canPlayer: boolean;
+    isHeliosMember: boolean;
+    isHelios: boolean;
+  }> = [];
+
+  const playersData: Array<{
+    id: string;
+    userId: string;
+    eventId: string;
+    teamId: string;
+    status: string;
+    individualScore: number;
+    isFlaggedForReview: boolean;
+    joinedAt: Date;
+  }> = [];
+
+  for (let t = 1; t <= numTeams; t++) {
+    const teamId = `team-gen-${String(t).padStart(2, '0')}`;
+    teamsData.push({
+      id: teamId,
+      eventId: ids.events.active,
+      name: `Generated Team ${t}`,
+      score: Math.floor(Math.random() * 1000),
+      status: 'ACTIVE',
+      pitStopExpiresAt: null,
+    });
+
+    // Each team gets `playersPerTeam` players; the first player is a Helios player.
+    for (let p = 1; p <= playersPerTeam; p++) {
+      const isHelios = p === 1;
+      const userId = isHelios ? `user-helios-gen-${t}` : `user-player-gen-${t}-${p}`;
+      usersData.push({
+        id: userId,
+        email: `${userId}@velocitygp.dev`,
+        displayName: isHelios ? `Helios Gen ${t}` : `Player Gen ${t}-${p}`,
+        role: isHelios ? 'HELIOS' : 'PLAYER',
+        canAdmin: false,
+        canPlayer: true,
+        isHeliosMember: isHelios,
+        isHelios,
+      });
+
+      playersData.push({
+        id: `player-gen-${t}-${p}`,
+        userId,
+        eventId: ids.events.active,
+        teamId,
+        status: 'RACING',
+        individualScore: 0,
+        isFlaggedForReview: false,
+        joinedAt: new Date(now.getTime() - minutes(5)),
+      });
+    }
+  }
+
+  if (teamsData.length) {
+    // Cast to `any` to satisfy the generated Prisma input types for enums
+    await prisma.team.createMany({ data: teamsData as any });
+  }
+
+  if (usersData.length) {
+    await prisma.user.createMany({ data: usersData as any });
+  }
+
+  if (playersData.length) {
+    await prisma.player.createMany({ data: playersData as any });
+  }
+}
+
+async function seedGeneratedQRCodes(count = 45): Promise<void> {
+  const data: Array<{
+    id: string;
+    eventId: string;
+    label: string;
+    value: number;
+    zone: string;
+    payload: string;
+    status: string;
+    activationStartsAt: Date | null;
+    activationEndsAt: Date | null;
+    hazardRatioOverride: number | null;
+    hazardWeightOverride: number | null;
+    scanCount: number;
+  }> = [];
+
+  for (let i = 1; i <= count; i++) {
+    const idx = String(i).padStart(3, '0');
+    data.push({
+      id: `qr-gen-${idx}`,
+      eventId: ids.events.active,
+      label: `Generated QR ${idx}`,
+      value: Math.floor(Math.random() * 150) + 25,
+      zone: `Generated Zone ${Math.ceil(i / 10)}`,
+      payload: `VG-GEN-QR-${idx}`,
+      status: 'ACTIVE',
+      activationStartsAt: new Date(now.getTime() - hours(2)),
+      activationEndsAt: null,
+      hazardRatioOverride: null,
+      hazardWeightOverride: null,
+      scanCount: 0,
+    });
+  }
+
+  if (data.length) {
+    await prisma.qRCode.createMany({ data: data as any });
+  }
 }
 
 async function seedClaimsScansRescuesAndAudits(): Promise<void> {
@@ -781,8 +885,6 @@ async function getSeedSummary(): Promise<SeedSummary> {
     prisma.adminActionAudit.count(),
   ]);
 
-  const garageSubmissions = await prisma.garageSubmission.count();
-
   return {
     users,
     events,
@@ -795,76 +897,7 @@ async function getSeedSummary(): Promise<SeedSummary> {
     rescues,
     teamStateTransitions,
     adminActionAudits,
-    garageSubmissions,
   };
-}
-
-/**
- * Seed garage submissions for local simulation.
- *
- * Scenarios seeded:
- *   Apex Comets  — both members APPROVED + logo READY (see team.logoStatus above)
- *   Nova Thunder — one player APPROVED, one not yet submitted (WAITING state sim)
- *   Drift Runners — one player APPROVED, logo GENERATING (mid-flight sim)
- *
- * This lets a developer open the Garage page for each player and immediately
- * see all three waiting-state scenarios without manual interaction.
- */
-async function seedGarageSubmissions(): Promise<void> {
-  await prisma.garageSubmission.createMany({
-    data: [
-      // ── Apex Comets: both members approved, logo already ready ───────────
-      {
-        id: 'garage-lina-apex',
-        playerId: ids.players.lina,
-        teamId: ids.teams.apex,
-        eventId: ids.events.active,
-        description: 'Fast, bold, and always ahead of the curve',
-        status: 'APPROVED',
-        moderatedAt: new Date(now.getTime() - minutes(95)),
-        createdAt: new Date(now.getTime() - minutes(95)),
-        updatedAt: new Date(now.getTime() - minutes(95)),
-      },
-      {
-        id: 'garage-mason-apex',
-        playerId: ids.players.mason,
-        teamId: ids.teams.apex,
-        eventId: ids.events.active,
-        description: 'Relentless, creative, driven by innovation',
-        status: 'APPROVED',
-        moderatedAt: new Date(now.getTime() - minutes(92)),
-        createdAt: new Date(now.getTime() - minutes(92)),
-        updatedAt: new Date(now.getTime() - minutes(92)),
-      },
-
-      // ── Nova Thunder: one in, one still pending ────────────────────────
-      {
-        id: 'garage-noah-nova',
-        playerId: ids.players.noah,
-        teamId: ids.teams.nova,
-        eventId: ids.events.active,
-        description: 'Powerful, dynamic, unstoppable in every challenge',
-        status: 'APPROVED',
-        moderatedAt: new Date(now.getTime() - minutes(60)),
-        createdAt: new Date(now.getTime() - minutes(60)),
-        updatedAt: new Date(now.getTime() - minutes(60)),
-      },
-      // olivia has NOT submitted yet — her absence simulates the WAITING state
-
-      // ── Drift Runners: one player submitted, logo now GENERATING ──────
-      {
-        id: 'garage-parker-drift',
-        playerId: ids.players.parker,
-        teamId: ids.teams.drift,
-        eventId: ids.events.active,
-        description: 'Daring, sharp, always pushing the limit',
-        status: 'APPROVED',
-        moderatedAt: new Date(now.getTime() - minutes(5)),
-        createdAt: new Date(now.getTime() - minutes(5)),
-        updatedAt: new Date(now.getTime() - minutes(5)),
-      },
-    ],
-  });
 }
 
 async function main(): Promise<void> {
@@ -872,8 +905,11 @@ async function main(): Promise<void> {
   await seedUsers();
   await seedEventsAndConfig();
   await seedTeamsPlayersAndQrCodes();
+  // Generate additional QR codes
+  await seedGeneratedQRCodes(45);
+  // Generate additional teams and players (10 teams × 8 players each, 1 Helios per team)
+  await seedGeneratedTeamsAndPlayers(10, 8);
   await seedClaimsScansRescuesAndAudits();
-  await seedGarageSubmissions();
 
   const summary = await getSeedSummary();
   console.log('Seed complete:');

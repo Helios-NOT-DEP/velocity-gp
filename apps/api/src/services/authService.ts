@@ -215,10 +215,17 @@ async function loadActivePlayerContextByUserId(
 }
 
 async function loadAuthCandidateByEmail(workEmail: string): Promise<AuthCandidate | null> {
-  const user = await prisma.user.findUnique({
+  const matches = await prisma.user.findMany({
     where: {
-      email: workEmail,
+      email: {
+        equals: workEmail,
+        mode: 'insensitive',
+      },
     },
+    orderBy: {
+      id: 'asc',
+    },
+    take: 2,
     select: {
       id: true,
       email: true,
@@ -231,9 +238,20 @@ async function loadAuthCandidateByEmail(workEmail: string): Promise<AuthCandidat
     },
   });
 
-  if (!user) {
+  if (matches.length === 0) {
     return null;
   }
+
+  if (matches.length > 1) {
+    incrementCounter('auth.magic_link.request.denied.ambiguous_email.total');
+    logger.error('Ambiguous auth candidate email match', {
+      normalizedWorkEmail: workEmail,
+      matchingUserIds: matches.map((match) => match.id),
+    });
+    return null;
+  }
+
+  const user = matches[0];
 
   return {
     userId: user.id,

@@ -159,6 +159,11 @@ export const adminEndpoints = {
   /** Lists scan history rows for a specific player in an event. */
   listPlayerScanHistory: (eventId: string, playerId: string) =>
     `/admin/events/${eventId}/players/${playerId}/scan-history`,
+  /** Creates a new player manually for an event. */
+  createAdminPlayer: (eventId: string) => `/admin/events/${eventId}/roster/players`,
+  /** Sends a welcome letter to a player. */
+  sendPlayerWelcome: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/send-welcome`,
   /** Validates a CSV/JSON bulk roster import payload without committing it. */
   previewRosterImport: (eventId: string) => `/admin/events/${eventId}/roster/import/preview`,
   /** Commits a bulk roster import payload to the database. */

@@ -31,6 +31,7 @@ describe('velocity gp backend', () => {
     unassignedPlayerId: `player-unassigned-app-${token}`,
     unassignedUserId: `user-unassigned-app-${token}`,
     adminUserId: `user-admin-app-${token}`,
+    adminMixedCaseUserId: `user-admin-mixed-case-app-${token}`,
     qrCodeId: `qr-app-${token}`,
     qrPayload: `VG-APP-${token.toUpperCase()}`,
     heliosUserId: `user-helios-app-${token}`,
@@ -77,6 +78,15 @@ describe('velocity gp backend', () => {
           email: `admin-${token}@velocitygp.dev`,
           displayName: 'Admin Fixture',
           role: 'ADMIN',
+          isHelios: false,
+        },
+        {
+          id: fixtureIds.adminMixedCaseUserId,
+          email: `AdminMixed-${token}@velocitygp.dev`,
+          displayName: 'Admin Mixed Case Fixture',
+          role: 'ADMIN',
+          canAdmin: true,
+          canPlayer: false,
           isHelios: false,
         },
         {
@@ -667,6 +677,92 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(202);
     expect(response.body.success).toBe(true);
     expect(response.body.data.accepted).toBe(true);
+  });
+
+  it('accepts magic-link requests for admin users when stored email casing differs', async () => {
+    const mixedCaseAdminEmail = `adminmixed-${token}@velocitygp.dev`;
+    const capturedLinks: string[] = [];
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: mixedCaseAdminEmail });
+
+    expect(response.status).toBe(202);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.accepted).toBe(true);
+    expect(capturedLinks.length).toBe(1);
+  });
+
+  it('rejects magic-link requests when multiple users match email case-insensitively', async () => {
+    const ambiguousEmail = `adminmixed-${token}@velocitygp.dev`;
+    const duplicateUserId = `user-admin-mixed-duplicate-app-${token}`;
+    const capturedLinks: string[] = [];
+
+    await prisma.user.create({
+      data: {
+        id: duplicateUserId,
+        email: ambiguousEmail,
+        displayName: 'Admin Mixed Duplicate Fixture',
+        role: 'ADMIN',
+        canAdmin: true,
+        canPlayer: false,
+        isHelios: false,
+      },
+    });
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
+    });
+
+    try {
+      const response = await request(app)
+        .post(`${apiPrefix}/auth/magic-link/request`)
+        .send({ workEmail: ambiguousEmail });
+
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('AUTH_USER_NOT_FOUND');
+      expect(capturedLinks).toHaveLength(0);
+    } finally {
+      setEmailDispatcherForTests(null);
+      await prisma.user.delete({
+        where: {
+          id: duplicateUserId,
+        },
+      });
+    }
+  });
+
+  it('verifies magic links for admin users without player context and routes to admin control', async () => {
+    const adminToken = createMagicLinkToken({
+      userId: fixtureIds.adminMixedCaseUserId,
+      playerId: null,
+      eventId: null,
+      email: `adminmixed-${token}@velocitygp.dev`,
+    });
+
+    const verifyResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/verify`)
+      .send({ token: adminToken });
+
+    expect(verifyResponse.status).toBe(200);
+    expect(verifyResponse.body.success).toBe(true);
+    expect(verifyResponse.body.data.redirectPath).toBe('/admin/game-control');
+    expect(verifyResponse.body.data.session.userId).toBe(fixtureIds.adminMixedCaseUserId);
+    expect(verifyResponse.body.data.session.playerId).toBeNull();
+    expect(verifyResponse.body.data.session.assignmentStatus).toBe('UNASSIGNED');
   });
 
   it('rejects Mailtrap webhook requests without a valid bearer token', async () => {
@@ -2470,6 +2566,421 @@ describe('velocity gp backend', () => {
       .get(`${apiPrefix}/players/${fixtureIds.playerId}/superpower-qr`)
       .set('x-user-id', fixtureIds.heliosUserId)
       .set('x-user-role', 'helios');
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Admin: manual player creation
+  // ---------------------------------------------------------------------------
+
+  it('creates a new player without team assignment and records an audit row', async () => {
+    const workEmail = `new-manual-${token}@velocitygp.dev`;
+
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ workEmail, displayName: 'Manual Player No Team' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.workEmail).toBe(workEmail);
+    expect(response.body.data.displayName).toBe('Manual Player No Team');
+    expect(response.body.data.teamId).toBeNull();
+    expect(response.body.data.teamName).toBeNull();
+    expect(response.body.data.assignmentStatus).toBe('UNASSIGNED');
+    expect(response.body.data.playerId).toBeTruthy();
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const audit = await prisma.adminActionAudit.findFirst({
+      where: {
+        eventId: fixtureIds.eventId,
+        targetId: response.body.data.playerId,
+        actionType: 'ROSTER_IMPORTED',
+      },
+    });
+    expect(audit).not.toBeNull();
+    expect((audit?.details as Record<string, unknown>)?.source).toBe('manual_create');
+    expect((audit?.details as Record<string, unknown>)?.userCreated).toBe(true);
+  });
+
+  it('creates a new player with team assignment and records a ROSTER_ASSIGNED audit', async () => {
+    const workEmail = `new-assigned-manual-${token}@velocitygp.dev`;
+
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ workEmail, displayName: 'Manual Player With Team', teamId: fixtureIds.teamId });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.workEmail).toBe(workEmail);
+    expect(response.body.data.teamId).toBe(fixtureIds.teamId);
+    expect(response.body.data.assignmentStatus).not.toBe('UNASSIGNED');
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const audit = await prisma.adminActionAudit.findFirst({
+      where: {
+        eventId: fixtureIds.eventId,
+        targetId: response.body.data.playerId,
+        actionType: 'ROSTER_ASSIGNED',
+      },
+    });
+    expect(audit).not.toBeNull();
+    expect((audit?.details as Record<string, unknown>)?.nextTeamId).toBe(fixtureIds.teamId);
+  });
+
+  it('upserts an existing user display name when creating a player for a known email', async () => {
+    const existingEmail = `admin-${token}@velocitygp.dev`;
+
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ workEmail: existingEmail, displayName: 'Admin Renamed For Test' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.workEmail).toBe(existingEmail);
+    expect(response.body.data.displayName).toBe('Admin Renamed For Test');
+
+    const user = await prisma.user.findUnique({
+      where: { email: existingEmail },
+      select: { displayName: true },
+    });
+    expect(user?.displayName).toBe('Admin Renamed For Test');
+
+    const audit = await prisma.adminActionAudit.findFirst({
+      where: {
+        eventId: fixtureIds.eventId,
+        targetId: response.body.data.playerId,
+        actionType: 'ROSTER_IMPORTED',
+      },
+    });
+    expect((audit?.details as Record<string, unknown>)?.userCreated).toBe(false);
+  });
+
+  it('reuses a mixed-case existing user when creating a player with lower-case email input', async () => {
+    const lowerCaseEmailInput = `adminmixed-${token}@velocitygp.dev`;
+
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ workEmail: lowerCaseEmailInput, displayName: 'Admin Mixed Case Reused' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.userId).toBe(fixtureIds.adminMixedCaseUserId);
+    expect(response.body.data.displayName).toBe('Admin Mixed Case Reused');
+
+    const matchingUsers = await prisma.user.count({
+      where: {
+        email: {
+          equals: lowerCaseEmailInput,
+          mode: 'insensitive',
+        },
+      },
+    });
+    expect(matchingUsers).toBe(1);
+  });
+
+  it('rejects manual player creation when the player already exists for this event', async () => {
+    const existingPlayerEmail = `existing-player-${token}@velocitygp.dev`;
+    const existingUserId = `user-existing-player-app-${token}`;
+    const existingPlayerId = `player-existing-app-${token}`;
+
+    await prisma.user.create({
+      data: {
+        id: existingUserId,
+        email: existingPlayerEmail,
+        displayName: 'Existing Player Fixture',
+        role: 'PLAYER',
+        isHelios: false,
+      },
+    });
+
+    await prisma.player.create({
+      data: {
+        id: existingPlayerId,
+        eventId: fixtureIds.eventId,
+        userId: existingUserId,
+        teamId: fixtureIds.teamId,
+        status: 'RACING',
+      },
+    });
+
+    try {
+      const response = await request(app)
+        .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({ workEmail: existingPlayerEmail, displayName: 'Duplicate Player' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    } finally {
+      await prisma.player.delete({
+        where: {
+          id: existingPlayerId,
+        },
+      });
+      await prisma.user.delete({
+        where: {
+          id: existingUserId,
+        },
+      });
+    }
+  });
+
+  it('rejects manual player creation when the teamId does not exist for the event', async () => {
+    const workEmail = `new-bad-team-${token}@velocitygp.dev`;
+
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ workEmail, displayName: 'Bad Team Player', teamId: 'team-does-not-exist' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects manual player creation with an invalid email format', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ workEmail: 'not-an-email', displayName: 'Invalid Email Player' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects manual player creation when required fields are missing', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ displayName: 'Missing Email' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects unauthenticated manual player creation', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .send({ workEmail: `noauth-${token}@velocitygp.dev`, displayName: 'No Auth' });
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+  });
+
+  it('rejects manual player creation for non-admin users', async () => {
+    const response = await request(app)
+      .post(`${apiPrefix}/admin/events/${fixtureIds.eventId}/roster/players`)
+      .set('x-user-id', fixtureIds.playerUserId)
+      .set('x-user-role', 'player')
+      .send({ workEmail: `player-nonadmin-${token}@velocitygp.dev`, displayName: 'Non Admin' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Admin: send player welcome email
+  // ---------------------------------------------------------------------------
+
+  it('dispatches a welcome email and records an EMAIL_RETURN_FLAGGED audit', async () => {
+    const capturedDispatches: Array<{ templateKey: string; toEmail: string }> = [];
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        capturedDispatches.push({ templateKey: input.templateKey, toEmail: input.toEmail });
+      },
+    });
+
+    const response = await request(app)
+      .post(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/send-welcome`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ reason: 'player requested resend' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.deliveryStatus).toBe('dispatched');
+    expect(response.body.data.playerId).toBe(fixtureIds.playerId);
+    expect(response.body.data.auditId).toBeTruthy();
+
+    expect(capturedDispatches).toHaveLength(1);
+    expect(capturedDispatches[0].templateKey).toBe('welcome_onboarding');
+
+    const audit = await prisma.adminActionAudit.findFirst({
+      where: {
+        eventId: fixtureIds.eventId,
+        targetId: fixtureIds.playerId,
+        actionType: 'EMAIL_RETURN_FLAGGED',
+        details: {
+          path: ['source'],
+          equals: 'manual_welcome_send',
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    expect(audit).not.toBeNull();
+    expect((audit?.details as Record<string, unknown>)?.deliveryStatus).toBe('dispatched');
+    expect((audit?.details as Record<string, unknown>)?.reason).toBe('player requested resend');
+
+    setEmailDispatcherForTests(null);
+  });
+
+  it('records dispatch_failed status and still creates audit when email dispatch throws', async () => {
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        throw new Error('simulated welcome dispatch failure');
+      },
+    });
+
+    const response = await request(app)
+      .post(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/send-welcome`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.deliveryStatus).toBe('dispatch_failed');
+    expect(response.body.data.auditId).toBeTruthy();
+
+    const audit = await prisma.adminActionAudit.findFirst({
+      where: {
+        eventId: fixtureIds.eventId,
+        targetId: fixtureIds.playerId,
+        actionType: 'EMAIL_RETURN_FLAGGED',
+        details: {
+          path: ['deliveryStatus'],
+          equals: 'dispatch_failed',
+        },
+      },
+    });
+    expect(audit).not.toBeNull();
+
+    setEmailDispatcherForTests(null);
+  });
+
+  it('passes an optional reason through to the welcome audit without dispatching', async () => {
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        return;
+      },
+    });
+
+    const response = await request(app)
+      .post(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/send-welcome`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({ reason: 'test audit reason check' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+
+    const audit = await prisma.adminActionAudit.findFirst({
+      where: {
+        eventId: fixtureIds.eventId,
+        targetId: fixtureIds.playerId,
+        actionType: 'EMAIL_RETURN_FLAGGED',
+        details: {
+          path: ['reason'],
+          equals: 'test audit reason check',
+        },
+      },
+    });
+    expect(audit).not.toBeNull();
+
+    setEmailDispatcherForTests(null);
+  });
+
+  it('rejects send-welcome requests with whitespace-only reason values', async () => {
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        return;
+      },
+    });
+
+    try {
+      const response = await request(app)
+        .post(
+          `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/send-welcome`
+        )
+        .set('x-user-id', fixtureIds.adminUserId)
+        .set('x-user-role', 'admin')
+        .send({ reason: '   ' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    } finally {
+      setEmailDispatcherForTests(null);
+    }
+  });
+
+  it('rejects send-welcome for a player that does not exist in the event', async () => {
+    setEmailDispatcherForTests({
+      dispatch: async () => {
+        return;
+      },
+    });
+
+    const response = await request(app)
+      .post(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/player-does-not-exist/send-welcome`
+      )
+      .set('x-user-id', fixtureIds.adminUserId)
+      .set('x-user-role', 'admin')
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+
+    setEmailDispatcherForTests(null);
+  });
+
+  it('rejects unauthenticated send-welcome requests', async () => {
+    const response = await request(app)
+      .post(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/send-welcome`
+      )
+      .send({});
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+  });
+
+  it('rejects send-welcome requests for non-admin users', async () => {
+    const response = await request(app)
+      .post(
+        `${apiPrefix}/admin/events/${fixtureIds.eventId}/players/${fixtureIds.playerId}/send-welcome`
+      )
+      .set('x-user-id', fixtureIds.playerUserId)
+      .set('x-user-role', 'player')
+      .send({});
 
     expect(response.status).toBe(403);
     expect(response.body.success).toBe(false);

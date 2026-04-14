@@ -211,6 +211,232 @@ describe('AdminPlayers roster workflows', () => {
     expect(JSON.parse(String(assignmentCallOptions.body))).toEqual({ teamId: 'team-2' });
   });
 
+  it('creates a player manually from admin roster', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    window.fetch = fetchMock as typeof window.fetch;
+
+    fetchMock
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            id: 'event-1',
+            name: 'Velocity GP Finals',
+            startDate: '2026-04-07T10:00:00.000Z',
+            endDate: '2026-04-07T18:00:00.000Z',
+            status: 'ACTIVE',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            teams: [
+              {
+                teamId: 'team-1',
+                teamName: 'Apex',
+                teamStatus: 'ACTIVE',
+                memberCount: 0,
+              },
+            ],
+            unassignedCount: 0,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            eventId: 'event-1',
+            playerId: 'player-99',
+            userId: 'user-99',
+            workEmail: 'new.player@velocitygp.dev',
+            displayName: 'New Player',
+            teamId: 'team-1',
+            teamName: 'Apex',
+            teamStatus: 'ACTIVE',
+            assignmentStatus: 'ASSIGNED_ACTIVE',
+            joinedAt: '2026-04-07T10:00:00.000Z',
+            updatedAt: '2026-04-07T10:00:00.000Z',
+            auditId: 'audit-create-1',
+          },
+        })
+      )
+      .mockResolvedValue(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      );
+
+    renderAdminPlayers();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Create Player' })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('work.email@company.com'), {
+      target: { value: 'new.player@velocitygp.dev' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Display name'), {
+      target: { value: 'New Player' },
+    });
+
+    const unassignedSelect = screen
+      .getAllByDisplayValue('Unassigned')
+      .find((node) => node.tagName.toLowerCase() === 'select');
+    expect(unassignedSelect).toBeTruthy();
+    fireEvent.change(unassignedSelect as globalThis.HTMLSelectElement, {
+      target: { value: 'team-1' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Player' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Created New Player (new.player@velocitygp.dev).')).toBeTruthy();
+    });
+
+    const createRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/admin/events/event-1/roster/players')
+    );
+
+    expect(createRequest).toBeTruthy();
+    const [, createOptions] = createRequest as [string, RequestInit];
+    expect(JSON.parse(String(createOptions.body))).toEqual({
+      workEmail: 'new.player@velocitygp.dev',
+      displayName: 'New Player',
+      teamId: 'team-1',
+    });
+  });
+
+  it('sends welcome letter from roster row action', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    window.fetch = fetchMock as typeof window.fetch;
+
+    fetchMock
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            id: 'event-1',
+            name: 'Velocity GP Finals',
+            startDate: '2026-04-07T10:00:00.000Z',
+            endDate: '2026-04-07T18:00:00.000Z',
+            status: 'ACTIVE',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [
+              {
+                playerId: 'player-1',
+                userId: 'user-1',
+                eventId: 'event-1',
+                workEmail: 'player1@velocitygp.dev',
+                displayName: 'Player One',
+                isHelios: false,
+                phoneE164: null,
+                teamId: null,
+                teamName: null,
+                teamStatus: null,
+                assignmentStatus: 'UNASSIGNED',
+                joinedAt: '2026-04-07T10:00:00.000Z',
+                updatedAt: '2026-04-07T10:00:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            teams: [],
+            unassignedCount: 1,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          success: true,
+          data: {
+            eventId: 'event-1',
+            playerId: 'player-1',
+            userId: 'user-1',
+            workEmail: 'player1@velocitygp.dev',
+            displayName: 'Player One',
+            deliveryStatus: 'dispatched',
+            auditId: 'audit-welcome-1',
+            updatedAt: '2026-04-07T10:00:00.000Z',
+          },
+        })
+      )
+      .mockResolvedValue(
+        buildJsonResponse({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        })
+      );
+
+    renderAdminPlayers();
+
+    await waitFor(() => {
+      expect(screen.getByText('Player One')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send Welcome' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome letter sent to Player One.')).toBeTruthy();
+    });
+
+    const welcomeRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/admin/events/event-1/players/player-1/send-welcome')
+    );
+
+    expect(welcomeRequest).toBeTruthy();
+  });
+
   it('assigns and revokes Helios role from roster rows', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
