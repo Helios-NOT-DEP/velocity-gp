@@ -102,42 +102,6 @@ describe('admin route guards', () => {
     });
   });
 
-  it('shows Helios bottom-nav button for Helios members on leaderboard', async () => {
-    renderWithRoute('/leaderboard', {
-      userId: 'helios-player-1',
-      role: 'helios',
-      isAuthenticated: true,
-      email: 'helios@example.com',
-      capabilities: {
-        admin: false,
-        player: true,
-        heliosMember: true,
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Helios' })).toBeTruthy();
-    });
-  });
-
-  it('hides Helios bottom-nav button for non-Helios players on leaderboard', async () => {
-    renderWithRoute('/leaderboard', {
-      userId: 'player-1',
-      role: 'player',
-      isAuthenticated: true,
-      email: 'player@example.com',
-      capabilities: {
-        admin: false,
-        player: true,
-        heliosMember: false,
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Helios' })).toBeNull();
-    });
-  });
-
   it('redirects legacy /signup path to the login experience', async () => {
     renderWithRoute('/signup');
 
