@@ -9,6 +9,7 @@ import { Prisma } from '../../prisma/generated/client.js';
 
 import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
+import { isSerializationFailure } from '../db/retry.js';
 import { callN8nWebhook } from '../lib/n8nWebhookClient.js';
 import { logger } from '../lib/logger.js';
 import { DependencyError, ForbiddenError, NotFoundError } from '../utils/appError.js';
@@ -32,10 +33,10 @@ function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRe
   return error instanceof Prisma.PrismaClientKnownRequestError;
 }
 
-function isRetryableTransactionError(
-  error: unknown
-): error is Prisma.PrismaClientKnownRequestError {
-  return isKnownPrismaError(error) && (error.code === 'P2002' || error.code === 'P2034');
+// P2002 = unique constraint violation: the generated payload already exists.
+// Handled separately from serialization failures so we regenerate a new payload.
+function isPayloadCollisionError(error: unknown): boolean {
+  return isKnownPrismaError(error) && error.code === 'P2002';
 }
 
 /**
@@ -247,12 +248,26 @@ export async function regenerateSuperpowerQR(
         revokedAssetId: transactionResult.revokedAssetId,
       };
     } catch (error) {
-      if (isRetryableTransactionError(error) && attempt < SUPERPOWER_REGEN_RETRY_LIMIT) {
-        logger.warn('Retrying Superpower QR regeneration after transaction conflict.', {
+      const isLast = attempt >= SUPERPOWER_REGEN_RETRY_LIMIT;
+      if (isLast) {
+        throw error;
+      }
+
+      if (isPayloadCollisionError(error)) {
+        // Unique constraint on the payload: regenerate a new random value next iteration.
+        logger.warn('Superpower QR payload collision, regenerating.', { userId, attempt });
+        continue;
+      }
+
+      if (isSerializationFailure(error)) {
+        // Serialization conflict under Serializable isolation: retry with jitter.
+        const delayMs = Math.random() * Math.pow(2, attempt - 1) * 25;
+        logger.warn('Superpower QR serialization conflict, retrying with backoff.', {
           userId,
           attempt,
-          errorCode: error.code,
+          delayMs: Math.round(delayMs),
         });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
 

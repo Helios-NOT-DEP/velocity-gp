@@ -9,8 +9,8 @@ import type {
 
 import { Prisma } from '../../prisma/generated/client.js';
 import { prisma } from '../db/client.js';
+import { runWithSerializationRetry } from '../db/retry.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
-import { logger } from '../lib/logger.js';
 import { ValidationError } from '../utils/appError.js';
 import {
   buildScanActivitySummary,
@@ -29,62 +29,6 @@ import {
 interface SubmitScanInput {
   readonly eventId: string;
   readonly request: SubmitScanRequest;
-}
-
-/**
- * Maximum retry attempts for serialization conflicts (`P2034` / adapter-level
- * write conflicts).
- */
-const SERIALIZATION_RETRY_LIMIT = 3;
-
-function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
-  return error instanceof Prisma.PrismaClientKnownRequestError;
-}
-
-interface AdapterSerializationCause {
-  readonly originalCode?: string;
-  readonly kind?: string;
-}
-
-interface AdapterSerializationErrorShape {
-  readonly name?: string;
-  readonly cause?: AdapterSerializationCause;
-  readonly message?: string;
-}
-
-/**
- * Detects Prisma adapter-level write-conflict signatures.
- */
-function isAdapterSerializationFailure(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) {
-    return false;
-  }
-
-  const adapterError = error as AdapterSerializationErrorShape;
-  if (adapterError.name !== 'DriverAdapterError') {
-    return false;
-  }
-
-  const originalCode = adapterError.cause?.originalCode;
-  if (originalCode === '40001') {
-    return true;
-  }
-
-  const kind = adapterError.cause?.kind;
-  if (kind === 'TransactionWriteConflict') {
-    return true;
-  }
-
-  return adapterError.message?.includes('TransactionWriteConflict') ?? false;
-}
-
-/**
- * Detects serialization failures that are safe to retry.
- */
-function isSerializationFailure(error: unknown): boolean {
-  return (
-    (isKnownPrismaError(error) && error.code === 'P2034') || isAdapterSerializationFailure(error)
-  );
 }
 
 /**
@@ -467,17 +411,19 @@ async function processScanInTransaction(
     // Hazard path transitions the team into pit-stop and records team/player state mutation.
     const pitStopExpiresAt = new Date(now.getTime() + eventConfig.pitStopDurationSeconds * 1_000);
 
-    const [updatedTeam, scanRecord] = await Promise.all([
-      tx.team.update({
+    // Guard the status update with a WHERE clause so concurrent scans that
+    // simultaneously trigger a hazard are idempotent — only the first writer
+    // actually transitions the status; the others see count=0 and skip the
+    // state transition records.
+    const [pitResult, scanRecord] = await Promise.all([
+      tx.team.updateMany({
         where: {
           id: team.id,
+          status: { not: 'IN_PIT' },
         },
         data: {
           status: 'IN_PIT',
           pitStopExpiresAt,
-        },
-        select: {
-          score: true,
         },
       }),
       tx.scanRecord.create({
@@ -501,27 +447,35 @@ async function processScanInTransaction(
       }),
     ]);
 
-    await Promise.all([
-      tx.player.updateMany({
-        where: {
-          teamId: team.id,
-        },
-        data: {
-          status: 'IN_PIT',
-        },
-      }),
-      tx.teamStateTransition.create({
-        data: {
-          eventId: input.eventId,
-          teamId: team.id,
-          fromStatus: team.status,
-          toStatus: 'IN_PIT',
-          reason: 'HAZARD_TRIGGER',
-          triggeredByPlayerId: playerWithTeam.id,
-          notes: `Hazard modulo triggered at global scan #${globalScanCountAfter}.`,
-        },
-      }),
-    ]);
+    const teamAfter = await tx.team.findUnique({
+      where: { id: team.id },
+      select: { score: true },
+    });
+
+    if (pitResult.count > 0) {
+      // Only create state transition records when we actually changed the status.
+      await Promise.all([
+        tx.player.updateMany({
+          where: {
+            teamId: team.id,
+          },
+          data: {
+            status: 'IN_PIT',
+          },
+        }),
+        tx.teamStateTransition.create({
+          data: {
+            eventId: input.eventId,
+            teamId: team.id,
+            fromStatus: team.status,
+            toStatus: 'IN_PIT',
+            reason: 'HAZARD_TRIGGER',
+            triggeredByPlayerId: playerWithTeam.id,
+            notes: `Hazard modulo triggered at global scan #${globalScanCountAfter}.`,
+          },
+        }),
+      ]);
+    }
 
     await recordScanActivityInTransaction(tx, {
       sourceKey: `scan:${scanRecord.id}`,
@@ -553,7 +507,7 @@ async function processScanInTransaction(
       scannedAt: scanRecord.createdAt.toISOString(),
       message: 'Hazard trigger reached. Team moved to pit stop.',
       pointsAwarded: 0,
-      teamScore: updatedTeam.score,
+      teamScore: teamAfter!.score,
       pitStopExpiresAt: pitStopExpiresAt.toISOString(),
       hazardRatioUsed,
     };
@@ -736,7 +690,11 @@ async function createBlockedScanResponse(
 /**
  * Primary scan ingestion API.
  *
- * Uses serializable transactions and bounded retries for write conflicts.
+ * Runs inside a ReadCommitted transaction — score increments and QRCodeClaim
+ * unique-constraint writes are already race-safe at this level, so Serializable
+ * is not required and would only produce unnecessary 40001 conflicts under load.
+ * The pit-stop guard uses a conditional `updateMany` to remain idempotent when
+ * two concurrent scans both trigger a hazard at the same modulo position.
  */
 export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResponse> {
   const qrPayload = input.request.qrPayload.trim();
@@ -751,36 +709,13 @@ export async function submitScan(input: SubmitScanInput): Promise<SubmitScanResp
     'scan.submit',
     { eventId: input.eventId, playerId: input.request.playerId },
     async () => {
-      let attempt = 0;
-      while (attempt < SERIALIZATION_RETRY_LIMIT) {
-        try {
-          const result = await prisma.$transaction(
-            (tx) => processScanInTransaction(tx, input, qrPayload, new Date()),
-            {
-              isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-            }
-          );
-          incrementCounter('scan.outcome.total', { outcome: result.outcome });
-          return result;
-        } catch (error) {
-          if (!isSerializationFailure(error) || attempt === SERIALIZATION_RETRY_LIMIT - 1) {
-            throw error;
-          }
-
-          // Retry only known serialization/write-conflict failures under serializable isolation.
-          attempt += 1;
-          logger.warn('serialization conflict during scan processing, retrying', {
-            eventId: input.eventId,
-            playerId: input.request.playerId,
-            attempt,
-          });
-        }
-      }
-
-      throw new ValidationError('Scan processing failed after retries.', {
-        eventId: input.eventId,
-        playerId: input.request.playerId,
-      });
+      const result = await runWithSerializationRetry(
+        () =>
+          prisma.$transaction((tx) => processScanInTransaction(tx, input, qrPayload, new Date())),
+        { service: 'scanService' }
+      );
+      incrementCounter('scan.outcome.total', { outcome: result.outcome });
+      return result;
     }
   );
 }
