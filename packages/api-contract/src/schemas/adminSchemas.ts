@@ -284,3 +284,11 @@ export const createAdminPlayerSchema = z.object({
 export const sendPlayerWelcomeSchema = z.object({
   reason: z.string().trim().min(2).optional(),
 });
+
+/**
+ * Validates the admin self-description update request body.
+ * Admin can set any non-empty description (moderation is bypassed for admin edits).
+ */
+export const adminUpdateSelfDescriptionSchema = z.object({
+  description: z.string().trim().min(1).max(500),
+});

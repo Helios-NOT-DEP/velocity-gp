@@ -1,4 +1,7 @@
 import type {
+  AdminTriggerLogoResponse,
+  AdminUpdateSelfDescriptionRequest,
+  AdminUpdateSelfDescriptionResponse,
   DeleteAdminTeamResponse,
   CreateAdminPlayerRequest,
   CreateAdminPlayerResponse,
@@ -367,6 +370,42 @@ export async function listAdminPlayerScanHistory(
 
   if (!response.ok) {
     throw new Error(`Unable to load player scan history (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function triggerAdminTeamLogo(
+  eventId: string,
+  teamId: string
+): Promise<AdminTriggerLogoResponse> {
+  const response = await apiClient.request<AdminTriggerLogoResponse>(
+    adminEndpoints.triggerTeamLogo(eventId, teamId),
+    { method: 'POST', body: {} }
+  );
+
+  if (!response.ok) {
+    const message =
+      (response.error as { message?: string } | undefined)?.message ??
+      `Unable to trigger logo generation (${response.status}).`;
+    throw new Error(message);
+  }
+
+  return response.data;
+}
+
+export async function updateAdminPlayerSelfDescription(
+  eventId: string,
+  playerId: string,
+  request: AdminUpdateSelfDescriptionRequest
+): Promise<AdminUpdateSelfDescriptionResponse> {
+  const response = await apiClient.request<AdminUpdateSelfDescriptionResponse>(
+    adminEndpoints.updatePlayerSelfDescription(eventId, playerId),
+    { method: 'PATCH', body: request }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to update self-description (${response.status}).`);
   }
 
   return response.data;

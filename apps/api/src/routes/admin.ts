@@ -36,7 +36,10 @@ import {
   updateRaceControlSchema,
   createAdminPlayerSchema,
   sendPlayerWelcomeSchema,
+  adminUpdateSelfDescriptionSchema,
 } from '@velocity-gp/api-contract/schemas';
+import { adminTriggerLogoGeneration } from '../services/garageService.js';
+import { adminUpdatePlayerSelfDescription } from '../services/rosterService.js';
 import {
   createHazardMultiplierRule,
   deleteHazardMultiplierRule,
@@ -705,6 +708,47 @@ adminRouter.get(
       successResponse(await listAdminAudits(eventId, { cursor, limit }), {
         requestId: response.locals.requestId,
       })
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/teams/:teamId/generate-logo',
+  validate(adminEventTeamParamsSchema, 'params'),
+  asyncHandler(async (_request, response) => {
+    const teamId = String(_request.params.teamId);
+
+    await adminTriggerLogoGeneration(teamId);
+
+    response.json(
+      successResponse(
+        {
+          teamId,
+          logoStatus: 'GENERATING' as const,
+          message: 'Logo generation has been enqueued.',
+        },
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.patch(
+  '/admin/events/:eventId/players/:playerId/self-description',
+  validate(adminEventRosterPlayerParamsSchema, 'params'),
+  validate(adminUpdateSelfDescriptionSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const playerId = String(request.params.playerId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await adminUpdatePlayerSelfDescription(eventId, playerId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
+        { requestId: response.locals.requestId }
+      )
     );
   })
 );

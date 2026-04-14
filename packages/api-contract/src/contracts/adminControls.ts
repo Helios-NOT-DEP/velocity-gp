@@ -40,7 +40,8 @@ export type AdminActionType =
   | 'TEAM_SCORE_UPDATED'
   | 'TEAM_SOFT_DELETED'
   | 'PLAYER_CONTACT_UPDATED'
-  | 'PLAYER_REVIEW_FLAG_RESOLVED';
+  | 'PLAYER_REVIEW_FLAG_RESOLVED'
+  | 'PLAYER_SELF_DESCRIPTION_UPDATED';
 
 /**
  * Request payload for modifying the global status of an event.

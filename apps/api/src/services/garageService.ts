@@ -46,6 +46,67 @@ import { AppError, ForbiddenError, NotFoundError } from '../utils/appError.js';
 import { generateTeamLogo } from './n8nService.js';
 import { moderateText } from './moderationService.js';
 
+// ── Public: admin-triggered logo regeneration ────────────────────────────────
+
+/**
+ * Admin-facing logo regeneration.  Collects all APPROVED descriptions for the
+ * team (regardless of quota) and fires logo generation immediately.
+ *
+ * Unlike maybeEnqueueLogoGeneration() this does NOT check the quota — the admin
+ * is explicitly requesting a regeneration with whatever descriptions exist.
+ * If no APPROVED descriptions exist the call throws so the UI can surface a
+ * clear message.
+ *
+ * The generation runs in the background (fire-and-forget) to keep the HTTP
+ * response fast.  The UI can poll /garage/status or the admin team-detail
+ * endpoint to observe logoStatus: GENERATING → READY.
+ */
+export async function adminTriggerLogoGeneration(teamId: string): Promise<void> {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { id: true, name: true, logoStatus: true },
+  });
+
+  if (!team) {
+    throw new AppError(404, 'TEAM_NOT_FOUND', `Team ${teamId} does not exist`);
+  }
+
+  const approvedCount = await prisma.garageSubmission.count({
+    where: { teamId, status: 'APPROVED' },
+  });
+
+  if (approvedCount === 0) {
+    throw new AppError(
+      409,
+      'NO_APPROVED_DESCRIPTIONS',
+      'No approved descriptions exist for this team. At least one player must submit before a logo can be generated.'
+    );
+  }
+
+  // Atomic claim — skip if already generating
+  const { count: claimed } = await prisma.team.updateMany({
+    where: {
+      id: teamId,
+      logoStatus: { notIn: ['GENERATING'] },
+    },
+    data: { logoStatus: 'GENERATING' },
+  });
+
+  if (claimed === 0) {
+    throw new AppError(
+      409,
+      'LOGO_ALREADY_GENERATING',
+      'Logo generation is already in progress for this team.'
+    );
+  }
+
+  logger.info('[garageService] Admin triggered logo regeneration', { teamId });
+
+  setTimeout(() => {
+    void triggerLogoGeneration(teamId, team.name);
+  }, 0);
+}
+
 // ── Public: submit a description ─────────────────────────────────────────────
 
 /**
@@ -168,7 +229,7 @@ export async function getTeamGarageStatus(
  *   flips the status will proceed; the other finds count===0 and exits quietly.
  */
 async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
-  // Fetch team and count APPROVED submissions in one round-trip
+  // Fetch team, its actual player count, and count APPROVED submissions in one round-trip
   const [team, approvedCount] = await Promise.all([
     prisma.team.findUnique({
       where: { id: teamId },
@@ -177,6 +238,7 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
         name: true,
         requiredPlayerCount: true,
         logoStatus: true,
+        _count: { select: { players: true } },
       },
     }),
     prisma.garageSubmission.count({
@@ -188,25 +250,27 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
     throw new AppError(404, 'TEAM_NOT_FOUND', `Team ${teamId} does not exist`);
   }
 
-  // Env override wins over per-team DB value — useful in dev (set to 1) so any
-  // single-player submission triggers logo generation without needing teammates.
-  const requiredCount = env.GARAGE_REQUIRED_PLAYER_COUNT ?? team.requiredPlayerCount;
+  // Logo generates when every player on the team has an APPROVED submission.
+  // The env override is kept as a dev shortcut (e.g. GARAGE_REQUIRED_PLAYER_COUNT=1
+  // lets a solo submission trigger generation without needing a full team).
+  const totalPlayers = team._count.players;
+  const requiredCount = env.GARAGE_REQUIRED_PLAYER_COUNT ?? totalPlayers;
 
   logger.debug('[garageService] maybeEnqueueLogoGeneration — quota check', {
     teamId,
     approvedCount,
+    totalPlayers,
     required: requiredCount,
-    dbRequired: team.requiredPlayerCount,
     logoStatus: team.logoStatus,
   });
 
-  // Has the quota been reached?
+  // Has every player submitted?
   if (approvedCount < requiredCount) {
     return; // Still waiting for more teammates
   }
 
-  // If more members have submitted than originally required (a late joiner), we
-  // allow re-generation even from the READY state so their description is included.
+  // Allow re-generation if a late joiner's description wasn't yet included in
+  // the current READY logo (approvedCount now exceeds the required threshold).
   const isLateJoiner = approvedCount > requiredCount && team.logoStatus === 'READY';
   const eligibleStatuses = isLateJoiner
     ? (['PENDING', 'FAILED', 'READY'] as const)

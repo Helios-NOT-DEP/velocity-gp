@@ -1,6 +1,9 @@
 import type {
   AdminPlayerScanHistoryItem,
   AdminRosterRow,
+  AdminTeamDetailMember,
+  AdminUpdateSelfDescriptionRequest,
+  AdminUpdateSelfDescriptionResponse,
   CreateAdminPlayerRequest,
   CreateAdminPlayerResponse,
   DeleteAdminTeamResponse,
@@ -37,6 +40,7 @@ import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.j
 import { getEmailDispatcher } from './emailDispatchService.js';
 import { normalizeWorkEmail } from '../utils/normalizeEmail.js';
 import { logger } from '../lib/logger.js';
+import { adminTriggerLogoGeneration } from './garageService.js';
 
 /**
  * Admin roster service for listing, assignment updates, and CSV-style import
@@ -1085,6 +1089,8 @@ export async function getAdminTeamDetail(
           score: true,
           status: true,
           pitStopExpiresAt: true,
+          logoStatus: true,
+          logoUrl: true,
           players: {
             orderBy: [
               {
@@ -1109,6 +1115,15 @@ export async function getAdminTeamDetail(
                   displayName: true,
                   email: true,
                 },
+              },
+              // Include this player's garage submission so admin can see/edit their description
+              garageSubmissions: {
+                where: { teamId },
+                select: {
+                  description: true,
+                  status: true,
+                },
+                take: 1,
               },
             },
           },
@@ -1140,15 +1155,20 @@ export async function getAdminTeamDetail(
       throw new ValidationError('Team does not exist for this event.', { eventId, teamId });
     }
 
-    const members = team.players.map((member, index) => ({
-      playerId: member.id,
-      userId: member.userId,
-      displayName: member.user.displayName,
-      workEmail: member.user.email,
-      individualScore: member.individualScore,
-      joinedAt: member.joinedAt.toISOString(),
-      rank: index + 1,
-    }));
+    const members = team.players.map((member, index) => {
+      const submission = member.garageSubmissions[0] ?? null;
+      return {
+        playerId: member.id,
+        userId: member.userId,
+        displayName: member.user.displayName,
+        workEmail: member.user.email,
+        individualScore: member.individualScore,
+        joinedAt: member.joinedAt.toISOString(),
+        rank: index + 1,
+        selfDescription: submission?.description ?? null,
+        submissionStatus: (submission?.status ?? null) as AdminTeamDetailMember['submissionStatus'],
+      };
+    });
 
     return {
       eventId: team.eventId,
@@ -1161,6 +1181,8 @@ export async function getAdminTeamDetail(
       keywords: [],
       memberCount: members.length,
       members,
+      logoStatus: team.logoStatus as GetAdminTeamDetailResponse['logoStatus'],
+      logoUrl: team.logoUrl,
     };
   });
 }
@@ -1963,6 +1985,104 @@ export async function listAdminPlayerScanHistory(
     return {
       items: sliced.map((row) => mapScanHistoryRow(row)),
       nextCursor: hasMore ? (sliced[sliced.length - 1]?.id ?? null) : null,
+    };
+  });
+}
+
+/**
+ * Admin-only: upsert a player's self-description directly, bypassing moderation.
+ *
+ * After the upsert, checks whether all players on the team now have APPROVED
+ * descriptions. If so, enqueues logo generation in the background.
+ *
+ * Throws if the player does not exist or is not assigned to a team.
+ */
+export async function adminUpdatePlayerSelfDescription(
+  eventId: string,
+  playerId: string,
+  request: AdminUpdateSelfDescriptionRequest,
+  context: AdminActionContext = {}
+): Promise<AdminUpdateSelfDescriptionResponse> {
+  return withTraceSpan('admin.player.selfDescription.update', { eventId, playerId }, async () => {
+    // Validate player exists in this event and has a team assignment
+    const player = await prisma.player.findFirst({
+      where: { id: playerId, eventId },
+      select: {
+        id: true,
+        eventId: true,
+        teamId: true,
+        userId: true,
+      },
+    });
+
+    if (!player) {
+      throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
+    }
+
+    if (!player.teamId) {
+      throw new ValidationError('Player is not assigned to a team.', { eventId, playerId });
+    }
+
+    const teamId = player.teamId;
+    const actorUserId = await resolveActorUserId(prisma, context.actorUserId);
+
+    logger.info('[rosterService] Admin updating player self-description', {
+      eventId,
+      playerId,
+      teamId,
+      actorUserId,
+    });
+
+    // Upsert — admin submissions are APPROVED directly (no moderation)
+    await prisma.garageSubmission.upsert({
+      where: { playerId_teamId: { playerId, teamId } },
+      create: {
+        playerId,
+        teamId,
+        eventId,
+        description: request.description,
+        status: 'APPROVED',
+        moderatedAt: new Date(),
+      },
+      update: {
+        description: request.description,
+        status: 'APPROVED',
+        moderatedAt: new Date(),
+      },
+    });
+
+    // Record audit entry for the description change
+    await prisma.adminActionAudit.create({
+      data: {
+        eventId,
+        actorUserId,
+        actionType: 'PLAYER_SELF_DESCRIPTION_UPDATED',
+        targetType: 'PLAYER',
+        targetId: playerId,
+        details: {
+          teamId,
+          descriptionLength: request.description.length,
+        },
+      },
+    });
+
+    // Check if all players on the team now have APPROVED descriptions.
+    // If so, enqueue logo generation (fire-and-forget, same pattern as garageService).
+    let logoRegenerationEnqueued = false;
+    try {
+      await adminTriggerLogoGeneration(teamId);
+      logoRegenerationEnqueued = true;
+    } catch {
+      // Not all descriptions are present yet, or generation is already running —
+      // this is expected and non-fatal from the admin update perspective.
+    }
+
+    return {
+      eventId,
+      teamId,
+      playerId,
+      description: request.description,
+      logoRegenerationEnqueued,
     };
   });
 }
