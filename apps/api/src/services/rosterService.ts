@@ -37,9 +37,11 @@ import { prisma } from '../db/client.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
 import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.js';
+import { env } from '../config/env.js';
 import { getEmailDispatcher } from './emailDispatchService.js';
 import { normalizeWorkEmail } from '../utils/normalizeEmail.js';
 import { logger } from '../lib/logger.js';
+import { createMagicLinkToken } from './authTokens.js';
 import { adminTriggerLogoGeneration } from './garageService.js';
 
 /**
@@ -1765,6 +1767,11 @@ export async function sendAdminPlayerWelcome(
             displayName: true,
           },
         },
+        event: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
 
@@ -1775,14 +1782,24 @@ export async function sendAdminPlayerWelcome(
     let deliveryStatus: 'dispatched' | 'dispatch_failed' = 'dispatched';
 
     try {
+      const magicLinkToken = createMagicLinkToken({
+        userId: player.userId,
+        playerId: player.id,
+        eventId: player.eventId,
+        email: player.user.email,
+      });
+      const magicLinkUrl = new URL('/login/callback', env.FRONTEND_MAGIC_LINK_ORIGIN);
+      magicLinkUrl.searchParams.set('token', magicLinkToken);
+
       await getEmailDispatcher().dispatch({
-        templateKey: 'welcome_onboarding',
+        templateKey: 'magic_link_login',
         toEmail: player.user.email,
         variables: {
-          displayName: player.user.displayName,
-          eventName: 'Velocity GP',
+          magicLinkUrl: magicLinkUrl.toString(),
+          eventName: player.event.name,
+          expiresInMinutes: env.MAGIC_LINK_TOKEN_TTL_MINUTES,
         },
-        correlationId: `welcome:${eventId}:${player.id}`,
+        correlationId: `magic-link:${eventId}:${player.id}`,
       });
     } catch (error) {
       deliveryStatus = 'dispatch_failed';
@@ -1807,8 +1824,8 @@ export async function sendAdminPlayerWelcome(
           targetType: 'PLAYER',
           targetId: player.id,
           details: {
-            source: 'manual_welcome_send',
-            templateKey: 'welcome_onboarding',
+            source: 'admin_magic_link_send',
+            templateKey: 'magic_link_login',
             deliveryStatus,
             reason: request.reason,
           },

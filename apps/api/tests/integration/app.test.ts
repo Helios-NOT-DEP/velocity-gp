@@ -2799,7 +2799,7 @@ describe('velocity gp backend', () => {
   // Admin: send player welcome email
   // ---------------------------------------------------------------------------
 
-  it('dispatches a welcome email and records an EMAIL_RETURN_FLAGGED audit', async () => {
+  it('dispatches a magic link email and records an EMAIL_RETURN_FLAGGED audit', async () => {
     const capturedDispatches: Array<{ templateKey: string; toEmail: string }> = [];
 
     setEmailDispatcherForTests({
@@ -2823,7 +2823,7 @@ describe('velocity gp backend', () => {
     expect(response.body.data.auditId).toBeTruthy();
 
     expect(capturedDispatches).toHaveLength(1);
-    expect(capturedDispatches[0].templateKey).toBe('welcome_onboarding');
+    expect(capturedDispatches[0].templateKey).toBe('magic_link_login');
 
     const audit = await prisma.adminActionAudit.findFirst({
       where: {
@@ -2832,7 +2832,7 @@ describe('velocity gp backend', () => {
         actionType: 'EMAIL_RETURN_FLAGGED',
         details: {
           path: ['source'],
-          equals: 'manual_welcome_send',
+          equals: 'admin_magic_link_send',
         },
       },
       orderBy: {

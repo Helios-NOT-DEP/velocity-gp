@@ -332,7 +332,7 @@ describe('AdminPlayers roster workflows', () => {
     });
   });
 
-  it('sends welcome letter from roster row action', async () => {
+  it('sends magic link from roster row action', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     window.fetch = fetchMock as typeof window.fetch;
@@ -424,10 +424,10 @@ describe('AdminPlayers roster workflows', () => {
       expect(screen.getByText('Player One')).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send Welcome' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Magic Link' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Welcome letter sent to Player One.')).toBeTruthy();
+      expect(screen.getByText('Magic link sent to Player One.')).toBeTruthy();
     });
 
     const welcomeRequest = fetchMock.mock.calls.find(([url]) =>

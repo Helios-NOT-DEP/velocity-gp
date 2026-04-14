@@ -374,12 +374,12 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
       const result = await sendAdminRosterPlayerWelcome(eventId, playerId);
       setWelcomeMessage(
         result.deliveryStatus === 'dispatched'
-          ? `Welcome letter sent to ${displayName}.`
-          : `Welcome dispatch failed for ${displayName}.`
+          ? `Magic link sent to ${displayName}.`
+          : `Magic link dispatch failed for ${displayName}.`
       );
       await refreshAuditSummary(eventId);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Unable to send welcome letter.');
+      setLoadError(error instanceof Error ? error.message : 'Unable to send magic link.');
     } finally {
       setSendingWelcomePlayerId(null);
     }
@@ -670,7 +670,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                         className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-200 disabled:opacity-50"
                       >
                         <Mail className="h-3.5 w-3.5" />
-                        {sendingWelcomePlayerId === row.playerId ? 'Sending…' : 'Send Welcome'}
+                        {sendingWelcomePlayerId === row.playerId ? 'Sending…' : 'Send Magic Link'}
                       </button>
                     </div>
                   </div>
@@ -835,11 +835,11 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
       const result = await sendAdminRosterPlayerWelcome(eventId, playerId);
       setWelcomeMessage(
         result.deliveryStatus === 'dispatched'
-          ? `Welcome letter sent to ${detail.displayName}.`
-          : `Welcome dispatch failed for ${detail.displayName}.`
+          ? `Magic link sent to ${detail.displayName}.`
+          : `Magic link dispatch failed for ${detail.displayName}.`
       );
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : 'Unable to send welcome letter.');
+      setError(sendError instanceof Error ? sendError.message : 'Unable to send magic link.');
     } finally {
       setIsSendingWelcome(false);
     }
@@ -936,7 +936,7 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
                 className="inline-flex w-full items-center justify-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 disabled:opacity-50 sm:w-auto"
               >
                 <Mail className="h-4 w-4" />
-                {isSendingWelcome ? 'Sending…' : 'Send Welcome Letter'}
+                {isSendingWelcome ? 'Sending…' : 'Send Magic Link'}
               </button>
             </div>
           </article>
