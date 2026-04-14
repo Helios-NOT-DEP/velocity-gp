@@ -159,9 +159,6 @@ const envSchema = z.object({
   // Override the number of approved descriptions required before logo generation fires.
   // Defaults to 2 (real team size). Set to 1 in dev to trigger generation from a single submission.
   GARAGE_REQUIRED_PLAYER_COUNT: z.coerce.number().int().min(1).default(2),
-  // Used by moderationService to call the OpenAI Moderations endpoint.
-  // Optional — when absent the service falls back to a keyword blocklist (dev only).
-  OPENAI_API_KEY: z.string().optional(),
   // When `true`, skip calling the OpenAI Moderations API and fall back to
   // the local keyword blocklist. Defaults to `false`.
   SKIP_OPENAI_MODERATION: booleanTrueOnlyIfExplicit.default(false),

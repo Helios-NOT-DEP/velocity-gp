@@ -42,6 +42,7 @@ type GarageUIState =
   | { screen: 'REJECTED'; policyMessage: string } // moderation blocked
   | { screen: 'WAITING'; teamStatus: TeamGarageStatus } // submitted; others pending
   | { screen: 'GENERATING'; teamStatus: TeamGarageStatus } // quota met; n8n in-flight
+  | { screen: 'LOGO_FAILED'; teamStatus: TeamGarageStatus } // logo generation failed; retry available
   | { screen: 'LOGO_REVEAL'; teamStatus: TeamGarageStatus } // logo ready
   | { screen: 'ERROR'; message: string }; // network / 5xx failure
 
@@ -95,11 +96,12 @@ export default function Garage() {
     };
   }, [teamId, playerId, isReady]);
 
-  // ── Polling: WAITING, GENERATING, and LOGO_REVEAL screens ──────────────────────
+  // ── Polling: WAITING, GENERATING, LOGO_FAILED, and LOGO_REVEAL screens ────────────────────
   useEffect(() => {
     const shouldPoll =
       uiState.screen === 'WAITING' ||
       uiState.screen === 'GENERATING' ||
+      uiState.screen === 'LOGO_FAILED' ||
       // Keep polling on LOGO_REVEAL so existing members see the updated logo if a
       // late-joining teammate triggers a re-generation (READY → GENERATING → READY).
       uiState.screen === 'LOGO_REVEAL';
@@ -123,11 +125,15 @@ export default function Garage() {
         // re-renders when the status hasn't moved)
         setUiState((prev) => {
           if (prev.screen === next.screen) {
-            // Still on LOGO_REVEAL but logo was regenerated — update the URL in-place
+            // Screen hasn't changed, but check if teamStatus changed
+            // (e.g., approvedCount, requiredCount, logoStatus, logoUrl)
             if (
-              prev.screen === 'LOGO_REVEAL' &&
-              next.screen === 'LOGO_REVEAL' &&
-              prev.teamStatus.logoUrl !== next.teamStatus.logoUrl
+              'teamStatus' in prev &&
+              'teamStatus' in next &&
+              (prev.teamStatus.approvedCount !== next.teamStatus.approvedCount ||
+                prev.teamStatus.requiredCount !== next.teamStatus.requiredCount ||
+                prev.teamStatus.logoStatus !== next.teamStatus.logoStatus ||
+                prev.teamStatus.logoUrl !== next.teamStatus.logoUrl)
             ) {
               return next;
             }
@@ -204,9 +210,10 @@ export default function Garage() {
           </CenteredMessage>
         )}
 
-        {/* ── INPUT / REJECTED - description form ── */}
+        {/* ── INPUT / REJECTED / LOGO_FAILED - description form ── */}
         {(uiState.screen === 'INPUT' ||
           uiState.screen === 'REJECTED' ||
+          uiState.screen === 'LOGO_FAILED' ||
           uiState.screen === 'ERROR') && (
           <>
             {/* Header */}
@@ -227,6 +234,21 @@ export default function Garage() {
                 </div>
               )}
 
+              {/* Logo generation failure banner */}
+              {uiState.screen === 'LOGO_FAILED' && (
+                <div className="bg-orange-900/20 border border-orange-500/40 rounded-xl p-4 mb-6 flex items-start gap-3">
+                  <ShieldAlert className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-orange-300 font-semibold mb-1">
+                      Logo generation failed
+                    </p>
+                    <p className="text-sm text-orange-400">
+                      We couldn't create your team logo. Please try resubmitting your description.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Generic error banner */}
               {uiState.screen === 'ERROR' && (
                 <div className="bg-orange-900/20 border border-orange-500/40 rounded-xl p-4 mb-6">
@@ -238,15 +260,18 @@ export default function Garage() {
               <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-xl p-4 mb-8 flex items-start gap-3">
                 <Info className="w-5 h-5 text-[#00D4FF] flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-[#00D4FF] font-['DM_Sans']">
-                  Your description will be combined with your teammates' to generate a unique team
-                  logo using AI.
+                  {uiState.screen === 'LOGO_FAILED'
+                    ? 'Your team logo generation ran into an issue. Resubmitting your description may help resolve it.'
+                    : "Your description will be combined with your teammates' to generate a unique team logo using AI."}
                 </p>
               </div>
 
               {/* Textarea */}
               <div className="mb-8">
                 <label className="block text-white font-['Space_Grotesk'] text-xl mb-3">
-                  Describe yourself in a few words
+                  {uiState.screen === 'LOGO_FAILED'
+                    ? 'Retry your description'
+                    : 'Describe yourself in a few words'}
                 </label>
                 <p className="text-gray-400 text-sm mb-4 font-['DM_Sans']">
                   Tell us what makes you unique — your style, values, or personality.
@@ -298,7 +323,7 @@ export default function Garage() {
                 }}
               >
                 <Sparkles className="w-6 h-6" />
-                Submit Description
+                {uiState.screen === 'LOGO_FAILED' ? 'Retry Generation' : 'Submit Description'}
               </button>
             </div>
 
@@ -458,16 +483,16 @@ function deriveScreenFromStatus(status: TeamGarageStatus): GarageUIState {
     return { screen: 'LOGO_REVEAL', teamStatus: status };
   }
 
-  // n8n is in-flight — show the generating animation
+  // n8n is in-flight — show the generating animation (only if actually generating)
   if (status.logoStatus === 'GENERATING') {
     return { screen: 'GENERATING', teamStatus: status };
   }
 
-  // Generation failed — if this player is approved and quota is met, show
-  // GENERATING so the polling loop keeps running and picks up the retry.
-  // The API marks FAILED and the next resubmit flips it back to GENERATING.
+  // Generation failed — show dedicated FAILED UI with retry CTA.
+  // Player can resubmit to trigger retry; no perpetual waiting required.
+  // This appears whenever quota is met and generation failed, regardless of other players.
   if (status.logoStatus === 'FAILED' && status.approvedCount >= status.requiredCount) {
-    return { screen: 'GENERATING', teamStatus: status };
+    return { screen: 'LOGO_FAILED', teamStatus: status };
   }
 
   // This player hasn't submitted yet (or was rejected and needs to retry)
@@ -475,7 +500,7 @@ function deriveScreenFromStatus(status: TeamGarageStatus): GarageUIState {
     return { screen: 'INPUT' };
   }
 
-  // Player has an approved submission; waiting for others
+  // Player has an approved submission; waiting for others or for generation to finish
   return { screen: 'WAITING', teamStatus: status };
 }
 

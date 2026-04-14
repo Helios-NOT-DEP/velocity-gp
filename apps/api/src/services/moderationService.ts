@@ -6,17 +6,16 @@
  *
  * HOW IT WORKS
  * ─────────────
- * 1. In production/development (when OPENAI_API_KEY is set):
- *    Calls the OpenAI Moderations endpoint (/v1/moderations).
- *    This is a free API call that runs in ~300 ms and classifies text across
- *    several harm categories (hate, violence, sexual, self-harm, etc.).
- *    Any flagged category causes the submission to be REJECTED with a clear
+ * 1. By default the service calls an n8n webhook at the `/moderation` path.
+ *    The webhook is expected to respond with JSON of the shape
+ *    `{ "flagged": "false" }` (safe) or `{ "flagged": "true" }` (blocked).
+ *    Any flagged response causes the submission to be REJECTED with a clear
  *    policy message.
  *
- * 2. When OPENAI_API_KEY is absent (local dev / CI without credentials):
- *    Falls through to a simple keyword blocklist so the flow can still be
- *    exercised end-to-end without a real API key.
- *    Swap this section for a proper mock or test double in unit tests.
+ * 2. When external moderation is disabled via config the implementation
+ *    falls back to a simple keyword blocklist so the flow can still be
+ *    exercised end-to-end without a real provider. Swap this section for a
+ *    proper mock or test double in unit tests.
  *
  * ADDING A NEW PROVIDER
  * ──────────────────────
@@ -26,7 +25,7 @@
 
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
-
+import { callN8nWebhook } from '../lib/n8nWebhookClient.js';
 // ── Public types ─────────────────────────────────────────────────────────────
 
 export interface ModerationResult {
@@ -41,13 +40,10 @@ export interface ModerationResult {
   policyMessage?: string;
 }
 
-// ── OpenAI moderation response shape (subset we need) ───────────────────────
+// ── n8n moderation response shape (very small subset we need) ─────────────
 
-interface OpenAIModerationResponse {
-  results: Array<{
-    flagged: boolean;
-    categories: Record<string, boolean>;
-  }>;
+interface N8nModerationResponse {
+  flagged: boolean | string | number;
 }
 
 // ── Main export ──────────────────────────────────────────────────────────────
@@ -66,64 +62,68 @@ export async function moderateText(text: string): Promise<ModerationResult> {
   // blocklist so developers/operators can still exercise the flow.
   if (env.SKIP_OPENAI_MODERATION) {
     logger.warn(
-      '[moderationService] OpenAI moderation disabled via config — using keyword fallback'
+      '[moderationService] External moderation disabled via config — using keyword fallback'
     );
     return keywordFallback(text);
   }
 
-  // ── Path 1: OpenAI Moderations API ────────────────────────────────────────
-  if (env.OPENAI_API_KEY) {
-    return callOpenAIModeration(text);
-  }
-
-  // ── Path 2: Keyword fallback (local dev only) ──────────────────────────────
-  logger.warn('[moderationService] OPENAI_API_KEY not set — using keyword fallback');
-  return keywordFallback(text);
+  // Call the n8n moderation webhook. Any infrastructure failure should
+  // surface as an exception so callers return a 5xx instead of silently
+  // approving content.
+  return callN8nModeration(text);
 }
 
-// ── OpenAI implementation ────────────────────────────────────────────────────
+// ── n8n moderation implementation ───────────────────────────────────────────
 
-async function callOpenAIModeration(text: string): Promise<ModerationResult> {
-  logger.debug('[moderationService] Calling OpenAI /v1/moderations');
+async function callN8nModeration(text: string): Promise<ModerationResult> {
+  logger.debug('[moderationService] Calling n8n /moderation webhook');
 
-  const response = await fetch('https://api.openai.com/v1/moderations', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Authorization header is sent only — never logged
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({ input: text }),
+  const { data } = await callN8nWebhook({
+    path: '/moderation',
+    payload: { input: text },
+    velocityEvent: 'MODERATION',
   });
 
-  if (!response.ok) {
-    // Infrastructure error — throw so the route returns 500, not a silent pass
+  if (!data || typeof data !== 'object') {
     throw new Error(
-      `[moderationService] OpenAI API error: ${response.status} ${response.statusText}`
+      '[moderationService] Unexpected empty or non-object response from n8n moderation'
     );
   }
 
-  const data = (await response.json()) as OpenAIModerationResponse;
-  const result = data.results[0];
-
-  if (!result) {
-    throw new Error('[moderationService] Unexpected empty results from OpenAI Moderations API');
+  if (!Object.prototype.hasOwnProperty.call(data, 'flagged')) {
+    throw new Error(
+      "[moderationService] Malformed n8n moderation response: missing 'flagged' field"
+    );
   }
 
-  if (!result.flagged) {
-    // Clean text
+  const resp = data as unknown as N8nModerationResponse;
+  const rawFlagged = resp.flagged;
+
+  if (
+    typeof rawFlagged !== 'boolean' &&
+    typeof rawFlagged !== 'string' &&
+    typeof rawFlagged !== 'number'
+  ) {
+    throw new Error(
+      "[moderationService] Malformed n8n moderation response: 'flagged' must be boolean|string|number"
+    );
+  }
+
+  // Normalize: treat boolean true, the string 'true' (case-insensitive), or numeric 1 as flagged
+  const flagged =
+    rawFlagged === true ||
+    String(rawFlagged).toLowerCase() === 'true' ||
+    String(rawFlagged) === '1';
+
+  if (!flagged) {
     return { safe: true };
   }
 
-  // Find the first category that fired so we can log it internally
-  const flaggedCategory =
-    Object.entries(result.categories).find(([, flagged]) => flagged)?.[0] ?? 'unknown';
-
-  logger.info('[moderationService] Description flagged by OpenAI moderation', { flaggedCategory });
+  logger.info('[moderationService] Description flagged by n8n moderation', { rawFlagged });
 
   return {
     safe: false,
-    flaggedCategory,
+    flaggedCategory: 'n8n-moderation',
     policyMessage:
       'Your description contains content that violates our community guidelines. ' +
       'Please revise it and try again.',
