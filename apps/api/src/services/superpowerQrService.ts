@@ -9,14 +9,9 @@ import { Prisma } from '../../prisma/generated/client.js';
 
 import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
-import { createHs512Jwt } from '../lib/n8nAuth.js';
+import { callN8nWebhook } from '../lib/n8nWebhookClient.js';
 import { logger } from '../lib/logger.js';
-import {
-  DependencyError,
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from '../utils/appError.js';
+import { DependencyError, ForbiddenError, NotFoundError } from '../utils/appError.js';
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -43,47 +38,6 @@ function isRetryableTransactionError(
   return isKnownPrismaError(error) && (error.code === 'P2002' || error.code === 'P2034');
 }
 
-function getN8nWebhookUrl(): string {
-  if (!env.N8N_HOST) {
-    throw new ValidationError('N8N_HOST must be configured for QR asset generation.');
-  }
-  const base = env.N8N_HOST.endsWith('/') ? env.N8N_HOST.slice(0, -1) : env.N8N_HOST;
-  const environmentSegment = env.NODE_ENV === 'production' ? 'prod' : 'dev';
-  const webhookPath = env.N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE.replace('{env}', environmentSegment);
-  return `${base}${webhookPath.startsWith('/') ? webhookPath : `/${webhookPath}`}`;
-}
-
-function getN8nWebhookToken(): string {
-  if (env.N8N_WEBHOOK_TOKEN) {
-    return env.N8N_WEBHOOK_TOKEN;
-  }
-  if (env.NODE_ENV === 'production') {
-    throw new ValidationError('N8N_WEBHOOK_TOKEN must be configured in production.');
-  }
-  logger.warn(
-    'N8N_WEBHOOK_TOKEN is not set — using hardcoded dev fallback. ' +
-      'Do not expose this environment to untrusted networks.'
-  );
-  return 'velocity-gp-dev-webhook-token';
-}
-
-/**
- * Builds a unique VG-prefixed payload string for identity-bound QR assets.
- */
-function buildSuperpowerPayload(): string {
-  const entropy = randomBytes(9)
-    .toString('base64url')
-    .replace(/[^A-Za-z0-9_-]/g, '')
-    .slice(0, 12);
-  return `VG-SP-${entropy}`;
-}
-
-function buildTrustedScanUrl(payload: string): string {
-  const origin = env.FRONTEND_MAGIC_LINK_ORIGIN;
-  const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-  return `${normalizedOrigin}/scan/${encodeURIComponent(payload)}`;
-}
-
 /**
  * Requests a QR code image from the n8n webhook pipeline.
  *
@@ -92,50 +46,28 @@ function buildTrustedScanUrl(payload: string): string {
  * @throws {DependencyError} If the webhook call fails or returns an invalid URL.
  */
 async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
-  const endpoint = getN8nWebhookUrl();
   const correlationId = randomUUID();
-  const token = getN8nWebhookToken();
-  const signedJwt = createHs512Jwt(token, correlationId);
-
-  const abortController = new globalThis.AbortController();
-  const timeout = setTimeout(() => abortController.abort(), env.N8N_WEBHOOK_TIMEOUT_MS);
 
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${signedJwt}`,
-        'x-velocity-event': 'SUPERPOWER_QR_GENERATE',
-        'x-correlation-id': correlationId,
-      },
-      body: JSON.stringify({ id: input.id, url: input.url }),
-      signal: abortController.signal,
-    });
+    const { data } = (await callN8nWebhook({
+      path: env.N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE,
+      expandEnvTemplate: true,
+      payload: { id: input.id, url: input.url },
+      velocityEvent: 'SUPERPOWER_QR_GENERATE',
+      correlationId,
+    })) as { data: QrGenerationResponse };
 
-    if (!response.ok) {
-      throw new DependencyError(
-        `Superpower QR asset generation failed with status ${response.status}.`,
-        {
-          status: response.status,
-        }
-      );
-    }
-
-    const payload = (await response.json()) as QrGenerationResponse;
-    if (typeof payload.qrImageURL !== 'string' || payload.qrImageURL.length === 0) {
+    if (typeof data.qrImageURL !== 'string' || data.qrImageURL.length === 0) {
       throw new DependencyError('Superpower QR generation response did not include qrImageURL.');
     }
 
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(payload.qrImageURL);
+      parsedUrl = new URL(data.qrImageURL);
     } catch {
       throw new DependencyError(
         'Superpower QR generation response provided a malformed qrImageURL.',
-        {
-          qrImageURL: payload.qrImageURL,
-        }
+        { qrImageURL: data.qrImageURL }
       );
     }
 
@@ -149,14 +81,28 @@ async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
     return parsedUrl.toString();
   } catch (error) {
     logger.error('Superpower QR asset generation failed', {
-      endpoint,
       correlationId,
       error: error instanceof Error ? error.message : 'unknown error',
     });
     throw error;
-  } finally {
-    globalThis.clearTimeout(timeout);
   }
+}
+
+/**
+ * Builds a unique VG-SP-prefixed payload string for identity-bound QR assets.
+ */
+function buildSuperpowerPayload(): string {
+  const entropy = randomBytes(9)
+    .toString('base64url')
+    .replace(/[^A-Za-z0-9_-]/g, '')
+    .slice(0, 12);
+  return `VG-SP-${entropy}`;
+}
+
+function buildTrustedScanUrl(payload: string): string {
+  const origin = env.FRONTEND_MAGIC_LINK_ORIGIN;
+  const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+  return `${normalizedOrigin}/scan/${encodeURIComponent(payload)}`;
 }
 
 function toAssetDto(asset: {

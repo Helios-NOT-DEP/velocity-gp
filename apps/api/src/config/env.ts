@@ -155,8 +155,7 @@ const envSchema = z.object({
   PIT_RELEASE_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   PIT_RELEASE_WEBHOOK_URL: optionalUrl,
   PIT_RELEASE_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(3_000),
-  N8N_IMAGE_API_URL: z.string().default('/logo/generate'),
-  N8N_IMAGE_API_KEY: optionalMinString(1),
+  N8N_IMAGE_API_URL: z.string().optional().default('/logo/generate'),
   // Override the number of approved descriptions required before logo generation fires.
   // Defaults to 2 (real team size). Set to 1 in dev to trigger generation from a single submission.
   GARAGE_REQUIRED_PLAYER_COUNT: z.coerce.number().int().min(1).default(2),

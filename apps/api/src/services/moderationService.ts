@@ -23,7 +23,6 @@
  * Implement the `ModerationResult` interface and swap the call inside
  * `moderateText`.  Nothing outside this file needs to change.
  */
-import fetch from 'node-fetch';
 
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
