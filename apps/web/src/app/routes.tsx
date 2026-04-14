@@ -69,6 +69,11 @@ export const appRoutes: RouteObject[] = [
     Component: DisplayBoard,
     errorElement: <RouteErrorPage />,
   },
+  // Leaderboard is public and shareable via link without authentication required.
+  {
+    path: '/leaderboard',
+    Component: Leaderboard,
+  },
   // Team setup remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
     path: '/team-setup',
@@ -112,7 +117,6 @@ export const appRoutes: RouteObject[] = [
           </HeliosRouteGuard>
         ),
       },
-      { path: 'leaderboard', Component: Leaderboard },
       { path: 'victory-lane', Component: VictoryLane },
     ],
   },

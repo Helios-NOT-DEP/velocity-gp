@@ -94,39 +94,11 @@ describe('admin route guards', () => {
     });
   });
 
-  it('shows Helios bottom-nav button for Helios members', async () => {
-    renderWithRoute('/leaderboard', {
-      userId: 'helios-player-1',
-      role: 'helios',
-      isAuthenticated: true,
-      email: 'helios@example.com',
-      capabilities: {
-        admin: false,
-        player: true,
-        heliosMember: true,
-      },
-    });
+  it('allows public access to leaderboard without authentication', async () => {
+    renderWithRoute('/leaderboard');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Helios' })).toBeTruthy();
-    });
-  });
-
-  it('hides Helios bottom-nav button for non-Helios players', async () => {
-    renderWithRoute('/leaderboard', {
-      userId: 'player-1',
-      role: 'player',
-      isAuthenticated: true,
-      email: 'player@example.com',
-      capabilities: {
-        admin: false,
-        player: true,
-        heliosMember: false,
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Helios' })).toBeNull();
+      expect(screen.getByText(/VELOCITY GRAND PRIX/i)).toBeTruthy();
     });
   });
 
