@@ -14,6 +14,7 @@ import AdminLayout from './layouts/AdminLayout';
 import AdminRouteGuard from './components/auth/AdminRouteGuard';
 import HeliosRouteGuard from './components/auth/HeliosRouteGuard';
 import ProtectedRouteGuard from './components/auth/ProtectedRouteGuard';
+import ScanRedirect from './pages/ScanRedirect';
 import AdminGameControl from './pages/admin/AdminGameControl';
 import AdminQrCodes from './pages/admin/AdminQrCodes';
 import AdminTeams from './pages/admin/AdminTeams';
@@ -65,6 +66,16 @@ export const appRoutes: RouteObject[] = [
     element: (
       <ProtectedRouteGuard>
         <Garage />
+      </ProtectedRouteGuard>
+    ),
+  },
+  // QR scan deep-link: opens when a player's phone camera scans a physical QR code URL.
+  // Resolves the payload, submits the scan, and redirects to the appropriate game screen.
+  {
+    path: '/scan/:payload',
+    element: (
+      <ProtectedRouteGuard>
+        <ScanRedirect />
       </ProtectedRouteGuard>
     ),
   },
