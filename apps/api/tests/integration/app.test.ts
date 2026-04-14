@@ -2102,7 +2102,7 @@ describe('velocity gp backend', () => {
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [calledUrl, calledInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      expect(calledUrl).toContain('/webhook/dev/QRCodeGen');
+      expect(calledUrl).toContain('/QRCodeGen');
       const generationBody = JSON.parse(String(calledInit.body)) as { id: string; url: string };
       expect(generationBody.id).toBe(response.body.data.qrCode.id);
       expect(generationBody.url).toContain('/scan/');
