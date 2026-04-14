@@ -4,6 +4,16 @@ import { errorResponse } from '@velocity-gp/api-contract/http';
 import { logger } from '../lib/logger.js';
 import { AppError } from '../utils/appError.js';
 
+// Codes that represent expected, non-actionable application states (missing
+// session, no active event, player not yet assigned, etc.).  These are logged
+// at debug rather than warn to reduce noise in production log streams.
+const EXPECTED_CODES = new Set([
+  'NOT_FOUND',
+  'PLAYER_NOT_ASSIGNED',
+  'AUTH_INVALID_SESSION',
+  'AUTH_MISSING_TOKEN',
+]);
+
 export function errorHandler(
   error: Error,
   request: Request,
@@ -25,6 +35,10 @@ export function errorHandler(
 
     if (error.statusCode >= 500) {
       logger.error('handled app error', appErrorLogContext);
+    } else if (EXPECTED_CODES.has(error.code)) {
+      // These are normal application states (no session, no active event, etc.)
+      // — log at debug to avoid noise in production warn streams.
+      logger.debug('handled app error', appErrorLogContext);
     } else {
       logger.warn('handled app error', appErrorLogContext);
     }

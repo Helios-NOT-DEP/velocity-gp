@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router';
 import { ArrowRight, Info, Loader2, ShieldAlert, Sparkles, Users } from 'lucide-react';
 
 import type { TeamGarageStatus } from '@/services/garage/garageService';
-import { garageService } from '@/services/garage/garageService';
+import { garageService, GarageServiceError } from '@/services/garage/garageService';
 import { usePlayerSession } from '@/hooks';
 
 // ── UI state machine ──────────────────────────────────────────────────────────
@@ -86,9 +86,14 @@ export default function Garage() {
 
         // Restore the correct screen based on what we find in the DB
         setUiState(deriveScreenFromStatus(status));
-      } catch {
+      } catch (err) {
         if (!cancelled) {
-          // If the initial load fails, fall through to the INPUT screen so the
+          if (err instanceof GarageServiceError && err.statusCode === 404) {
+            // Player no longer exists — stale session. Force re-authentication.
+            navigate('/', { replace: true });
+            return;
+          }
+          // For other errors, fall through to the INPUT screen so the
           // player can still try to submit (graceful degradation)
           setUiState({ screen: 'INPUT' });
         }
@@ -154,8 +159,16 @@ export default function Garage() {
           }
           return next;
         });
-      } catch {
-        // Swallow poll errors silently — a single failed poll shouldn't kick
+      } catch (err) {
+        if (err instanceof GarageServiceError && err.statusCode === 404) {
+          // Player no longer exists (stale session) — stop the poll loop and
+          // force re-authentication rather than spamming the server with 404s.
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          navigate('/', { replace: true });
+          return;
+        }
+        // Swallow other poll errors silently — a single failed poll shouldn't kick
         // the player out of the waiting state.  The interval will retry.
       }
     }, POLL_INTERVAL_MS);
