@@ -665,7 +665,7 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                       </button>
                       <button
                         type="button"
-                        disabled={sendingWelcomePlayerId === row.playerId}
+                        // disabled={sendingWelcomePlayerId === row.playerId}
                         onClick={() => void handleSendWelcome(row.playerId, row.displayName)}
                         className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-200 disabled:opacity-50"
                       >

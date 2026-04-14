@@ -31,11 +31,12 @@ import type {
 
 import type { Prisma } from '../../prisma/generated/client.js';
 import { prisma } from '../db/client.js';
-import { withTraceSpan } from '../lib/observability.js';
+import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
 import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.js';
 import { getEmailDispatcher } from './emailDispatchService.js';
 import { normalizeWorkEmail } from '../utils/normalizeEmail.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Admin roster service for listing, assignment updates, and CSV-style import
@@ -1570,34 +1571,61 @@ export async function createAdminPlayer(
         });
       }
 
-      const existingUser = await tx.user.findUnique({
+      const matchingUsers = await tx.user.findMany({
         where: {
-          email: normalizedWorkEmail,
+          email: {
+            equals: normalizedWorkEmail,
+            mode: 'insensitive',
+          },
         },
         select: {
           id: true,
         },
+        orderBy: {
+          id: 'asc',
+        },
+        take: 2,
       });
 
-      const user = await tx.user.upsert({
-        where: {
-          email: normalizedWorkEmail,
-        },
-        create: {
-          email: normalizedWorkEmail,
-          displayName: request.displayName,
-          role: 'PLAYER',
-          isHelios: false,
-        },
-        update: {
-          displayName: request.displayName,
-        },
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-        },
-      });
+      if (matchingUsers.length > 1) {
+        throw new ValidationError(
+          'Multiple users already exist for this email. Resolve duplicates before creating a player.',
+          {
+            eventId,
+            workEmail: normalizedWorkEmail,
+          }
+        );
+      }
+
+      const existingUser = matchingUsers[0] ?? null;
+
+      const user = existingUser
+        ? await tx.user.update({
+            where: {
+              id: existingUser.id,
+            },
+            data: {
+              displayName: request.displayName,
+            },
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          })
+        : await tx.user.create({
+            data: {
+              email: normalizedWorkEmail,
+              displayName: request.displayName,
+              role: 'PLAYER',
+              isHelios: false,
+            },
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          });
 
       const existingPlayer = await tx.player.findFirst({
         where: {
@@ -1725,8 +1753,16 @@ export async function sendAdminPlayerWelcome(
         },
         correlationId: `welcome:${eventId}:${player.id}`,
       });
-    } catch {
+    } catch (error) {
       deliveryStatus = 'dispatch_failed';
+      incrementCounter('admin.player.welcome.dispatch.failure.total');
+      logger.error('Admin welcome dispatch failed', {
+        eventId,
+        playerId: player.id,
+        userId: player.userId,
+        templateKey: 'welcome_onboarding',
+        errorMessage: error instanceof Error ? error.message : 'unknown error',
+      });
     }
 
     const audit = await prisma.$transaction(async (tx) => {

@@ -269,10 +269,10 @@ export const adminAuditListQuerySchema = z.object({
 
 /**
  * Validates the manual player creation endpoint payload.
- * Ensures workEmail uniqueness, displayName presence, and optional team assignment.
+ * Ensures valid workEmail format, displayName presence, and optional team assignment.
  */
 export const createAdminPlayerSchema = z.object({
-  workEmail: z.string().toLowerCase().email('Invalid email address').min(1),
+  workEmail: z.string().trim().toLowerCase().email('Invalid email address').min(1),
   displayName: z.string().trim().min(1).max(160),
   teamId: z.string().min(1).optional(),
 });
@@ -282,5 +282,5 @@ export const createAdminPlayerSchema = z.object({
  * Allows optional reason for audit trail.
  */
 export const sendPlayerWelcomeSchema = z.object({
-  reason: z.string().trim().optional(),
+  reason: z.string().trim().min(2).optional(),
 });

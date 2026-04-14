@@ -305,7 +305,7 @@ export interface CreateAdminPlayerRequest {
 }
 
 /**
- * Response payload after manually creating (or linking) a player in the roster.
+ * Response payload after manually creating a player in the roster.
  */
 export interface CreateAdminPlayerResponse {
   readonly eventId: string;
