@@ -215,9 +215,12 @@ async function loadActivePlayerContextByUserId(
 }
 
 async function loadAuthCandidateByEmail(workEmail: string): Promise<AuthCandidate | null> {
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: {
-      email: workEmail,
+      email: {
+        equals: workEmail,
+        mode: 'insensitive',
+      },
     },
     select: {
       id: true,

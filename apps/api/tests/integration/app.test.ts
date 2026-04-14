@@ -31,6 +31,7 @@ describe('velocity gp backend', () => {
     unassignedPlayerId: `player-unassigned-app-${token}`,
     unassignedUserId: `user-unassigned-app-${token}`,
     adminUserId: `user-admin-app-${token}`,
+    adminMixedCaseUserId: `user-admin-mixed-case-app-${token}`,
     qrCodeId: `qr-app-${token}`,
     qrPayload: `VG-APP-${token.toUpperCase()}`,
     heliosUserId: `user-helios-app-${token}`,
@@ -77,6 +78,15 @@ describe('velocity gp backend', () => {
           email: `admin-${token}@velocitygp.dev`,
           displayName: 'Admin Fixture',
           role: 'ADMIN',
+          isHelios: false,
+        },
+        {
+          id: fixtureIds.adminMixedCaseUserId,
+          email: `AdminMixed-${token}@velocitygp.dev`,
+          displayName: 'Admin Mixed Case Fixture',
+          role: 'ADMIN',
+          canAdmin: true,
+          canPlayer: false,
           isHelios: false,
         },
         {
@@ -667,6 +677,48 @@ describe('velocity gp backend', () => {
     expect(response.status).toBe(202);
     expect(response.body.success).toBe(true);
     expect(response.body.data.accepted).toBe(true);
+  });
+
+  it('accepts magic-link requests for admin users when stored email casing differs', async () => {
+    const mixedCaseAdminEmail = `adminmixed-${token}@velocitygp.dev`;
+    const capturedLinks: string[] = [];
+
+    setEmailDispatcherForTests({
+      dispatch: async (input) => {
+        if (input.templateKey === 'magic_link_login') {
+          capturedLinks.push(input.variables['magicLinkUrl'] as string);
+        }
+      },
+    });
+
+    const response = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/request`)
+      .send({ workEmail: mixedCaseAdminEmail });
+
+    expect(response.status).toBe(202);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.accepted).toBe(true);
+    expect(capturedLinks.length).toBe(1);
+  });
+
+  it('verifies magic links for admin users without player context and routes to admin control', async () => {
+    const adminToken = createMagicLinkToken({
+      userId: fixtureIds.adminMixedCaseUserId,
+      playerId: null,
+      eventId: null,
+      email: `adminmixed-${token}@velocitygp.dev`,
+    });
+
+    const verifyResponse = await request(app)
+      .post(`${apiPrefix}/auth/magic-link/verify`)
+      .send({ token: adminToken });
+
+    expect(verifyResponse.status).toBe(200);
+    expect(verifyResponse.body.success).toBe(true);
+    expect(verifyResponse.body.data.redirectPath).toBe('/admin/game-control');
+    expect(verifyResponse.body.data.session.userId).toBe(fixtureIds.adminMixedCaseUserId);
+    expect(verifyResponse.body.data.session.playerId).toBeNull();
+    expect(verifyResponse.body.data.session.assignmentStatus).toBe('UNASSIGNED');
   });
 
   it('rejects Mailtrap webhook requests without a valid bearer token', async () => {
