@@ -34,6 +34,8 @@ import {
   updateUserCapabilitiesSchema,
   updateHeliosRoleSchema,
   updateRaceControlSchema,
+  createAdminPlayerSchema,
+  sendPlayerWelcomeSchema,
 } from '@velocity-gp/api-contract/schemas';
 import {
   createHazardMultiplierRule,
@@ -72,6 +74,8 @@ import {
   updateAdminPlayerContact,
   updateAdminTeamScore,
   updateRosterAssignment,
+  createAdminPlayer,
+  sendAdminPlayerWelcome,
 } from '../services/rosterService.js';
 
 export const adminRouter = Router();
@@ -270,6 +274,43 @@ adminRouter.get(
           playerId,
           request.query as { limit?: number; cursor?: string }
         ),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/roster/players',
+  validate(adminEventParamsSchema, 'params'),
+  validate(createAdminPlayerSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await createAdminPlayer(eventId, request.body, { actorUserId: authContext?.userId }),
+        { requestId: response.locals.requestId }
+      )
+    );
+  })
+);
+
+adminRouter.post(
+  '/admin/events/:eventId/players/:playerId/send-welcome',
+  validate(adminEventRosterPlayerParamsSchema, 'params'),
+  validate(sendPlayerWelcomeSchema),
+  asyncHandler(async (request, response) => {
+    const eventId = String(request.params.eventId);
+    const playerId = String(request.params.playerId);
+    const authContext = getRequestAuthContext(response);
+
+    response.json(
+      successResponse(
+        await sendAdminPlayerWelcome(eventId, playerId, request.body, {
+          actorUserId: authContext?.userId,
+        }),
         { requestId: response.locals.requestId }
       )
     );
