@@ -273,8 +273,13 @@ function buildRosterWhereClause(
     };
   }
 
-  if (typeof query.isFlaggedForReview === 'boolean') {
-    where.isFlaggedForReview = query.isFlaggedForReview;
+  const flaggedFilter =
+    typeof query.isFlaggedForReview === 'string'
+      ? query.isFlaggedForReview.toLowerCase() === 'true'
+      : query.isFlaggedForReview;
+
+  if (typeof flaggedFilter === 'boolean') {
+    where.isFlaggedForReview = flaggedFilter;
   }
 
   return where;
@@ -288,7 +293,8 @@ export async function listAdminRoster(
   query: ListAdminRosterQuery
 ): Promise<ListAdminRosterResponse> {
   return withTraceSpan('admin.roster.list', { eventId }, async () => {
-    const limit = query.limit ?? 50;
+    const normalizedLimit = Number(query.limit ?? 50);
+    const limit = Number.isFinite(normalizedLimit) ? normalizedLimit : 50;
     const players = await prisma.player.findMany({
       where: buildRosterWhereClause(eventId, query),
       orderBy: [
@@ -1628,7 +1634,8 @@ export async function listAdminPlayerScanHistory(
       throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
     }
 
-    const limit = query.limit ?? 100;
+    const normalizedLimit = Number(query.limit ?? 100);
+    const limit = Number.isFinite(normalizedLimit) ? normalizedLimit : 100;
     const scanRows = await prisma.scanRecord.findMany({
       where: {
         eventId,

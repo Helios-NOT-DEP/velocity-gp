@@ -148,7 +148,7 @@ const envSchema = z.object({
   MAILTRAP_AUDIT_ACTOR_EMAIL: optionalEmail.default('system+mailtrap@velocitygp.internal'),
   N8N_WEBHOOK_TOKEN: optionalMinString(16),
   N8N_HOST: optionalUrl,
-  N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE: optionalMinString(1).default('/QRCodeGen'),
+  N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE: optionalMinString(1).default('/webhook/{env}/QRCodeGen'),
   N8N_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
@@ -165,7 +165,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   // When `true`, skip calling the OpenAI Moderations API and fall back to
   // the local keyword blocklist. Defaults to `false`.
-  SKIP_OPENAI_MODERATION: booleanTrueOnlyIfExplicit.default(true),
+  SKIP_OPENAI_MODERATION: booleanTrueOnlyIfExplicit.default(false),
 });
 
 export const packageJson = z

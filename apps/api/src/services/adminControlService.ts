@@ -1127,7 +1127,8 @@ export async function listAdminAudits(
   eventId: string,
   options: { cursor?: string; limit?: number } = {}
 ): Promise<ListAdminAuditsResponse> {
-  const limit = options.limit ?? 50;
+  const normalizedLimit = Number(options.limit ?? 50);
+  const limit = Number.isFinite(normalizedLimit) ? normalizedLimit : 50;
 
   const audits = await prisma.adminActionAudit.findMany({
     where: { eventId },

@@ -31,6 +31,26 @@ function tokensMatch(expected: string, provided: string): boolean {
   return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
+function getExpectedWebhookToken(requestMetadata: {
+  method: string;
+  path: string;
+  ip: string | undefined;
+  hasAuthorizationHeader: boolean;
+  hasBearerToken: boolean;
+}): string {
+  if (env.N8N_WEBHOOK_TOKEN) {
+    return env.N8N_WEBHOOK_TOKEN;
+  }
+
+  if (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') {
+    logger.warn('n8n webhook auth using non-production fallback token', requestMetadata);
+    return 'velocity-gp-dev-webhook-token';
+  }
+
+  logger.warn('n8n webhook auth failed: token not configured', requestMetadata);
+  throw new UnauthorizedError('Webhook token is not configured.');
+}
+
 export function requireN8nWebhookAuth(
   request: Request,
   _response: Response,
@@ -49,11 +69,7 @@ export function requireN8nWebhookAuth(
 
   logger.debug('n8n webhook auth attempt', requestMetadata);
 
-  const configuredToken = env.N8N_WEBHOOK_TOKEN;
-  if (!configuredToken) {
-    logger.warn('n8n webhook auth failed: token not configured', requestMetadata);
-    throw new UnauthorizedError('Webhook token is not configured.');
-  }
+  const configuredToken = getExpectedWebhookToken(requestMetadata);
 
   if (!bearerToken) {
     logger.warn('n8n webhook auth failed: missing bearer token', requestMetadata);
