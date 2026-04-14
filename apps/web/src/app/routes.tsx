@@ -19,12 +19,18 @@ import AdminQrCodes from './pages/admin/AdminQrCodes';
 import AdminTeams from './pages/admin/AdminTeams';
 import AdminPlayers from './pages/admin/AdminPlayers';
 import AdminStatistics from './pages/admin/AdminStatistics';
+import Logout from './pages/Logout';
 
 export const appRoutes: RouteObject[] = [
   // Public auth entrypoint.
   {
     path: '/',
     Component: Login,
+  },
+  // Public logout page — clears session and redirects to login.
+  {
+    path: '/logout',
+    Component: Logout,
   },
   // TODO(figma-sync): Reconcile auth callback/waiting routes with the simplified Figma route map so the designed entry flow and production auth flow do not diverge unexpectedly. | Figma source: src/app/routes.ts (Login -> Garage baseline) | Impact: user flow
   {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
-import { BarChart3, QrCode, Settings, User, Users } from 'lucide-react';
+import { BarChart3, LogOut, QrCode, Settings, User, Users } from 'lucide-react';
 import { adminSections } from '../admin/sections';
 import {
   AUTH_SESSION_UPDATED_EVENT,
@@ -74,8 +74,19 @@ export default function AdminLayout() {
                 </p>
               </div>
             </div>
-            <div className="px-2 md:px-4 py-1 md:py-2 rounded-lg font-mono text-xs md:text-sm whitespace-nowrap flex-shrink-0 bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
-              ACTIVE
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="px-2 md:px-4 py-1 md:py-2 rounded-lg font-mono text-xs md:text-sm whitespace-nowrap bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
+                ACTIVE
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/logout')}
+                title="Sign out"
+                className="flex items-center gap-1.5 rounded-lg border border-gray-700 px-2 md:px-3 py-1 md:py-2 text-xs text-gray-400 hover:border-red-500/60 hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign out</span>
+              </button>
             </div>
           </div>
           {canSwitchToPlayer && (

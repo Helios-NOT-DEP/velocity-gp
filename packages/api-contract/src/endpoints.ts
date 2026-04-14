@@ -207,6 +207,12 @@ export const adminEndpoints = {
   updateUserCapabilities: (userId: string) => `/admin/users/${userId}/capabilities`,
   /** Retrieves the centralized log of all administrative actions taken during the event. */
   listAuditEntries: (eventId: string) => `/admin/events/${eventId}/audits`,
+  /** Admin-triggered logo generation (or re-generation) for a team. */
+  triggerTeamLogo: (eventId: string, teamId: string) =>
+    `/admin/events/${eventId}/teams/${teamId}/generate-logo`,
+  /** Admin update of a player's self-description (bypasses moderation, may enqueue logo). */
+  updatePlayerSelfDescription: (eventId: string, playerId: string) =>
+    `/admin/events/${eventId}/players/${playerId}/self-description`,
 };
 
 /**

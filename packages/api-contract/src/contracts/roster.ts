@@ -205,6 +205,10 @@ export interface AdminTeamDetailMember {
   readonly individualScore: number;
   readonly joinedAt: string;
   readonly rank: number;
+  /** The player's approved self-description, or null if not yet submitted. */
+  readonly selfDescription: string | null;
+  /** Current submission status for this player's description. */
+  readonly submissionStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | null;
 }
 
 /**
@@ -221,6 +225,44 @@ export interface GetAdminTeamDetailResponse {
   readonly keywords: readonly string[];
   readonly memberCount: number;
   readonly members: readonly AdminTeamDetailMember[];
+  /** Current logo generation status for the team. */
+  readonly logoStatus: 'PENDING' | 'GENERATING' | 'READY' | 'FAILED';
+  /** URL of the generated team logo, or null if not yet generated. */
+  readonly logoUrl: string | null;
+}
+
+/**
+ * Request to trigger (or re-trigger) logo generation for a team from the admin surface.
+ * All context is taken from path params; no body fields are required.
+ */
+export type AdminTriggerLogoRequest = Record<string, never>;
+
+/**
+ * Response after admin triggers logo generation.
+ */
+export interface AdminTriggerLogoResponse {
+  readonly teamId: string;
+  readonly logoStatus: 'GENERATING';
+  readonly message: string;
+}
+
+/**
+ * Request for admin to update a player's self-description.
+ */
+export interface AdminUpdateSelfDescriptionRequest {
+  readonly description: string;
+}
+
+/**
+ * Response after admin updates a player's self-description.
+ */
+export interface AdminUpdateSelfDescriptionResponse {
+  readonly eventId: string;
+  readonly teamId: string;
+  readonly playerId: string;
+  readonly description: string;
+  /** Whether logo regeneration was enqueued because all players now have approved descriptions. */
+  readonly logoRegenerationEnqueued: boolean;
 }
 
 /**
