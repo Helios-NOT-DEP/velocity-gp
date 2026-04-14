@@ -254,7 +254,7 @@ describe('display board storytelling states', () => {
       () => {
         const overtakingRow = document.querySelector('[data-team-id="team-delta"]');
         expect(overtakingRow).toBeTruthy();
-        expect(overtakingRow?.className).toContain('ring-2');
+        expect(overtakingRow?.className).toContain('border-red-400/60');
       },
       { timeout: 12_000 }
     );

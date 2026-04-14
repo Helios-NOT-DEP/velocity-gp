@@ -9,6 +9,7 @@ export {
   signIn,
   signOut,
   getSession,
+  savePlayerSession,
   sendVerificationEmail,
   AUTH_SESSION_STORAGE_KEY,
   AUTH_SESSION_TOKEN_STORAGE_KEY,

@@ -39,5 +39,11 @@ export default defineConfig({
   // Ignore source maps for node_modules
   server: {
     sourcemapIgnoreList: (sourcePath) => sourcePath.includes('node_modules'),
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
   },
 });

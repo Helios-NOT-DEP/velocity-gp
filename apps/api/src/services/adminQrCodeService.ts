@@ -24,7 +24,7 @@ import { logger } from '../lib/logger.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { DependencyError, ValidationError } from '../utils/appError.js';
 import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.js';
-import { createHs512Jwt } from '../lib/n8nAuth.js';
+import { callN8nWebhook } from '../lib/n8nWebhookClient.js';
 
 // Private helper types for n8n integration.
 interface QrGenerationRequest {
@@ -126,33 +126,54 @@ function toPreviewSummary(rows: readonly QrImportPreviewRow[]): QrImportPreviewR
   return summary;
 }
 
-function getN8nWebhookUrl(): string {
-  if (!env.N8N_HOST) {
-    throw new ValidationError('N8N_HOST must be configured for QR asset generation.');
+/**
+ * Requests the generation of a downloadable QR code asset via an external n8n webhook.
+ * Connects securely to the N8N instance via HS512 JWT verification.
+ *
+ * @param input - The unique QR ID and the trusted URL payload it should encode.
+ * @returns The verifiable absolute URL string for the externally hosted QR code image.
+ * @throws {DependencyError} If the n8n webhook fails, times out, or returns an invalid URL format.
+ */
+async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
+  const correlationId = randomUUID();
+
+  try {
+    const { data: payload } = (await callN8nWebhook({
+      path: env.N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE,
+      expandEnvTemplate: true,
+      payload: { id: input.id, url: input.url },
+      velocityEvent: 'QR_CODE_GENERATE',
+      correlationId,
+    })) as { data: QrGenerationResponse };
+
+    if (typeof payload.qrImageURL !== 'string' || payload.qrImageURL.length === 0) {
+      throw new DependencyError('QR asset generation response did not include qrImageURL.');
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(payload.qrImageURL);
+    } catch {
+      throw new DependencyError('QR asset generation response provided a malformed qrImageURL.', {
+        qrImageURL: payload.qrImageURL,
+      });
+    }
+
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      throw new DependencyError(
+        'QR asset generation response provided an unsafe qrImageURL protocol.',
+        { protocol: parsedUrl.protocol }
+      );
+    }
+
+    return parsedUrl.toString();
+  } catch (error) {
+    logger.error('admin QR asset generation failed', {
+      correlationId,
+      error: error instanceof Error ? error.message : 'unknown error',
+    });
+    throw error;
   }
-  const baseUrl = env.N8N_HOST;
-  const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  const environmentSegment = env.NODE_ENV === 'production' ? 'prod' : 'dev';
-  // Keep the webhook path environment-configurable with a single template variable.
-  const webhookPath = env.N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE.replace('{env}', environmentSegment);
-
-  return `${normalizedBase}${webhookPath.startsWith('/') ? webhookPath : `/${webhookPath}`}`;
-}
-
-function getN8nWebhookToken(): string {
-  if (env.N8N_WEBHOOK_TOKEN) {
-    return env.N8N_WEBHOOK_TOKEN;
-  }
-
-  if (env.NODE_ENV === 'production') {
-    throw new ValidationError('N8N_WEBHOOK_TOKEN must be configured in production.');
-  }
-
-  logger.warn(
-    'N8N_WEBHOOK_TOKEN is not set — using hardcoded dev fallback. ' +
-      'Do not expose this environment to untrusted networks.'
-  );
-  return 'velocity-gp-dev-webhook-token';
 }
 
 function buildQrPayload(): string {
@@ -170,79 +191,6 @@ function buildTrustedScanUrl(payload: string): string {
     : trustedOrigin;
 
   return `${originWithNoTrailingSlash}/scan/${encodeURIComponent(payload)}`;
-}
-
-/**
- * Requests the generation of a downloadable QR code asset via an external n8n webhook.
- * Connects securely to the N8N instance via HS512 JWT verification.
- *
- * @param input - The unique QR ID and the trusted URL payload it should encode.
- * @returns The verifiable absolute URL string for the externally hosted QR code image.
- * @throws {DependencyError} If the n8n webhook fails, times out, or returns an invalid URL format.
- */
-async function generateQrAsset(input: QrGenerationRequest): Promise<string> {
-  const endpoint = getN8nWebhookUrl();
-  const correlationId = randomUUID();
-  const token = getN8nWebhookToken();
-  const signedJwt = createHs512Jwt(token, correlationId);
-
-  const abortController = new globalThis.AbortController();
-  const timeout = setTimeout(() => abortController.abort(), env.N8N_WEBHOOK_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${signedJwt}`,
-        'x-velocity-event': 'QR_CODE_GENERATE',
-        'x-correlation-id': correlationId,
-      },
-      body: JSON.stringify({ id: input.id, url: input.url }),
-      signal: abortController.signal,
-    });
-
-    if (!response.ok) {
-      throw new DependencyError(`QR asset generation failed with status ${response.status}.`, {
-        status: response.status,
-      });
-    }
-
-    const payload = (await response.json()) as QrGenerationResponse;
-    if (typeof payload.qrImageURL !== 'string' || payload.qrImageURL.length === 0) {
-      throw new DependencyError('QR asset generation response did not include qrImageURL.');
-    }
-
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(payload.qrImageURL);
-    } catch {
-      throw new DependencyError('QR asset generation response provided a malformed qrImageURL.', {
-        qrImageURL: payload.qrImageURL,
-      });
-    }
-
-    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-      throw new DependencyError(
-        'QR asset generation response provided an unsafe qrImageURL protocol.',
-        {
-          protocol: parsedUrl.protocol,
-        }
-      );
-    }
-
-    return parsedUrl.toString();
-  } catch (error) {
-    logger.error('admin QR asset generation failed', {
-      endpoint,
-      correlationId,
-      error: error instanceof Error ? error.message : 'unknown error',
-    });
-
-    throw error;
-  } finally {
-    globalThis.clearTimeout(timeout);
-  }
 }
 
 async function resolveQrImportPreviewRows(
