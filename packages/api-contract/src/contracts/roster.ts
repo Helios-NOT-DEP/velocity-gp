@@ -296,6 +296,54 @@ export interface UpdateAdminPlayerContactResponse {
 }
 
 /**
+ * Admin payload for manually creating a player in an event roster.
+ */
+export interface CreateAdminPlayerRequest {
+  readonly workEmail: string;
+  readonly displayName: string;
+  readonly teamId?: string;
+}
+
+/**
+ * Response payload after manually creating a player in the roster.
+ */
+export interface CreateAdminPlayerResponse {
+  readonly eventId: string;
+  readonly playerId: string;
+  readonly userId: string;
+  readonly workEmail: string;
+  readonly displayName: string;
+  readonly teamId: string | null;
+  readonly teamName: string | null;
+  readonly teamStatus: TeamStatus | null;
+  readonly assignmentStatus: PlayerAssignmentStatus;
+  readonly joinedAt: string;
+  readonly updatedAt: string;
+  readonly auditId: string;
+}
+
+/**
+ * Admin payload for sending a welcome letter to a player.
+ */
+export interface SendAdminPlayerWelcomeRequest {
+  readonly reason?: string;
+}
+
+/**
+ * Response payload after attempting to dispatch a player welcome letter.
+ */
+export interface SendAdminPlayerWelcomeResponse {
+  readonly eventId: string;
+  readonly playerId: string;
+  readonly userId: string;
+  readonly workEmail: string;
+  readonly displayName: string;
+  readonly deliveryStatus: 'dispatched' | 'dispatch_failed';
+  readonly auditId: string;
+  readonly updatedAt: string;
+}
+
+/**
  * Supported admin review outcomes when resolving a flagged player.
  */
 export type AdminPlayerReviewDecision = 'APPROVED' | 'WARNED' | 'DISQUALIFIED';

@@ -1,6 +1,8 @@
 import type {
   AdminPlayerScanHistoryItem,
   AdminRosterRow,
+  CreateAdminPlayerRequest,
+  CreateAdminPlayerResponse,
   DeleteAdminTeamResponse,
   GetAdminPlayerDetailResponse,
   GetAdminTeamDetailResponse,
@@ -17,6 +19,8 @@ import type {
   RosterImportPreviewRow,
   ResolveAdminPlayerReviewFlagRequest,
   ResolveAdminPlayerReviewFlagResponse,
+  SendAdminPlayerWelcomeRequest,
+  SendAdminPlayerWelcomeResponse,
   UpdateAdminPlayerContactRequest,
   UpdateAdminPlayerContactResponse,
   UpdateAdminTeamScoreRequest,
@@ -27,10 +31,12 @@ import type {
 
 import type { Prisma } from '../../prisma/generated/client.js';
 import { prisma } from '../db/client.js';
-import { withTraceSpan } from '../lib/observability.js';
+import { incrementCounter, withTraceSpan } from '../lib/observability.js';
 import { ValidationError } from '../utils/appError.js';
 import { type AdminActionContext, resolveActorUserId } from '../lib/adminActor.js';
+import { getEmailDispatcher } from './emailDispatchService.js';
 import { normalizeWorkEmail } from '../utils/normalizeEmail.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Admin roster service for listing, assignment updates, and CSV-style import
@@ -1521,6 +1527,277 @@ export async function updateAdminPlayerContact(
         auditId: audit.id,
       };
     });
+  });
+}
+
+/**
+ * Creates a single player manually from the Admin roster screen.
+ */
+export async function createAdminPlayer(
+  eventId: string,
+  request: CreateAdminPlayerRequest,
+  context: AdminActionContext = {}
+): Promise<CreateAdminPlayerResponse> {
+  return withTraceSpan('admin.player.create', { eventId }, async () => {
+    return prisma.$transaction(async (tx) => {
+      const actorUserId = await resolveActorUserId(tx, context.actorUserId);
+      const normalizedWorkEmail = normalizeWorkEmail(request.workEmail);
+
+      if (!normalizedWorkEmail) {
+        throw new ValidationError('workEmail must be a valid email address.', {
+          workEmail: request.workEmail,
+        });
+      }
+
+      const targetTeam = request.teamId
+        ? await tx.team.findFirst({
+            where: {
+              id: request.teamId,
+              eventId,
+              deletedAt: null,
+            },
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          })
+        : null;
+
+      if (request.teamId && !targetTeam) {
+        throw new ValidationError('Team does not exist for this event.', {
+          eventId,
+          teamId: request.teamId,
+        });
+      }
+
+      const matchingUsers = await tx.user.findMany({
+        where: {
+          email: {
+            equals: normalizedWorkEmail,
+            mode: 'insensitive',
+          },
+        },
+        select: {
+          id: true,
+        },
+        orderBy: {
+          id: 'asc',
+        },
+        take: 2,
+      });
+
+      if (matchingUsers.length > 1) {
+        throw new ValidationError(
+          'Multiple users already exist for this email. Resolve duplicates before creating a player.',
+          {
+            eventId,
+            workEmail: normalizedWorkEmail,
+          }
+        );
+      }
+
+      const existingUser = matchingUsers[0] ?? null;
+
+      const user = existingUser
+        ? await tx.user.update({
+            where: {
+              id: existingUser.id,
+            },
+            data: {
+              displayName: request.displayName,
+            },
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          })
+        : await tx.user.create({
+            data: {
+              email: normalizedWorkEmail,
+              displayName: request.displayName,
+              role: 'PLAYER',
+              isHelios: false,
+            },
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          });
+
+      const existingPlayer = await tx.player.findFirst({
+        where: {
+          eventId,
+          userId: user.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (existingPlayer) {
+        throw new ValidationError('Player already exists for this event.', {
+          eventId,
+          playerId: existingPlayer.id,
+          userId: user.id,
+          workEmail: normalizedWorkEmail,
+        });
+      }
+
+      const createdPlayer = await tx.player.create({
+        data: {
+          eventId,
+          userId: user.id,
+          teamId: targetTeam?.id ?? null,
+          status: resolvePlayerStatusFromTeamStatus(targetTeam?.status ?? null),
+        },
+        select: {
+          id: true,
+          eventId: true,
+          userId: true,
+          joinedAt: true,
+          updatedAt: true,
+          team: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      const audit = await tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId,
+          actionType: targetTeam ? 'ROSTER_ASSIGNED' : 'ROSTER_IMPORTED',
+          targetType: 'PLAYER',
+          targetId: createdPlayer.id,
+          details: {
+            source: 'manual_create',
+            userCreated: !existingUser,
+            workEmail: normalizedWorkEmail,
+            displayName: request.displayName,
+            nextTeamId: targetTeam?.id ?? null,
+            nextTeamName: targetTeam?.name ?? null,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        eventId: createdPlayer.eventId,
+        playerId: createdPlayer.id,
+        userId: createdPlayer.userId,
+        workEmail: user.email,
+        displayName: user.displayName,
+        teamId: createdPlayer.team?.id ?? null,
+        teamName: createdPlayer.team?.name ?? null,
+        teamStatus: createdPlayer.team?.status ?? null,
+        assignmentStatus: resolveAssignmentStatus(createdPlayer.team),
+        joinedAt: createdPlayer.joinedAt.toISOString(),
+        updatedAt: createdPlayer.updatedAt.toISOString(),
+        auditId: audit.id,
+      };
+    });
+  });
+}
+
+/**
+ * Sends a welcome letter to a roster player and records the attempt.
+ */
+export async function sendAdminPlayerWelcome(
+  eventId: string,
+  playerId: string,
+  request: SendAdminPlayerWelcomeRequest,
+  context: AdminActionContext = {}
+): Promise<SendAdminPlayerWelcomeResponse> {
+  return withTraceSpan('admin.player.welcome.send', { eventId, playerId }, async () => {
+    const player = await prisma.player.findFirst({
+      where: {
+        id: playerId,
+        eventId,
+      },
+      select: {
+        id: true,
+        eventId: true,
+        userId: true,
+        updatedAt: true,
+        user: {
+          select: {
+            email: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+
+    if (!player) {
+      throw new ValidationError('Player does not exist for this event.', { eventId, playerId });
+    }
+
+    let deliveryStatus: 'dispatched' | 'dispatch_failed' = 'dispatched';
+
+    try {
+      await getEmailDispatcher().dispatch({
+        templateKey: 'welcome_onboarding',
+        toEmail: player.user.email,
+        variables: {
+          displayName: player.user.displayName,
+          eventName: 'Velocity GP',
+        },
+        correlationId: `welcome:${eventId}:${player.id}`,
+      });
+    } catch (error) {
+      deliveryStatus = 'dispatch_failed';
+      incrementCounter('admin.player.welcome.dispatch.failure.total');
+      logger.error('Admin welcome dispatch failed', {
+        eventId,
+        playerId: player.id,
+        userId: player.userId,
+        templateKey: 'welcome_onboarding',
+        errorMessage: error instanceof Error ? error.message : 'unknown error',
+      });
+    }
+
+    const audit = await prisma.$transaction(async (tx) => {
+      const actorUserId = await resolveActorUserId(tx, context.actorUserId);
+
+      return tx.adminActionAudit.create({
+        data: {
+          eventId,
+          actorUserId,
+          actionType: 'EMAIL_RETURN_FLAGGED',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          details: {
+            source: 'manual_welcome_send',
+            templateKey: 'welcome_onboarding',
+            deliveryStatus,
+            reason: request.reason,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+    });
+
+    return {
+      eventId: player.eventId,
+      playerId: player.id,
+      userId: player.userId,
+      workEmail: player.user.email,
+      displayName: player.user.displayName,
+      deliveryStatus,
+      auditId: audit.id,
+      updatedAt: player.updatedAt.toISOString(),
+    };
   });
 }
 

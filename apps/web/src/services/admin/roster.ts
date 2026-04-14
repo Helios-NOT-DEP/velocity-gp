@@ -1,5 +1,7 @@
 import type {
   DeleteAdminTeamResponse,
+  CreateAdminPlayerRequest,
+  CreateAdminPlayerResponse,
   GetAdminPlayerDetailResponse,
   GetAdminTeamDetailResponse,
   ListAdminPlayerScanHistoryQuery,
@@ -14,6 +16,8 @@ import type {
   RosterImportRowInput,
   ResolveAdminPlayerReviewFlagRequest,
   ResolveAdminPlayerReviewFlagResponse,
+  SendAdminPlayerWelcomeRequest,
+  SendAdminPlayerWelcomeResponse,
   UpdateAdminPlayerContactRequest,
   UpdateAdminPlayerContactResponse,
   UpdateAdminTeamScoreRequest,
@@ -287,6 +291,45 @@ export async function updateAdminPlayerContact(
 
   if (!response.ok) {
     throw new Error(`Unable to update player contact (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function createAdminRosterPlayer(
+  eventId: string,
+  request: CreateAdminPlayerRequest
+): Promise<CreateAdminPlayerResponse> {
+  const response = await apiClient.request<CreateAdminPlayerResponse>(
+    adminEndpoints.createAdminPlayer(eventId),
+    {
+      method: 'POST',
+      body: request,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to create player (${response.status}).`);
+  }
+
+  return response.data;
+}
+
+export async function sendAdminRosterPlayerWelcome(
+  eventId: string,
+  playerId: string,
+  request: SendAdminPlayerWelcomeRequest = {}
+): Promise<SendAdminPlayerWelcomeResponse> {
+  const response = await apiClient.request<SendAdminPlayerWelcomeResponse>(
+    adminEndpoints.sendPlayerWelcome(eventId, playerId),
+    {
+      method: 'POST',
+      body: request,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to send welcome letter (${response.status}).`);
   }
 
   return response.data;

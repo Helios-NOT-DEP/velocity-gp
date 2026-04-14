@@ -9,11 +9,12 @@ import type {
   RosterImportPreviewResponse,
   RosterImportRowInput,
 } from '@velocity-gp/api-contract';
-import { ArrowLeft, Loader2, RefreshCcw, Save, Upload, Users } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail, RefreshCcw, Save, Upload, Users } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { listAdminAudits, updateHeliosRole } from '@/services/admin/control';
 import {
   applyAdminRosterImport,
+  createAdminRosterPlayer,
   getAdminPlayerDetail,
   getCurrentEventId,
   listAdminPlayerScanHistory,
@@ -22,6 +23,7 @@ import {
   parseRosterCsvFile,
   previewAdminRosterImport,
   resolveAdminPlayerReviewFlag,
+  sendAdminRosterPlayerWelcome,
   updateAdminPlayerContact,
   updateAdminRosterAssignment,
 } from '@/services/admin/roster';
@@ -137,6 +139,13 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
   const [importResultMessage, setImportResultMessage] = useState<string | null>(null);
   const [isPreviewingImport, setIsPreviewingImport] = useState(false);
   const [isApplyingImport, setIsApplyingImport] = useState(false);
+  const [manualCreateWorkEmail, setManualCreateWorkEmail] = useState('');
+  const [manualCreateDisplayName, setManualCreateDisplayName] = useState('');
+  const [manualCreateTeamId, setManualCreateTeamId] = useState<string>(UNASSIGNED_OPTION);
+  const [isCreatingPlayer, setIsCreatingPlayer] = useState(false);
+  const [manualCreateMessage, setManualCreateMessage] = useState<string | null>(null);
+  const [sendingWelcomePlayerId, setSendingWelcomePlayerId] = useState<string | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
 
   const refreshAuditSummary = async (targetEventId: string) => {
     try {
@@ -316,6 +325,66 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
     }
   }
 
+  async function handleCreatePlayer(event: React.FormEvent<globalThis.HTMLFormElement>) {
+    event.preventDefault();
+    if (!eventId) {
+      return;
+    }
+
+    const workEmail = manualCreateWorkEmail.trim();
+    const displayName = manualCreateDisplayName.trim();
+    if (!workEmail || !displayName) {
+      setLoadError('Work email and display name are required.');
+      return;
+    }
+
+    setIsCreatingPlayer(true);
+    setLoadError(null);
+    setManualCreateMessage(null);
+
+    try {
+      const created = await createAdminRosterPlayer(eventId, {
+        workEmail,
+        displayName,
+        ...(manualCreateTeamId !== UNASSIGNED_OPTION ? { teamId: manualCreateTeamId } : {}),
+      });
+
+      setManualCreateWorkEmail('');
+      setManualCreateDisplayName('');
+      setManualCreateTeamId(UNASSIGNED_OPTION);
+      setManualCreateMessage(`Created ${created.displayName} (${created.workEmail}).`);
+      await loadRoster(eventId);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Unable to create player.');
+    } finally {
+      setIsCreatingPlayer(false);
+    }
+  }
+
+  async function handleSendWelcome(playerId: string, displayName: string) {
+    if (!eventId) {
+      return;
+    }
+
+    setSendingWelcomePlayerId(playerId);
+    setLoadError(null);
+    setWelcomeMessage(null);
+
+    try {
+      const result = await sendAdminRosterPlayerWelcome(eventId, playerId);
+      setWelcomeMessage(
+        result.deliveryStatus === 'dispatched'
+          ? `Welcome letter sent to ${displayName}.`
+          : `Welcome dispatch failed for ${displayName}.`
+      );
+      await refreshAuditSummary(eventId);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Unable to send welcome letter.');
+    } finally {
+      setSendingWelcomePlayerId(null);
+    }
+  }
+
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -331,6 +400,18 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
       {loadError ? (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
           {loadError}
+        </div>
+      ) : null}
+
+      {manualCreateMessage ? (
+        <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-200">
+          {manualCreateMessage}
+        </div>
+      ) : null}
+
+      {welcomeMessage ? (
+        <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-3 text-sm text-cyan-200">
+          {welcomeMessage}
         </div>
       ) : null}
 
@@ -385,6 +466,45 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
             className="rounded-lg bg-[#00D4FF] px-3 py-2 font-semibold text-black hover:opacity-90 md:col-span-1"
           >
             Apply Filters
+          </button>
+        </form>
+      </article>
+
+      <article className="bg-gradient-to-br from-[#0B1E3B] to-[#050E1D] border border-gray-800 rounded-xl p-4 md:p-6 space-y-4">
+        <h3 className="font-['Space_Grotesk'] text-lg md:text-xl">Add Player Manually</h3>
+        <form className="grid grid-cols-1 md:grid-cols-4 gap-3" onSubmit={handleCreatePlayer}>
+          <input
+            type="email"
+            value={manualCreateWorkEmail}
+            onChange={(event) => setManualCreateWorkEmail(event.target.value)}
+            placeholder="work.email@company.com"
+            className="px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+          />
+          <input
+            type="text"
+            value={manualCreateDisplayName}
+            onChange={(event) => setManualCreateDisplayName(event.target.value)}
+            placeholder="Display name"
+            className="px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+          />
+          <select
+            value={manualCreateTeamId}
+            onChange={(event) => setManualCreateTeamId(event.target.value)}
+            className="px-3 py-2 rounded-lg bg-black/40 border border-gray-700 focus:outline-none focus:border-[#00D4FF]"
+          >
+            <option value={UNASSIGNED_OPTION}>Unassigned</option>
+            {teamSelectOptions.map((team) => (
+              <option key={team.teamId} value={team.teamId}>
+                {team.teamName}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            disabled={isCreatingPlayer}
+            className="rounded-lg bg-[#39FF14] px-3 py-2 font-semibold text-black disabled:opacity-50"
+          >
+            {isCreatingPlayer ? 'Creating…' : 'Create Player'}
           </button>
         </form>
       </article>
@@ -543,6 +663,15 @@ function PlayerListView(props: { onOpenDetail: (playerId: string) => void }) {
                             ? 'Revoke'
                             : 'Assign'}
                       </button>
+                      <button
+                        type="button"
+                        // disabled={sendingWelcomePlayerId === row.playerId}
+                        onClick={() => void handleSendWelcome(row.playerId, row.displayName)}
+                        className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-200 disabled:opacity-50"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        {sendingWelcomePlayerId === row.playerId ? 'Sending…' : 'Send Welcome'}
+                      </button>
                     </div>
                   </div>
 
@@ -597,6 +726,8 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
   const [eventId, setEventId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
+  const [isSendingWelcome, setIsSendingWelcome] = useState(false);
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [isResolvingReview, setIsResolvingReview] = useState(false);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getAdminPlayerDetail>> | null>(
@@ -611,6 +742,7 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
   const loadDetail = async (overrideEventId?: string) => {
     setIsLoading(true);
     setError(null);
+    setWelcomeMessage(null);
 
     try {
       const resolvedEventId = overrideEventId ?? eventId ?? (await getCurrentEventId());
@@ -691,6 +823,28 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
     }
   }
 
+  async function handleSendWelcome() {
+    if (!eventId || !detail) {
+      return;
+    }
+
+    setIsSendingWelcome(true);
+    setError(null);
+    setWelcomeMessage(null);
+    try {
+      const result = await sendAdminRosterPlayerWelcome(eventId, playerId);
+      setWelcomeMessage(
+        result.deliveryStatus === 'dispatched'
+          ? `Welcome letter sent to ${detail.displayName}.`
+          : `Welcome dispatch failed for ${detail.displayName}.`
+      );
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : 'Unable to send welcome letter.');
+    } finally {
+      setIsSendingWelcome(false);
+    }
+  }
+
   return (
     <section className="space-y-6">
       <button
@@ -705,6 +859,12 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
       {error ? (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
           {error}
+        </div>
+      ) : null}
+
+      {welcomeMessage ? (
+        <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-3 text-sm text-cyan-200">
+          {welcomeMessage}
         </div>
       ) : null}
 
@@ -766,6 +926,18 @@ function PlayerDetailView(props: { playerId: string; onBack: () => void }) {
 
             <div className="text-sm text-gray-300">
               Team: {detail.teamName ? `${detail.teamName} (${detail.teamId})` : 'Unassigned'}
+            </div>
+
+            <div>
+              <button
+                type="button"
+                disabled={isSendingWelcome}
+                onClick={() => void handleSendWelcome()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 disabled:opacity-50 sm:w-auto"
+              >
+                <Mail className="h-4 w-4" />
+                {isSendingWelcome ? 'Sending…' : 'Send Welcome Letter'}
+              </button>
             </div>
           </article>
 
