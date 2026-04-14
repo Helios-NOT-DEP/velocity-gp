@@ -1,4 +1,4 @@
-name: Deploy to Infra to DigitalOcean
+name: Deploy to Infra to DigitalOcean -
 on:
   # push:
   #   branches: [main]
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to DigitalOcean
+    name: Deploy to DigitalOcean - ${{ inputs.environment }}
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
     env:

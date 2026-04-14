@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to DigitalOcean
+    name: Deploy to DigitalOcean - ${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     env:
@@ -67,7 +67,7 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
-        
+
       - name: Get Action IP
         if: ${{ inputs.environment == 'prod' }}
         id: ip
@@ -97,8 +97,7 @@ jobs:
           SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
         run: |
-            npm run db:deploy
-
+          npm run db:deploy
 
       - name: Run Database Seed for dev
         if: ${{ inputs.environment == 'dev' && inputs.reseed_data == 'true' }}
@@ -111,8 +110,8 @@ jobs:
           SPACE_BACKUP_ENDPOINT_DOMAIN: ${{ vars.SPACE_BACKUP_ENDPOINT_DOMAIN }}
           SPACE_BACKUP_BUCKET: ${{ vars.SPACE_BACKUP_BUCKET }}
         run: |
-            npm run db:generate
-            npm run db:seed
+          npm run db:generate
+          npm run db:seed
       # - if: vars.DO_APP_ID == ' '
       #   name: Deploy App
       #   run: doctl apps create-deployment ${{ vars.DO_APP_ID }} --verbose --wait
