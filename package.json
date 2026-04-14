@@ -45,20 +45,5 @@
     "husky": "^9.1.7",
     "prettier": "^3.8.1",
     "typescript": "^6.0.2"
-  },
-  "dependencies": {
-    "async": "^3.2.4",
-    "docker": "^1.0.0",
-    "jws": "^4.0.1",
-    "kuler": "^2.0.0",
-    "lodash.includes": "^4.3.0",
-    "lodash.isboolean": "^3.0.3",
-    "lodash.isinteger": "^4.0.4",
-    "lodash.isnumber": "^3.0.3",
-    "lodash.isplainobject": "^4.0.6",
-    "lodash.isstring": "^4.0.1",
-    "lodash.once": "^4.1.1",
-    "lodash.set": "^4.3.2",
-    "node-fetch": "^3.3.2"
   }
 }
