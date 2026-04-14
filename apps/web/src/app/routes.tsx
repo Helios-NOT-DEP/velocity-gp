@@ -59,10 +59,13 @@ export const appRoutes: RouteObject[] = [
     path: '/display',
     Component: DisplayBoard,
   },
-  // Leaderboard is public and shareable via link without authentication required.
+  // Unprotected layout wrapper for public pages that benefit from shared navigation.
+  // Leaderboard is accessible without auth, but signed-in users see full BottomNav with Helios button if applicable.
   {
-    path: '/leaderboard',
-    Component: Leaderboard,
+    element: <RootLayout />,
+    children: [
+      { path: 'leaderboard', Component: Leaderboard },
+    ],
   },
   // Team setup remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
