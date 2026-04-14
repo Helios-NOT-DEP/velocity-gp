@@ -7,6 +7,9 @@ interface AuthSessionSeed {
   readonly role: 'player' | 'admin' | 'helios';
   readonly isAuthenticated: true;
   readonly email: string;
+  readonly playerId?: string;
+  readonly teamId?: string;
+  readonly eventId?: string;
 }
 
 async function seedAuthSession(page: Page, session: AuthSessionSeed) {
@@ -135,11 +138,14 @@ test.describe('Velocity GP web flows', () => {
       role: 'player',
       isAuthenticated: true,
       email: 'player@example.com',
+      playerId: 'player-1',
+      teamId: 'team-apex-comets',
+      eventId: 'event-velocity-active',
     });
 
     await page.goto('/team-setup');
 
-    await expect(page.getByRole('heading', { name: 'Create Your Team' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome to the Garage' })).toBeVisible();
   });
 
   test('redirects authenticated users away from login page', async ({ page }) => {
@@ -148,6 +154,9 @@ test.describe('Velocity GP web flows', () => {
       role: 'player',
       isAuthenticated: true,
       email: 'player@example.com',
+      playerId: 'player-1',
+      teamId: 'team-apex-comets',
+      eventId: 'event-velocity-active',
     });
 
     await page.goto('/');
@@ -161,6 +170,9 @@ test.describe('Velocity GP web flows', () => {
       role: 'player',
       isAuthenticated: true,
       email: 'player@example.com',
+      playerId: 'player-1',
+      teamId: 'team-apex-comets',
+      eventId: 'event-velocity-active',
     });
 
     await page.goto('/garage');

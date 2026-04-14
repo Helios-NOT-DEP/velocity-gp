@@ -9,18 +9,18 @@
  *   1. `session`  — the full AuthSession object (userId, role, email, …)
  *   2. `player`   — the three IDs the Garage and Race Hub pages need:
  *                     playerId, teamId, eventId
- *                   Falls back to seeded dev values so the app stays usable
- *                   during local development without going through login.
+ *                   Falls back to seeded dev values only in local development
+ *                   so the app stays usable without going through login.
  *   3. `isReady`  — false on the first render (session hasn't been read yet);
  *                   true once the async read has resolved.  Show a loading
  *                   spinner while this is false.
  *
  * ── How it works ────────────────────────────────────────────────────────────
  *
- *   On mount the hook calls `getSession()` (which reads localStorage).
+ *   On mount the hook calls `getSession()` (which may validate with the backend).
  *   If the session contains playerId/teamId/eventId those are used directly.
- *   If ANY of the three is missing the hook falls back to the dev defaults so
- *   the Garage page can still be exercised without a real login.
+ *   If ANY of the three is missing, dev defaults are used only when `import.meta.env.DEV`
+ *   is true; in non-dev environments the fields remain null.
  *
  * ── How to go live with Auth.js ─────────────────────────────────────────────
  *
@@ -52,11 +52,11 @@ const DEV_DEFAULTS = {
 
 export interface PlayerIdentity {
   /** DB ID of the Player row (e.g. "player-lina-active") */
-  playerId: string;
+  playerId: string | null;
   /** DB ID of the team the player was pre-assigned to */
-  teamId: string;
+  teamId: string | null;
   /** DB ID of the current race event */
-  eventId: string;
+  eventId: string | null;
   /** true when all three IDs came from a real session; false = dev fallback */
   isRealSession: boolean;
 }
@@ -64,8 +64,33 @@ export interface PlayerIdentity {
 export interface UsePlayerSessionResult {
   session: AuthSession | null;
   player: PlayerIdentity;
-  /** false on first render; true once localStorage has been read */
+  /** false on first render; true once getSession() has resolved */
   isReady: boolean;
+}
+
+export function derivePlayerIdentity(session: AuthSession | null, isDev: boolean): PlayerIdentity {
+  const hasRealSession =
+    Boolean(session?.playerId) && Boolean(session?.teamId) && Boolean(session?.eventId);
+  const canUseDevFallback = isDev && !hasRealSession;
+
+  return {
+    playerId: hasRealSession
+      ? (session?.playerId ?? null)
+      : canUseDevFallback
+        ? DEV_DEFAULTS.playerId
+        : null,
+    teamId: hasRealSession
+      ? (session?.teamId ?? null)
+      : canUseDevFallback
+        ? DEV_DEFAULTS.teamId
+        : null,
+    eventId: hasRealSession
+      ? (session?.eventId ?? null)
+      : canUseDevFallback
+        ? DEV_DEFAULTS.eventId
+        : null,
+    isRealSession: hasRealSession,
+  };
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -75,8 +100,8 @@ export function usePlayerSession(): UsePlayerSessionResult {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // getSession() reads synchronously from localStorage behind an async wrapper;
-    // this resolves on the first microtask tick.
+    // getSession() may make a backend validation request, so readiness tracks
+    // completion of that async operation (not just localStorage hydration).
     getSession()
       .then((s) => {
         setSession(s);
@@ -86,16 +111,7 @@ export function usePlayerSession(): UsePlayerSessionResult {
       });
   }, []);
 
-  // Derive player identity — prefer real session values; fall back to dev defaults
-  const hasRealSession =
-    Boolean(session?.playerId) && Boolean(session?.teamId) && Boolean(session?.eventId);
-
-  const player: PlayerIdentity = {
-    playerId: session?.playerId ?? DEV_DEFAULTS.playerId,
-    teamId: session?.teamId ?? DEV_DEFAULTS.teamId,
-    eventId: session?.eventId ?? DEV_DEFAULTS.eventId,
-    isRealSession: hasRealSession,
-  };
+  const player = derivePlayerIdentity(session, import.meta.env.DEV);
 
   return { session, player, isReady };
 }

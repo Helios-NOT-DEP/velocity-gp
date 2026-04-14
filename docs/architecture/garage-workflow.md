@@ -24,7 +24,7 @@ flowchart TD
 
     INPUT -- "player types & submits" --> SUBMIT["POST /garage/submit"]
 
-    SUBMIT --> MOD["moderateText()\nOpenAI /v1/moderations\nor keyword fallback"]
+    SUBMIT --> MOD["moderateText()\nn8n /moderation webhook\nor keyword fallback"]
 
     MOD -- "safe=false" --> REJECT["❌ REJECTED\nShow policyMessage\nPlayer revises description"]
     REJECT -- "retry" --> INPUT
@@ -103,9 +103,9 @@ packages/api-contract/
 
 apps/api/
   prisma/schema.prisma             ← GarageSubmission model + Team garage fields
-  src/config/env.ts                ← Garage env vars: N8N_IMAGE_API_URL, N8N_IMAGE_API_KEY,
-                                     OPENAI_API_KEY, GARAGE_REQUIRED_PLAYER_COUNT
-  src/services/moderationService.ts  ← OpenAI /v1/moderations call (keyword fallback in dev)
+  src/config/env.ts                ← Garage env vars: N8N_IMAGE_API_URL,
+                                     GARAGE_REQUIRED_PLAYER_COUNT, SKIP_OPENAI_MODERATION
+  src/services/moderationService.ts  ← n8n /moderation call (keyword fallback when disabled)
   src/services/garageService.ts      ← core business logic: submit, quota check, logo trigger
   src/services/n8nService.ts         ← n8n webhook client for logo generation (JWT-signed, dev fallback)
   src/routes/garage.ts               ← POST /garage/submit,  GET /garage/team/:id/status
@@ -136,7 +136,7 @@ Two players submitting at the same millisecond could both see `approvedCount >= 
 The logo generation race is resolved by a conditional `updateMany` that only flips `logoStatus` from
 `PENDING|FAILED → GENERATING` (or `PENDING|FAILED|READY → GENERATING` for late-joiner re-generation).
 Prisma returns `count` of updated rows — only the winner (`count=1`) proceeds to call n8n.  The loser
-exits silently.  The winner's n8n call is dispatched via `setImmediate()` (fire-and-forget) and runs
+exits silently.  The winner's n8n call is dispatched via `setTimeout(..., 0)` (fire-and-forget) and runs
 to completion, setting `logoStatus=READY`; subsequent polls on either player's client will see the result.
 
 ---

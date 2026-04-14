@@ -8,7 +8,7 @@
  * ── Key responsibilities ─────────────────────────────────────────────────────
  *
  *  submitDescription()
- *    1. Run text moderation (OpenAI or keyword fallback)
+ *    1. Run text moderation (n8n webhook or keyword fallback)
  *    2. Upsert the player's GarageSubmission row (one slot per player-team)
  *    3. Count APPROVED submissions for the team
  *    4. If count >= requiredPlayerCount, fire logo generation (idempotent via
@@ -42,7 +42,7 @@ import type {
 import { prisma } from '../db/client.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
-import { AppError } from '../utils/appError.js';
+import { AppError, ForbiddenError, NotFoundError } from '../utils/appError.js';
 import { generateTeamLogo } from './n8nService.js';
 import { moderateText } from './moderationService.js';
 
@@ -61,6 +61,8 @@ export async function submitDescription(
   request: GarageSubmitRequest
 ): Promise<GarageSubmitResponse> {
   const { playerId, teamId, eventId, description } = request;
+
+  await assertSubmissionContext({ playerId, teamId, eventId });
 
   logger.info('[garageService] submitDescription — starting moderation', { playerId, teamId });
 
@@ -147,6 +149,7 @@ export async function getTeamGarageStatus(
   teamId: string,
   playerId: string
 ): Promise<TeamGarageStatus> {
+  await assertPlayerCanAccessTeam({ teamId, playerId });
   return buildTeamGarageStatus(teamId, playerId);
 }
 
@@ -155,7 +158,7 @@ export async function getTeamGarageStatus(
 /**
  * Checks whether the team has reached its submission quota.
  * If so, attempts to atomically claim the GENERATING state and dispatches the
- * n8n logo generation call as a background task (fire-and-forget via setImmediate).
+ * n8n logo generation call as a background task (fire-and-forget via setTimeout(0)).
  * The submit response is returned to the client immediately; the UI polls /status
  * every ~4s and sees GENERATING → READY when the job completes.
  *
@@ -271,26 +274,13 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
 
     const descriptions = submissions.map((s) => s.description.trim());
 
-    // Log each description being incorporated so the prompt build is fully traceable
-    descriptions.forEach((desc, i) => {
-      logger.info('[garageService] Including member description in logo prompt', {
-        teamId,
-        teamName,
-        memberIndex: i + 1,
-        total: descriptions.length,
-        playerId: submissions[i].playerId,
-        description: desc,
-      });
-    });
-
     // Build a structured prompt the image model can act on directly
     const prompt = buildLogoPrompt(teamName, descriptions);
 
     logger.info('[garageService] Final logo prompt constructed — dispatching to n8n', {
       teamId,
-      teamName,
       descriptionCount: descriptions.length,
-      prompt,
+      promptLength: prompt.length,
     });
 
     // generateTeamLogo calls the n8n webhook which runs an OpenAI image
@@ -321,7 +311,7 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
 
     const message = error instanceof Error ? error.message : String(error);
     logger.error('[garageService] Logo generation failed', { teamId, message });
-    // Do NOT re-throw — triggerLogoGeneration is called fire-and-forget via setImmediate.
+    // Do NOT re-throw — triggerLogoGeneration is called fire-and-forget via setTimeout(0).
     // Re-throwing would create an unhandled rejection that crashes the process.
     // The UI polls /status and will see FAILED, allowing the next submission to retry.
   }
@@ -340,7 +330,92 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
 function buildLogoPrompt(teamName: string, descriptions: string[]): string {
   const memberTraits = descriptions.map((d, i) => `member ${i + 1}: ${d}`).join('\n');
 
-  return memberTraits;
+  return [
+    `Team name: ${teamName}`,
+    'Create a racing team logo that reflects these member traits:',
+    memberTraits,
+  ].join('\n');
+}
+
+async function assertSubmissionContext(input: {
+  playerId: string;
+  teamId: string;
+  eventId: string;
+}): Promise<void> {
+  const [player, team] = await Promise.all([
+    prisma.player.findUnique({
+      where: { id: input.playerId },
+      select: { id: true, eventId: true, teamId: true },
+    }),
+    prisma.team.findUnique({
+      where: { id: input.teamId },
+      select: { id: true, eventId: true },
+    }),
+  ]);
+
+  if (!player) {
+    throw new NotFoundError(`Player ${input.playerId} does not exist`, {
+      playerId: input.playerId,
+    });
+  }
+
+  if (!team) {
+    throw new NotFoundError(`Team ${input.teamId} does not exist`, { teamId: input.teamId });
+  }
+
+  if (player.eventId !== input.eventId || team.eventId !== input.eventId) {
+    throw new ForbiddenError('Player/team/event context mismatch', {
+      playerId: input.playerId,
+      teamId: input.teamId,
+      eventId: input.eventId,
+      playerEventId: player.eventId,
+      teamEventId: team.eventId,
+    });
+  }
+
+  if (player.teamId !== input.teamId) {
+    throw new ForbiddenError('Player is not assigned to the requested team', {
+      playerId: input.playerId,
+      requestedTeamId: input.teamId,
+      assignedTeamId: player.teamId,
+    });
+  }
+}
+
+async function assertPlayerCanAccessTeam(input: {
+  teamId: string;
+  playerId: string;
+}): Promise<void> {
+  const [player, team] = await Promise.all([
+    prisma.player.findUnique({
+      where: { id: input.playerId },
+      select: { id: true, eventId: true, teamId: true },
+    }),
+    prisma.team.findUnique({
+      where: { id: input.teamId },
+      select: { id: true, eventId: true },
+    }),
+  ]);
+
+  if (!player) {
+    throw new NotFoundError(`Player ${input.playerId} does not exist`, {
+      playerId: input.playerId,
+    });
+  }
+
+  if (!team) {
+    throw new NotFoundError(`Team ${input.teamId} does not exist`, { teamId: input.teamId });
+  }
+
+  if (player.teamId !== input.teamId || player.eventId !== team.eventId) {
+    throw new ForbiddenError('Player cannot access the requested team status', {
+      playerId: input.playerId,
+      requestedTeamId: input.teamId,
+      assignedTeamId: player.teamId,
+      playerEventId: player.eventId,
+      teamEventId: team.eventId,
+    });
+  }
 }
 
 // ── Internal: status snapshot builder ────────────────────────────────────────

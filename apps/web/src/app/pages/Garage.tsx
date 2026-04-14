@@ -54,11 +54,11 @@ const POLL_INTERVAL_MS = 4_000;
 export default function Garage() {
   // TODO(figma-sync): Replace keyword-based generation with description-driven onboarding to match the updated Team Onboarding design flow. | Figma source: src/app/pages/Garage.tsx description textarea + suggestion chips | Impact: user flow
   const navigate = useNavigate();
-  // Read playerId / teamId / eventId from localStorage (written by savePlayerSession
-  // after a successful magic-link login).  Falls back to seeded dev values so the
-  // Garage page is fully usable during local development without going through login.
+  // Read playerId / teamId / eventId from auth session.
+  // Dev-only fallback IDs are handled in usePlayerSession.
   const { player, isReady } = usePlayerSession();
   const { playerId, teamId, eventId } = player;
+  const hasPlayerContext = Boolean(playerId && teamId && eventId);
 
   const [description, setDescription] = useState('');
   const [uiState, setUiState] = useState<GarageUIState>({ screen: 'LOADING' });
@@ -72,11 +72,16 @@ export default function Garage() {
   // avoids firing the status call with dev-fallback IDs when a real session exists.
   useEffect(() => {
     if (!isReady) return; // session not yet loaded — skip until it resolves
+    if (!hasPlayerContext) {
+      navigate('/waiting-assignment', { replace: true });
+      return;
+    }
+
     let cancelled = false;
 
     async function loadInitialStatus() {
       try {
-        const status = await garageService.getTeamStatus(teamId, playerId);
+        const status = await garageService.getTeamStatus(teamId!, playerId!);
         if (cancelled) return;
 
         // Restore the correct screen based on what we find in the DB
@@ -94,10 +99,18 @@ export default function Garage() {
     return () => {
       cancelled = true;
     };
-  }, [teamId, playerId, isReady]);
+  }, [teamId, playerId, isReady, hasPlayerContext, navigate]);
 
   // ── Polling: WAITING, GENERATING, LOGO_FAILED, and LOGO_REVEAL screens ────────────────────
   useEffect(() => {
+    if (!hasPlayerContext) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      return;
+    }
+
     const shouldPoll =
       uiState.screen === 'WAITING' ||
       uiState.screen === 'GENERATING' ||
@@ -118,7 +131,7 @@ export default function Garage() {
     // Start polling
     pollRef.current = setInterval(async () => {
       try {
-        const status = await garageService.getTeamStatus(teamId, playerId);
+        const status = await garageService.getTeamStatus(teamId!, playerId!);
         const next = deriveScreenFromStatus(status);
 
         // Only update state if something meaningful changed (avoids unnecessary
@@ -154,20 +167,20 @@ export default function Garage() {
         pollRef.current = null;
       }
     };
-  }, [uiState.screen, teamId, playerId]);
+  }, [uiState.screen, teamId, playerId, hasPlayerContext]);
 
   // ── Submit handler ────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
-    if (!description.trim()) return;
+    if (!description.trim() || !hasPlayerContext) return;
 
     setUiState({ screen: 'SUBMITTING' });
 
     try {
       const result = await garageService.submit({
-        playerId,
-        teamId,
-        eventId,
+        playerId: playerId!,
+        teamId: teamId!,
+        eventId: eventId!,
         description: description.trim(),
       });
 
