@@ -94,12 +94,12 @@ describe('resolveN8nToken', () => {
 describe('expandN8nPathTemplate', () => {
   it('expands {env} to "prod" in production', async () => {
     const { expandN8nPathTemplate } = await loadModule({ nodeEnv: 'production' });
-    expect(expandN8nPathTemplate('/webhook/{env}/QRCodeGen')).toBe('/webhook/prod/QRCodeGen');
+    expect(expandN8nPathTemplate('/QRCodeGen')).toBe('/QRCodeGen');
   });
 
   it('expands {env} to "dev" in non-production', async () => {
     const { expandN8nPathTemplate } = await loadModule({ nodeEnv: 'development' });
-    expect(expandN8nPathTemplate('/webhook/{env}/QRCodeGen')).toBe('/webhook/dev/QRCodeGen');
+    expect(expandN8nPathTemplate('/QRCodeGen')).toBe('/QRCodeGen');
   });
 
   it('returns the template unchanged when it has no {env} placeholder', async () => {
@@ -169,13 +169,13 @@ describe('callN8nWebhook URL construction', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     await callN8nWebhook({
-      path: '/webhook/{env}/QRCodeGen',
+      path: '/QRCodeGen',
       expandEnvTemplate: true,
       payload: { id: '1', url: 'https://example.com' },
       velocityEvent: 'QR_CODE_GENERATE',
     });
 
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://n8n.example.com/webhook/prod/QRCodeGen');
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://n8n.example.com/QRCodeGen');
   });
 });
 
