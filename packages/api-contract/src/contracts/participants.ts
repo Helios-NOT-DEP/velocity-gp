@@ -193,6 +193,11 @@ export interface RescueCompletionResponse {
   readonly status: Extract<RescueStatus, 'COMPLETED'>;
 }
 
+export interface CreateTeamLogoRequest {
+  readonly description: string;
+  readonly teamName: string;
+}
+
 /**
  * Identity payload vended by the backend directly to the scanner UI.
  * Unifies the distinct database identifiers needed to properly credit

@@ -5,6 +5,7 @@ import { authRouter } from './auth.js';
 import { emailWebhookRouter } from './emailWebhook.js';
 import { eventRouter } from './event.js';
 import { gameRouter } from './game.js';
+import { garageRouter } from './garage.js';
 import { hazardRouter } from './hazard.js';
 import { playerRouter } from './player.js';
 import { rescueRouter } from './rescue.js';
@@ -19,6 +20,8 @@ apiRouter.use(authRouter);
 apiRouter.use(emailWebhookRouter);
 apiRouter.use(eventRouter);
 apiRouter.use(gameRouter);
+// Garage workflow: player description submission + team logo polling
+apiRouter.use(garageRouter);
 apiRouter.use(hazardRouter);
 apiRouter.use(playerRouter);
 apiRouter.use(rescueRouter);

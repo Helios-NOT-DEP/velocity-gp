@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { incrementCounter, withTraceSpan } from '../lib/observability.js';
-import { createHs512Jwt } from '../lib/n8nAuth.js';
+import { callN8nWebhook, resolveN8nToken } from '../lib/n8nWebhookClient.js';
+import { DependencyError } from '../utils/appError.js';
 
 /**
  * Outbound email dispatch layer.
@@ -59,16 +60,14 @@ class NoopEmailDispatcher implements EmailDispatcher {
  * n8n-backed dispatcher used for production email workflows.
  */
 class N8nEmailDispatcher implements EmailDispatcher {
-  readonly #url: string;
   readonly #token: string;
-  readonly #timeoutMs: number;
   readonly #loggableUrl: string;
 
-  constructor(url: string, token: string, timeoutMs: number) {
-    this.#url = url + '/sendmail';
+  constructor(token: string, host: string) {
     this.#token = token;
-    this.#timeoutMs = timeoutMs;
-    this.#loggableUrl = sanitizeWebhookUrlForLogs(this.#url);
+    this.#loggableUrl = sanitizeWebhookUrlForLogs(
+      `${host.endsWith('/') ? host.slice(0, -1) : host}/sendmail`
+    );
   }
 
   async dispatch(input: EmailDispatchInput): Promise<void> {
@@ -84,57 +83,23 @@ class N8nEmailDispatcher implements EmailDispatcher {
           templateKey: input.templateKey,
           toEmail: input.toEmail,
           correlationId,
-          timeoutMs: this.#timeoutMs,
+          timeoutMs: env.N8N_WEBHOOK_TIMEOUT_MS,
           endpoint: this.#loggableUrl,
         });
 
-        const abortController = new globalThis.AbortController();
-        const timeout = setTimeout(() => abortController.abort(), this.#timeoutMs);
-        let responseStatus: number | null = null;
-        const jwt = createHs512Jwt(this.#token, correlationId);
-
         try {
-          const response = await fetch(this.#url, {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              authorization: `Bearer ${jwt}`,
-              'x-velocity-event': 'EMAIL_DISPATCH',
-              'x-correlation-id': correlationId,
-            },
-            body: JSON.stringify({
+          const { status: responseStatus } = await callN8nWebhook({
+            path: '/sendmail',
+            payload: {
               templateKey: input.templateKey,
               toEmail: input.toEmail,
               variables: input.variables,
               correlationId,
-            }),
-            signal: abortController.signal,
+            },
+            velocityEvent: 'EMAIL_DISPATCH',
+            correlationId,
+            skipBodyParsing: true,
           });
-
-          responseStatus = response.status;
-
-          if (!response.ok) {
-            const failureContext = {
-              provider: 'n8n_mailtrap',
-              templateKey: input.templateKey,
-              toEmail: input.toEmail,
-              correlationId,
-              endpoint: this.#loggableUrl,
-              status: response.status,
-              durationMs: Date.now() - startTimeMs,
-            };
-
-            logger.warn('email dispatch failure from n8n', {
-              ...failureContext,
-            });
-
-            const baseErrorMessage = `n8n email dispatch failed with status ${response.status}`;
-            if (env.NODE_ENV === 'development') {
-              throw new Error(`${baseErrorMessage} \n ${JSON.stringify(failureContext)}`);
-            }
-
-            throw new Error(baseErrorMessage);
-          }
 
           logger.info('email dispatch success from n8n', {
             provider: 'n8n_mailtrap',
@@ -142,34 +107,56 @@ class N8nEmailDispatcher implements EmailDispatcher {
             toEmail: input.toEmail,
             correlationId,
             endpoint: this.#loggableUrl,
-            status: response.status,
+            status: responseStatus,
             durationMs: Date.now() - startTimeMs,
           });
 
           incrementCounter('email.dispatch.success', { templateKey: input.templateKey });
         } catch (error) {
-          if (responseStatus === null) {
-            const rawErrorMessage = error instanceof Error ? error.message : 'unknown error';
-            const errorMessage =
-              env.NODE_ENV === 'development'
-                ? rawErrorMessage
-                : redactTokenLikeValues(rawErrorMessage, this.#token);
-
-            logger.error('email dispatch error before response from n8n', {
+          // HTTP-level failure: DependencyError with a numeric `status` detail.
+          if (error instanceof DependencyError && typeof error.details?.['status'] === 'number') {
+            const httpStatus = error.details['status'] as number;
+            const failureContext = {
               provider: 'n8n_mailtrap',
               templateKey: input.templateKey,
               toEmail: input.toEmail,
               correlationId,
               endpoint: this.#loggableUrl,
+              status: httpStatus,
               durationMs: Date.now() - startTimeMs,
-              errorMessage,
-            });
+            };
+
+            logger.warn('email dispatch failure from n8n', failureContext);
+            incrementCounter('email.dispatch.failure', { templateKey: input.templateKey });
+
+            const baseErrorMessage = `n8n email dispatch failed with status ${httpStatus}`;
+            if (env.NODE_ENV === 'development') {
+              throw new Error(`${baseErrorMessage} \n ${JSON.stringify(failureContext)}`, {
+                cause: error,
+              });
+            }
+            throw new Error(baseErrorMessage, { cause: error });
           }
+
+          // Pre-response transport error (network failure, timeout, etc.).
+          const rawErrorMessage = error instanceof Error ? error.message : 'unknown error';
+          const errorMessage =
+            env.NODE_ENV === 'development'
+              ? rawErrorMessage
+              : redactTokenLikeValues(rawErrorMessage, this.#token);
+
+          logger.error('email dispatch error before response from n8n', {
+            provider: 'n8n_mailtrap',
+            templateKey: input.templateKey,
+            toEmail: input.toEmail,
+            correlationId,
+            endpoint: this.#loggableUrl,
+            durationMs: Date.now() - startTimeMs,
+            errorMessage,
+          });
 
           incrementCounter('email.dispatch.failure', { templateKey: input.templateKey });
           throw error;
-        } finally {
-          globalThis.clearTimeout(timeout);
         }
       }
     );
@@ -184,7 +171,7 @@ function createDefaultDispatcher(): EmailDispatcher {
     return new NoopEmailDispatcher();
   }
 
-  return new N8nEmailDispatcher(env.N8N_HOST, env.N8N_WEBHOOK_TOKEN, env.N8N_WEBHOOK_TIMEOUT_MS);
+  return new N8nEmailDispatcher(resolveN8nToken(), env.N8N_HOST);
 }
 
 const defaultDispatcher = createDefaultDispatcher();

@@ -52,6 +52,15 @@ const booleanFromEnv = z.preprocess(
     .transform((value) => value !== 'false')
 );
 
+// Boolean env helper that defaults to false unless explicitly set to 'true'.
+const booleanTrueOnlyIfExplicit = z.preprocess(
+  (value) => (typeof value === 'string' ? value.toLowerCase() : value),
+  z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true')
+);
+
 const optionalUrl = z.preprocess(
   (v) => (v === '' ? undefined : v),
   z.string().url().optional().nullable()
@@ -139,13 +148,20 @@ const envSchema = z.object({
   MAILTRAP_AUDIT_ACTOR_EMAIL: optionalEmail.default('system+mailtrap@velocitygp.internal'),
   N8N_WEBHOOK_TOKEN: optionalMinString(16),
   N8N_HOST: optionalUrl,
-  N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE: optionalMinString(1).default('/QRCodeGen'),
+  N8N_QRCODEGEN_WEBHOOK_PATH_TEMPLATE: optionalMinString(1).default('/webhook/{env}/QRCodeGen'),
   N8N_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PIT_RELEASE_SCHEDULER_ENABLED: booleanFromEnv,
   PIT_RELEASE_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
   PIT_RELEASE_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   PIT_RELEASE_WEBHOOK_URL: optionalUrl,
   PIT_RELEASE_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(3_000),
+  N8N_IMAGE_API_URL: z.string().optional().default('/logo/generate'),
+  // Override the number of approved descriptions required before logo generation fires.
+  // Defaults to 2 (real team size). Set to 1 in dev to trigger generation from a single submission.
+  GARAGE_REQUIRED_PLAYER_COUNT: z.coerce.number().int().min(1).default(2),
+  // When `true`, skip calling the OpenAI Moderations API and fall back to
+  // the local keyword blocklist. Defaults to `false`.
+  SKIP_OPENAI_MODERATION: booleanTrueOnlyIfExplicit.default(false),
 });
 
 export const packageJson = z

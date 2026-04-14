@@ -87,6 +87,8 @@ async function clearDatabase(): Promise<void> {
   await prisma.rescue.deleteMany();
   await prisma.scanRecord.deleteMany();
   await prisma.qRCodeClaim.deleteMany();
+  // Garage submissions reference Player/Team and must be removed first.
+  await prisma.garageSubmission.deleteMany();
   // SuperpowerQRAsset references User with ON DELETE RESTRICT, remove assets first
   await prisma.superpowerQRAsset.deleteMany();
   await prisma.player.deleteMany();

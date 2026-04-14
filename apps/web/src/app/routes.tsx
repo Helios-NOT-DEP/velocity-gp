@@ -35,7 +35,6 @@ export const appRoutes: RouteObject[] = [
     path: '/signup',
     element: <Navigate to="/" replace />,
   },
-  // Legacy alias: preserve older /garage links while canonical path is /team-setup.
   {
     path: '/garage',
     element: <Navigate to="/team-setup" replace />,

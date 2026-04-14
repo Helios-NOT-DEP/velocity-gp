@@ -37,6 +37,22 @@ interface AuthUser {
   createdAt: Date;
 }
 
+/**
+ * Player context received after the backend resolves a magic-link login and
+ * looks up the Player record for the current event.
+ *
+ * Pass this to `savePlayerSession()` so Garage.tsx (and any other route that
+ * needs player IDs) can read them without prop-drilling.
+ */
+export interface PlayerSessionContext {
+  userId: string;
+  email: string;
+  playerId: string;
+  teamId: string;
+  eventId: string;
+  role: AuthRole;
+}
+
 const LOGOUT_ENDPOINT = '/auth/logout';
 
 export type MagicLinkRequestResult = RequestMagicLinkResponse;
@@ -231,9 +247,35 @@ export async function verifyMagicLink(token: string): Promise<MagicLinkVerifyRes
   return response.data;
 }
 
+/**
+ * Persist the player context after the magic-link callback resolves.
+ * Call this once the backend returns the player's team + event IDs so
+ * Garage.tsx and other routes can read them without prop-drilling.
+ */
+export function savePlayerSession(context: PlayerSessionContext): void {
+  const session: AuthSession = {
+    userId: context.userId,
+    email: context.email,
+    role: context.role,
+    isAuthenticated: true,
+    playerId: context.playerId,
+    teamId: context.teamId,
+    eventId: context.eventId,
+  };
+  const storage = getBrowserStorage();
+  if (storage) {
+    storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+    emitSessionUpdatedEvent();
+  }
+}
+
 export async function getSession(): Promise<AuthSession> {
   const storedToken = readAuthTokenFromStorage();
   const storedSession = readSessionFromStorage();
+
+  // Always validate session with the backend; do not short-circuit auth checks.
+  // (Removed the previous DEV-only localStorage bypass to ensure consistent
+  // behavior across environments.)
 
   let response: Awaited<ReturnType<typeof apiClient.get<SessionResponse>>>;
   try {

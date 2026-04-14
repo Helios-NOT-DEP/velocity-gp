@@ -16,13 +16,18 @@ export function validate<T>(
       return;
     }
 
-    // Replace request payload with parsed data so downstream handlers consume typed values.
-    Object.defineProperty(request, source, {
-      value: result.data,
-      configurable: true,
-      writable: true,
-      enumerable: true,
-    });
+    // Express 5 makes `request.query` and `request.params` read-only getters,
+    // so we can only replace properties in-place rather than reassigning.
+    if (source === 'body') {
+      request.body = result.data;
+    } else {
+      const target = request[source] as Record<string, unknown>;
+      const parsed = result.data as Record<string, unknown>;
+      for (const key of Object.keys(target)) {
+        if (!(key in parsed)) delete target[key];
+      }
+      Object.assign(target, parsed);
+    }
     next();
   };
 }

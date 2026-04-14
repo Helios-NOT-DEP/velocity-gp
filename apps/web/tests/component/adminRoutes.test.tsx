@@ -90,7 +90,7 @@ describe('admin route guards', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Create Your Team' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Welcome to the Garage' })).toBeTruthy();
     });
   });
 
@@ -161,7 +161,7 @@ describe('admin route guards', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Create Your Team' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Welcome to the Garage' })).toBeTruthy();
       expect(router.state.location.pathname).toBe('/team-setup');
     });
   });
