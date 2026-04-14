@@ -332,7 +332,7 @@ export async function sendAdminRosterPlayerWelcome(
   );
 
   if (!response.ok) {
-    throw new Error(`Unable to send welcome letter (${response.status}).`);
+    throw new Error(`Unable to send magic link (${response.status}).`);
   }
 
   return response.data;
