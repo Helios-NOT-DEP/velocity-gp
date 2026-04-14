@@ -21,44 +21,53 @@ import AdminTeams from './pages/admin/AdminTeams';
 import AdminPlayers from './pages/admin/AdminPlayers';
 import AdminStatistics from './pages/admin/AdminStatistics';
 import Logout from './pages/Logout';
+import RouteErrorPage, { NotFoundRoutePage } from './pages/RouteErrorPage';
 
 export const appRoutes: RouteObject[] = [
   // Public auth entrypoint.
   {
     path: '/',
     Component: Login,
+    errorElement: <RouteErrorPage />,
   },
   // Public logout page — clears session and redirects to login.
   {
     path: '/logout',
     Component: Logout,
+    errorElement: <RouteErrorPage />,
   },
   // TODO(figma-sync): Reconcile auth callback/waiting routes with the simplified Figma route map so the designed entry flow and production auth flow do not diverge unexpectedly. | Figma source: src/app/routes.ts (Login -> Garage baseline) | Impact: user flow
   {
     path: '/login/callback',
     Component: LoginCallback,
+    errorElement: <RouteErrorPage />,
   },
   {
     path: '/signup',
     element: <Navigate to="/" replace />,
+    errorElement: <RouteErrorPage />,
   },
   {
     path: '/garage',
     element: <Navigate to="/team-setup" replace />,
+    errorElement: <RouteErrorPage />,
   },
   // Legacy alias: preserve older /race-hub links while canonical path is /race.
   {
     path: '/race-hub',
     element: <Navigate to="/race" replace />,
+    errorElement: <RouteErrorPage />,
   },
   {
     path: '/waiting-assignment',
     Component: WaitingAssignment,
+    errorElement: <RouteErrorPage />,
   },
   // Venue display board is intentionally public and passive for large-format screens.
   {
     path: '/display',
     Component: DisplayBoard,
+    errorElement: <RouteErrorPage />,
   },
   // Team setup remains a standalone pre-race screen outside the bottom-nav layout shell.
   {
@@ -68,6 +77,7 @@ export const appRoutes: RouteObject[] = [
         <Garage />
       </ProtectedRouteGuard>
     ),
+    errorElement: <RouteErrorPage />,
   },
   // QR scan deep-link: opens when a player's phone camera scans a physical QR code URL.
   // Resolves the payload, submits the scan, and redirects to the appropriate game screen.
@@ -78,6 +88,7 @@ export const appRoutes: RouteObject[] = [
         <ScanRedirect />
       </ProtectedRouteGuard>
     ),
+    errorElement: <RouteErrorPage />,
   },
   // Pathless layout wrapper: ProtectedRouteGuard + RootLayout applied to all in-race routes.
   // Using a pathless route (no `path` key) avoids the duplicate '/' that would otherwise
@@ -88,6 +99,7 @@ export const appRoutes: RouteObject[] = [
         <RootLayout />
       </ProtectedRouteGuard>
     ),
+    errorElement: <RouteErrorPage />,
     children: [
       // In-race player navigation rendered with persistent bottom navigation.
       { path: 'race', Component: RaceHub },
@@ -113,6 +125,7 @@ export const appRoutes: RouteObject[] = [
         <AdminLayout />
       </AdminRouteGuard>
     ),
+    errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <Navigate to="game-control" replace /> },
       { path: 'game-control', Component: AdminGameControl },
@@ -123,6 +136,11 @@ export const appRoutes: RouteObject[] = [
       { path: 'players/:playerId', Component: AdminPlayers },
       { path: 'statistics', Component: AdminStatistics },
     ],
+  },
+  {
+    path: '*',
+    Component: NotFoundRoutePage,
+    errorElement: <RouteErrorPage />,
   },
 ];
 
