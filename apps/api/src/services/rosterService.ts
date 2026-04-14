@@ -273,10 +273,13 @@ function buildRosterWhereClause(
     };
   }
 
+  const rawFlaggedFilter = query.isFlaggedForReview as unknown;
   const flaggedFilter =
-    typeof query.isFlaggedForReview === 'string'
-      ? query.isFlaggedForReview.toLowerCase() === 'true'
-      : query.isFlaggedForReview;
+    typeof rawFlaggedFilter === 'string'
+      ? rawFlaggedFilter.toLowerCase() === 'true'
+      : typeof rawFlaggedFilter === 'boolean'
+        ? rawFlaggedFilter
+        : undefined;
 
   if (typeof flaggedFilter === 'boolean') {
     where.isFlaggedForReview = flaggedFilter;
