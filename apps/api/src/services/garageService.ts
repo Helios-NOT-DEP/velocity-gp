@@ -11,8 +11,9 @@
  *    1. Run text moderation (n8n webhook or keyword fallback)
  *    2. Upsert the player's GarageSubmission row (one slot per player-team)
  *    3. Count APPROVED submissions for the team
- *    4. If count >= requiredPlayerCount, fire logo generation (idempotent via
- *       DB-level status guard so concurrent submits don't double-call n8n)
+ *    4. If every currently-joined player has an APPROVED submission, fire logo
+ *       generation (idempotent via DB-level status guard so concurrent submits
+ *       don't double-call n8n)
  *    5. Return the submit outcome plus current team status snapshot
  *
  *  getTeamGarageStatus()
@@ -29,7 +30,7 @@
  *
  *  The GENERATING guard uses a conditional `updateMany` (only matches when
  *  logoStatus is NOT already GENERATING) inside a transaction.  If two players
- *  submit at the same millisecond and both cross the quota, only one will win
+ *  submit at the same millisecond and both complete the roster, only one will win
  *  the status-flip and dispatch n8n.  The loser sees GENERATING already set
  *  and returns without a second call.
  */
@@ -40,7 +41,6 @@ import type {
 } from '@velocity-gp/api-contract';
 
 import { prisma } from '../db/client.js';
-import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { AppError, DependencyError, ForbiddenError, NotFoundError } from '../utils/appError.js';
 import { generateTeamLogo } from './n8nService.js';
@@ -225,19 +225,24 @@ export async function getTeamGarageStatus(
   return buildTeamGarageStatus(teamId, playerId);
 }
 
-// ── Internal: quota check + generation trigger ────────────────────────────────
+// ── Internal: roster check + generation trigger ──────────────────────────────
 
 /**
- * Checks whether the team has reached its submission quota.
- * If so, attempts to atomically claim the GENERATING state and dispatches the
- * n8n logo generation call as a background task (fire-and-forget via setTimeout(0)).
- * The submit response is returned to the client immediately; the UI polls /status
- * every ~4s and sees GENERATING → READY when the job completes.
+ * Checks whether every currently-joined player on the team has an APPROVED
+ * submission. If so, attempts to atomically claim the GENERATING state and
+ * dispatches the n8n logo generation call as a background task (fire-and-forget
+ * via setTimeout(0)). The submit response is returned to the client immediately;
+ * the UI polls /status every ~4s and sees GENERATING → READY when the job
+ * completes.
+ *
+ * The threshold scales with the team's actual joined player count, so teams of
+ * any size are supported without configuration.
  *
  * Idempotency:
  *   The `updateMany` only matches teams whose logoStatus is NOT already GENERATING.
- *   If two concurrent requests both cross the quota, only the one that successfully
- *   flips the status will proceed; the other finds count===0 and exits quietly.
+ *   If two concurrent requests both complete the roster, only the one that
+ *   successfully flips the status will proceed; the other finds count===0 and
+ *   exits quietly.
  */
 async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
   // Fetch team, its actual player count, and count APPROVED submissions in one round-trip
@@ -247,7 +252,6 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
       select: {
         id: true,
         name: true,
-        requiredPlayerCount: true,
         logoStatus: true,
         _count: { select: { players: true } },
       },
@@ -261,16 +265,14 @@ async function maybeEnqueueLogoGeneration(teamId: string): Promise<void> {
     throw new AppError(404, 'TEAM_NOT_FOUND', `Team ${teamId} does not exist`);
   }
 
-  // Logo generates when every player on the team has an APPROVED submission.
-  // The env override is kept as a dev shortcut (e.g. GARAGE_REQUIRED_PLAYER_COUNT=1
-  // lets a solo submission trigger generation without needing a full team).
-  const totalPlayers = team._count.players;
-  const requiredCount = env.GARAGE_REQUIRED_PLAYER_COUNT ?? totalPlayers;
+  // Logo generates when every currently-joined player on the team has an
+  // APPROVED submission. The threshold is always the actual joined-player
+  // count, so teams of any size work without configuration.
+  const requiredCount = team._count.players;
 
-  logger.debug('[garageService] maybeEnqueueLogoGeneration — quota check', {
+  logger.debug('[garageService] maybeEnqueueLogoGeneration — roster check', {
     teamId,
     approvedCount,
-    totalPlayers,
     required: requiredCount,
     logoStatus: team.logoStatus,
   });
@@ -537,7 +539,6 @@ async function buildTeamGarageStatus(teamId: string, playerId: string): Promise<
         name: true,
         logoUrl: true,
         logoStatus: true,
-        requiredPlayerCount: true,
         // Count total assigned players without loading full records
         _count: { select: { players: true } },
       },
@@ -564,9 +565,9 @@ async function buildTeamGarageStatus(teamId: string, playerId: string): Promise<
     logoStatus: team.logoStatus as TeamGarageStatus['logoStatus'],
     totalMembers: team._count.players,
     approvedCount,
-    // Env override wins so the UI progress bar reflects the same threshold
-    // used by the generation logic at runtime.
-    requiredCount: env.GARAGE_REQUIRED_PLAYER_COUNT ?? team.requiredPlayerCount,
+    // Mirror the generation trigger: every joined player must submit before
+    // the logo fires, so the UI progress bar uses the same threshold.
+    requiredCount: team._count.players,
     mySubmission: {
       submitted: mySubmission !== null,
       status: mySubmission
