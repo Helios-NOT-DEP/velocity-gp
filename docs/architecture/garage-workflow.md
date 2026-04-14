@@ -103,10 +103,9 @@ packages/api-contract/
 
 apps/api/
   prisma/schema.prisma             ← GarageSubmission model + Team garage fields
-  src/config/env.ts                ← Garage env vars: N8N_IMAGE_API_URL,
-                                     GARAGE_REQUIRED_PLAYER_COUNT, SKIP_OPENAI_MODERATION
+  src/config/env.ts                ← Garage env vars: N8N_IMAGE_API_URL, SKIP_OPENAI_MODERATION
   src/services/moderationService.ts  ← n8n /moderation call (keyword fallback when disabled)
-  src/services/garageService.ts      ← core business logic: submit, quota check, logo trigger
+  src/services/garageService.ts      ← core business logic: submit, roster check, logo trigger
   src/services/n8nService.ts         ← n8n webhook client for logo generation (JWT-signed, dev fallback)
   src/routes/garage.ts               ← POST /garage/submit,  GET /garage/team/:id/status
   src/routes/index.ts                ← garageRouter registered here
