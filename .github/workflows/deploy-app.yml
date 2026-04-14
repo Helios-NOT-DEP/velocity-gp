@@ -8,6 +8,7 @@ on:
         description: "Environment to run against"
         type: environment
         required: true
+        default: dev
       reseed_data:
         description: "Reseed the database data"
         type: boolean
