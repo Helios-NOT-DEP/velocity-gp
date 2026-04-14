@@ -1,8 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { SubmitScanResponse } from '@velocity-gp/api-contract';
 
 import type { ScanIdentity } from '@/services/scan';
 import { identifyAnalyticsUser, trackAnalyticsEvent } from '@/services/observability';
+import {
+  PLAYER_LEADERBOARD_POLL_INTERVAL_MS,
+  fetchLeaderboardEntries,
+  mergeTeamsWithLeaderboard,
+} from '@/services/game';
 import {
   AUTH_SESSION_UPDATED_EVENT,
   getSession as getAuthSession,
@@ -126,6 +131,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentTeam: null,
     scans: [],
   });
+  const gameStateRef = useRef(gameState);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   useEffect(() => {
     let active = true;
@@ -155,6 +165,60 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       globalThis.removeEventListener(AUTH_SESSION_UPDATED_EVENT, handleSessionChange);
     };
   }, []);
+
+  const syncLeaderboardForEvent = useCallback(async (eventId: string): Promise<boolean> => {
+    const leaderboardEntries = await fetchLeaderboardEntries(eventId);
+    if (!leaderboardEntries) {
+      return false;
+    }
+
+    setGameState((previousState) => {
+      const teams = mergeTeamsWithLeaderboard(previousState.teams, leaderboardEntries);
+      const selectedTeamId =
+        previousState.currentUser?.teamId ?? previousState.currentTeam?.id ?? null;
+      const currentTeam = selectedTeamId
+        ? (teams.find((team) => team.id === selectedTeamId) ?? null)
+        : null;
+
+      return {
+        ...previousState,
+        teams,
+        currentTeam,
+      };
+    });
+
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const eventId = gameState.currentUser?.eventId;
+    if (!eventId) {
+      return;
+    }
+
+    let isMounted = true;
+    let pollTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+
+    const pollLeaderboard = async () => {
+      await syncLeaderboardForEvent(eventId);
+      if (!isMounted) {
+        return;
+      }
+
+      pollTimeout = globalThis.setTimeout(() => {
+        void pollLeaderboard();
+      }, PLAYER_LEADERBOARD_POLL_INTERVAL_MS);
+    };
+
+    void pollLeaderboard();
+
+    return () => {
+      isMounted = false;
+      if (pollTimeout !== null) {
+        globalThis.clearTimeout(pollTimeout);
+      }
+    };
+  }, [gameState.currentUser?.eventId, syncLeaderboardForEvent]);
 
   const login = (name: string, email: string) => {
     // @deprecated — use the magic-link auth flow. This local mutation does not
@@ -308,26 +372,25 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const seedTeam: Team = existingTeam ?? {
         id: identity.teamId,
         name: identity.teamName,
-        score: 0,
-        rank: prev.teams.length + 1,
+        score: prev.currentTeam?.id === identity.teamId ? prev.currentTeam.score : 0,
+        rank:
+          prev.currentTeam?.id === identity.teamId ? prev.currentTeam.rank : prev.teams.length + 1,
         inPitStop: resolvedPitState.inPitStop,
         pitStopExpiresAt: resolvedPitState.pitStopExpiresAt,
       };
 
-      const teams = withUpdatedRanks(
-        existingTeam
-          ? prev.teams.map((team) =>
-              team.id === seedTeam.id
-                ? {
-                    ...team,
-                    name: identity.teamName,
-                    inPitStop: resolvedPitState.inPitStop,
-                    pitStopExpiresAt: resolvedPitState.pitStopExpiresAt,
-                  }
-                : team
-            )
-          : [...prev.teams, seedTeam]
-      );
+      const teams = existingTeam
+        ? prev.teams.map((team) =>
+            team.id === seedTeam.id
+              ? {
+                  ...team,
+                  name: identity.teamName,
+                  inPitStop: resolvedPitState.inPitStop,
+                  pitStopExpiresAt: resolvedPitState.pitStopExpiresAt,
+                }
+              : team
+          )
+        : withUpdatedRanks([...prev.teams, seedTeam]);
       const currentTeam = teams.find((team) => team.id === identity.teamId) ?? seedTeam;
 
       return {
@@ -432,6 +495,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentTeam,
       };
     });
+
+    const eventId = response.eventId ?? gameStateRef.current.currentUser?.eventId ?? null;
+    if (eventId) {
+      void syncLeaderboardForEvent(eventId);
+    }
   };
 
   return (

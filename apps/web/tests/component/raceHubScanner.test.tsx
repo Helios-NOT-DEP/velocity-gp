@@ -13,15 +13,19 @@ const {
   getSessionMock,
   resolveScanIdentityForEmailMock,
   trackAnalyticsEventMock,
+  apiGetMock,
   submitScanMock,
   getTeamActivityFeedMock,
+  getLeaderboardMock,
   redirectToTrustedQrUrlMock,
 } = vi.hoisted(() => ({
   getSessionMock: vi.fn(),
   resolveScanIdentityForEmailMock: vi.fn(),
   trackAnalyticsEventMock: vi.fn(),
+  apiGetMock: vi.fn(),
   submitScanMock: vi.fn(),
   getTeamActivityFeedMock: vi.fn(),
+  getLeaderboardMock: vi.fn(),
   redirectToTrustedQrUrlMock: vi.fn(),
 }));
 
@@ -49,12 +53,15 @@ vi.mock('@/services/auth', () => ({
 
 vi.mock('@/services/api', () => ({
   apiClient: {
-    get: getTeamActivityFeedMock,
+    get: apiGetMock,
     post: submitScanMock,
   },
   eventEndpoints: {
     listTeamActivityFeed: (eventId: string, teamId: string) =>
       `/events/${eventId}/teams/${teamId}/activity-feed`,
+  },
+  raceStateEndpoints: {
+    getLeaderboard: (eventId: string) => `/events/${eventId}/leaderboard`,
   },
   scanEndpoints: {
     submitScan: (eventId: string) => `/events/${eventId}/scans`,
@@ -181,12 +188,45 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       email: 'lina@velocitygp.dev',
     });
     resolveScanIdentityForEmailMock.mockResolvedValue(resolvedIdentity);
+    apiGetMock.mockImplementation((endpoint: string, ...args: unknown[]) => {
+      if (endpoint.includes('/activity-feed')) {
+        return getTeamActivityFeedMock(endpoint, ...args);
+      }
+
+      if (endpoint.includes('/leaderboard')) {
+        return getLeaderboardMock(endpoint, ...args);
+      }
+
+      throw new Error(`Unexpected GET endpoint in RaceHub test: ${endpoint}`);
+    });
     getTeamActivityFeedMock.mockResolvedValue({
       ok: true,
       status: 200,
       data: {
         items: [],
       },
+    });
+    getLeaderboardMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [
+        {
+          rank: 1,
+          teamId: 'team-apex-comets',
+          teamName: 'Apex Comets',
+          score: 1240,
+          memberCount: 4,
+          status: 'ACTIVE',
+        },
+        {
+          rank: 2,
+          teamId: 'team-drift-runners',
+          teamName: 'Drift Runners',
+          score: 980,
+          memberCount: 4,
+          status: 'ACTIVE',
+        },
+      ],
     });
     submitScanMock.mockResolvedValue({
       ok: true,
@@ -215,6 +255,21 @@ describe('RaceHub scanner hybrid QR behavior', () => {
       value: originalMediaDevices,
     });
   });
+
+  it(
+    'hydrates score and rank from leaderboard API without requiring a local scan',
+    { timeout: SCANNER_TEST_TIMEOUT_MS },
+    async () => {
+      renderRaceHub();
+
+      await waitFor(() => {
+        expect(screen.getByText('1,240')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('#1')).toBeInTheDocument();
+      expect(getLeaderboardMock).toHaveBeenCalledWith('/events/event-velocity-active/leaderboard');
+    }
+  );
 
   it(
     'renders team activity feed entries from the backend feed endpoint',
