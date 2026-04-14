@@ -144,6 +144,13 @@ Thank you to everyone who has contributed to Velocity GP.
                 </a>
             </td>
             <td align="center">
+                <a href="https://github.com/jn-anki">
+                    <img src="https://avatars.githubusercontent.com/u/179261691?v=4" width="100;" alt="jn-anki"/>
+                    <br />
+                    <sub><b>jn-anki</b></sub>
+                </a>
+            </td>
+            <td align="center">
                 <a href="https://github.com/MiloWical">
                     <img src="https://avatars.githubusercontent.com/u/20027643?v=4" width="100;" alt="MiloWical"/>
                     <br />
