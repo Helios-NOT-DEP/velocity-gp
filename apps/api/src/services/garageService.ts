@@ -42,9 +42,20 @@ import type {
 import { prisma } from '../db/client.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
-import { AppError, ForbiddenError, NotFoundError } from '../utils/appError.js';
+import { AppError, DependencyError, ForbiddenError, NotFoundError } from '../utils/appError.js';
 import { generateTeamLogo } from './n8nService.js';
 import { moderateText } from './moderationService.js';
+
+// ── Logo polling constants ────────────────────────────────────────────────────
+
+/** How long to wait after firing n8n before the first DB check. */
+const LOGO_POLL_INITIAL_DELAY_MS = 30_000;
+/** Interval between successive DB checks. */
+const LOGO_POLL_INTERVAL_MS = 5_000;
+/** Maximum number of DB checks before giving up (~5 minutes total after initial delay). */
+const LOGO_POLL_MAX_ATTEMPTS = 60;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // ── Public: admin-triggered logo regeneration ────────────────────────────────
 
@@ -347,25 +358,52 @@ async function triggerLogoGeneration(teamId: string, teamName: string): Promise<
       promptLength: prompt.length,
     });
 
-    // generateTeamLogo calls the n8n webhook which runs an OpenAI image
-    // generation step, uploads the image to storage, and returns the URL.
-    // See n8nService.ts for the implementation.
-    const logoUrl = await generateTeamLogo({
-      prompt,
-      teamName,
-    });
+    // Fire the n8n webhook. The workflow generates the image, uploads it to
+    // storage, and writes the resulting URL directly to the DB.
+    // We do not read a URL from the response — instead we poll the DB below.
+    await generateTeamLogo({ prompt, teamName });
 
-    // Persist the result — the UI's next poll will see logoStatus: 'READY'
-    await prisma.team.update({
-      where: { id: teamId },
-      data: {
-        logoUrl,
-        logoStatus: 'READY',
-        logoGeneratedAt: new Date(),
-      },
+    // Wait before the first check — n8n needs time to generate and upload the image.
+    logger.info('[garageService] n8n webhook fired — waiting before polling DB for logoUrl', {
+      teamId,
+      initialDelayMs: LOGO_POLL_INITIAL_DELAY_MS,
     });
+    await sleep(LOGO_POLL_INITIAL_DELAY_MS);
 
-    logger.info('[garageService] Logo generated and stored', { teamId, logoUrl });
+    // Poll the DB until n8n writes the logoUrl or we exhaust attempts.
+    for (let attempt = 1; attempt <= LOGO_POLL_MAX_ATTEMPTS; attempt++) {
+      const team = await prisma.team.findUnique({
+        where: { id: teamId },
+        select: { logoUrl: true },
+      });
+
+      if (team?.logoUrl) {
+        // n8n has written the URL — mark the team READY
+        await prisma.team.update({
+          where: { id: teamId },
+          data: { logoStatus: 'READY', logoGeneratedAt: new Date() },
+        });
+
+        logger.info('[garageService] Logo URL found in DB — marked READY', {
+          teamId,
+          logoUrl: team.logoUrl,
+          attempt,
+        });
+        return;
+      }
+
+      logger.debug('[garageService] logoUrl not yet set — retrying', {
+        teamId,
+        attempt,
+        maxAttempts: LOGO_POLL_MAX_ATTEMPTS,
+      });
+
+      await sleep(LOGO_POLL_INTERVAL_MS);
+    }
+
+    throw new DependencyError(
+      `Logo URL was not written to the DB after ${LOGO_POLL_MAX_ATTEMPTS} attempts (~${Math.round((LOGO_POLL_INITIAL_DELAY_MS + LOGO_POLL_MAX_ATTEMPTS * LOGO_POLL_INTERVAL_MS) / 60_000)} min). n8n may have failed silently.`
+    );
   } catch (error) {
     // Mark as FAILED so the next approved submission can retry
     await prisma.team.update({

@@ -150,7 +150,7 @@ function resolveRedirectPath(session: PlayerAuthSession): VerifyMagicLinkRespons
     }
 
     // Canonical active race path (legacy /race-hub is now an alias redirect).
-    return '/race';
+    return '/team-setup';
   }
 
   return '/admin/game-control';
