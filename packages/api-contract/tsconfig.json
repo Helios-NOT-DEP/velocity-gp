@@ -1,6 +1,7 @@
 {
   "extends": "@velocity-gp/config-typescript/node.json",
   "compilerOptions": {
+    "lib": ["ES2023"],
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",

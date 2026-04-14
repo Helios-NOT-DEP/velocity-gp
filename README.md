@@ -137,6 +137,13 @@ Thank you to everyone who has contributed to Velocity GP.
                 </a>
             </td>
             <td align="center">
+                <a href="https://github.com/dannydjg16">
+                    <img src="https://avatars.githubusercontent.com/u/21086409?v=4" width="100;" alt="dannydjg16"/>
+                    <br />
+                    <sub><b>Daniel Grant</b></sub>
+                </a>
+            </td>
+            <td align="center">
                 <a href="https://github.com/rm-potato">
                     <img src="https://avatars.githubusercontent.com/u/32198503?v=4" width="100;" alt="rm-potato"/>
                     <br />
@@ -155,13 +162,6 @@ Thank you to everyone who has contributed to Velocity GP.
                     <img src="https://avatars.githubusercontent.com/u/20027643?v=4" width="100;" alt="MiloWical"/>
                     <br />
                     <sub><b>MiloWical</b></sub>
-                </a>
-            </td>
-            <td align="center">
-                <a href="https://github.com/dannydjg16">
-                    <img src="https://avatars.githubusercontent.com/u/21086409?v=4" width="100;" alt="dannydjg16"/>
-                    <br />
-                    <sub><b>Daniel Grant</b></sub>
                 </a>
             </td>
 		</tr>
